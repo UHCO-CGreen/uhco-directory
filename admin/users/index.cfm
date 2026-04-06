@@ -30,7 +30,8 @@
 </cfloop>
 
 <cfset selectedFlagFilter = structKeyExists(url, "filterFlag") ? trim(url.filterFlag) : "">
-<cfset searchTerm = structKeyExists(url, "search") ? trim(url.search) : "">
+<cfset searchTerm         = structKeyExists(url, "search")     ? trim(url.search)     : "">
+<cfset selectedOrgFilter  = structKeyExists(url, "filterOrg")  ? trim(url.filterOrg)  : "">
 <cfparam name="pageMessage" default="">
 <cfparam name="pageMessageClass" default="alert-info">
 
@@ -101,6 +102,28 @@
     <cfset filteredUsers = searchedUsers>
 </cfif>
 
+<!--- Apply org filter --->
+<cfif selectedOrgFilter != "">
+    <cfset orgFilteredUsers = []>
+    <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
+        <cfset u = filteredUsers[i]>
+        <cfset userOrgsList = structKeyExists(allUserOrgMap, toString(u.USERID)) ? allUserOrgMap[toString(u.USERID)] : []>
+        <cfif selectedOrgFilter == "NOORGS">
+            <cfif arrayLen(userOrgsList) EQ 0>
+                <cfset arrayAppend(orgFilteredUsers, u)>
+            </cfif>
+        <cfelse>
+            <cfloop from="1" to="#arrayLen(userOrgsList)#" index="o">
+                <cfif toString(userOrgsList[o].ORGID) == selectedOrgFilter>
+                    <cfset arrayAppend(orgFilteredUsers, u)>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        </cfif>
+    </cfloop>
+    <cfset filteredUsers = orgFilteredUsers>
+</cfif>
+
 <!--- Handle sorting --->
 <cfset sortColumn = structKeyExists(url, "sortCol") ? url.sortCol : "LASTNAME">
 <cfset sortDirection = structKeyExists(url, "sortDir") ? url.sortDir : "ASC">
@@ -138,20 +161,39 @@
 
 <!--- Helper function to toggle sort direction --->
 <cffunction name="getSortLink" returntype="string">
-    <cfargument name="column" type="string" required="true">
+    <cfargument name="column"      type="string" required="true">
     <cfargument name="currentSort" type="string" required="true">
-    <cfargument name="currentDir" type="string" required="true">
-    <cfset var newDir = (currentSort == column && currentDir == "ASC") ? "DESC" : "ASC">
+    <cfargument name="currentDir"  type="string" required="true">
+    <cfset var newDir      = (currentSort == column && currentDir == "ASC") ? "DESC" : "ASC">
     <cfset var filterParam = selectedFlagFilter != "" ? "&filterFlag=" & urlEncodedFormat(selectedFlagFilter) : "">
-    <cfset var searchParam = searchTerm != "" ? "&search=" & urlEncodedFormat(searchTerm) : "">
-    <cfreturn "?sortCol=" & column & "&sortDir=" & newDir & filterParam & searchParam>
+    <cfset var orgParam    = selectedOrgFilter  != "" ? "&filterOrg="  & urlEncodedFormat(selectedOrgFilter)  : "">
+    <cfset var searchParam = searchTerm         != "" ? "&search="     & urlEncodedFormat(searchTerm)         : "">
+    <cfreturn "?sortCol=" & column & "&sortDir=" & newDir & filterParam & orgParam & searchParam & "&perPage=" & perPage & "&page=1">
 </cffunction>
+
+<cffunction name="getPageLink" returntype="string">
+    <cfargument name="p" type="numeric" required="true">
+    <cfset var filterParam = selectedFlagFilter != "" ? "&filterFlag=" & urlEncodedFormat(selectedFlagFilter) : "">
+    <cfset var orgParam    = selectedOrgFilter  != "" ? "&filterOrg="  & urlEncodedFormat(selectedOrgFilter)  : "">
+    <cfset var searchParam = searchTerm         != "" ? "&search="     & urlEncodedFormat(searchTerm)         : "">
+    <cfreturn "?sortCol=" & sortColumn & "&sortDir=" & sortDirection & filterParam & orgParam & searchParam & "&perPage=" & perPage & "&page=" & p>
+</cffunction>
+
+<!--- Server-side pagination --->
+<cfset validPerPage   = [10, 25, 50, 100]>
+<cfset perPage        = structKeyExists(url, "perPage") AND isNumeric(url.perPage) AND arrayContains(validPerPage, val(url.perPage)) ? val(url.perPage) : 25>
+<cfset totalRecords   = arrayLen(filteredUsers)>
+<cfset totalPages     = max(1, ceiling(totalRecords / perPage))>
+<cfset currentPage    = structKeyExists(url, "page") AND isNumeric(url.page) ? max(1, min(val(url.page), totalPages)) : 1>
+<cfset sliceStart     = ((currentPage - 1) * perPage) + 1>
+<cfset sliceEnd       = min(sliceStart + perPage - 1, totalRecords)>
+<cfset pageRows       = totalRecords GT 0 ? arraySlice(filteredUsers, sliceStart, min(perPage, totalRecords - sliceStart + 1)) : []>
 
 <cfset content = "
 <div class='d-flex justify-content-between mb-4'>
-    <h1>All Users</h1>
+    <h1>Problem Records</h1>
     <div class='d-flex gap-2'>
-        <a href='/dir/admin/users/new.cfm' class='btn btn-primary'>Records with Issues</a>
+        <a href='/dir/admin/users/new.cfm' class='btn btn-primary'>New User</a>
     </div>
 </div>
 
@@ -161,6 +203,7 @@
         <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
             <input type='hidden' name='sortCol' value='#sortColumn#'>
             <input type='hidden' name='sortDir' value='#sortDirection#'>
+            <input type='hidden' name='page'    value='1'>
             <div class='input-group' style='min-width:220px; flex:1;'>
                 <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
                 <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
@@ -180,33 +223,33 @@
 ">
 </cfloop>
 
-<!--- Build org tabs HTML from top-level orgs --->
-<cfset orgTabsHTML = "<nav aria-label='Organization tabs'><div class='nav nav-tabs mb-3' id='orgTabs' role='tablist'><a class='nav-link active' href='##' data-orgfilter=''>All</a>">
-<cfloop from="1" to="#arrayLen(topLevelOrgs)#" index="iTab">
-    <cfset tabOrg = topLevelOrgs[iTab]>
-    <cfset orgTabsHTML &= "<a class='nav-link' href='##' data-orgfilter='#tabOrg.ORGID#'>#EncodeForHTML(tabOrg.ORGNAME)#</a>">
-</cfloop>
-<cfset orgTabsHTML &= "<a class='nav-link' href='##' data-orgfilter='NOORGS'>No Org</a></div></nav>">
-
 <cfset content &= "
             </select>
-            <label for='pageSizeSelect' class='mb-0'>Per page:</label>
-            <select id='pageSizeSelect' class='form-select' style='width:auto;'>
-                <option value='10'>10</option>
-                <option value='25' selected>25</option>
-                <option value='50'>50</option>
-                <option value='100'>100</option>
-                <option value='9999'>All</option>
+            <label for='orgFilter' class='mb-0'>Org:</label>
+            <select name='filterOrg' id='orgFilter' class='form-select' style='width:auto;'>
+                <option value=''>All Orgs</option>
+                <option value='NOORGS'#(selectedOrgFilter == 'NOORGS' ? ' selected' : '')#>No Org</option>
+">
+<cfloop from="1" to="#arrayLen(topLevelOrgs)#" index="iTab">
+    <cfset tabOrg = topLevelOrgs[iTab]>
+    <cfset content &= "<option value='#tabOrg.ORGID#'" & (selectedOrgFilter == toString(tabOrg.ORGID) ? " selected" : "") & ">#EncodeForHTML(tabOrg.ORGNAME)#</option>">
+</cfloop>
+<cfset content &= "
+            </select>
+            <label for='perPageSelect' class='mb-0'>Per page:</label>
+            <select name='perPage' id='perPageSelect' class='form-select' style='width:auto;'>
+                <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
+                <option value='25'  #(perPage == 25  ? 'selected' : '')#>25</option>
+                <option value='50'  #(perPage == 50  ? 'selected' : '')#>50</option>
+                <option value='100' #(perPage == 100 ? 'selected' : '')#>100</option>
             </select>
             <button type='submit' class='btn btn-sm btn-secondary'>Apply Filter</button>
-            " & ((selectedFlagFilter != "" OR searchTerm != "") ? "<a href='?sortCol=" & sortColumn & "&sortDir=" & sortDirection & "' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
+            " & ((selectedFlagFilter != "" OR selectedOrgFilter != "" OR searchTerm != "") ? "<a href='?sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage & "' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
         </form>
     </div>
 </div>
 
 " & (pageMessage != "" ? "<div class='alert " & pageMessageClass & "'>" & EncodeForHTML(pageMessage) & "</div>" : "") & "
-
-" & orgTabsHTML & "
 
 <table id='usersTable' class='table table-striped table-hover'>
     <thead class='table-dark'>
@@ -223,8 +266,8 @@
     <tbody>
 " />
 
-<cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
-    <cfset u = filteredUsers[i]>
+<cfloop from="1" to="#arrayLen(pageRows)#" index="i">
+    <cfset u = pageRows[i]>
     <cfset userFlags = structKeyExists(allUserFlagMap, toString(u.USERID)) ? allUserFlagMap[toString(u.USERID)] : []>
     <cfset userOrgsData = structKeyExists(allUserOrgMap, toString(u.USERID)) ? allUserOrgMap[toString(u.USERID)] : []>
     <cfset userOrgIdList = "">
@@ -234,8 +277,14 @@
         <cfset userOrgIdList = listAppend(userOrgIdList, userOrgsData[o].ORGID)>
         <cfset orgsHTML &= "<span class='badge bg-primary me-1'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
     </cfloop>
+
     <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
-        <cfset flagsHTML &= "<span class='badge bg-secondary'>#userFlags[f].FLAGNAME#</span> ">
+        <cfif userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH">
+             <!--- Highlight these flags since they are criteria for inclusion in this list --->
+             <cfset flagsHTML &= "<span class='badge bg-danger'>#userFlags[f].FLAGNAME#</span> ">
+        <cfelse>
+            <cfset flagsHTML &= "<span class='badge bg-secondary'>#userFlags[f].FLAGNAME#</span> ">
+        </cfif>
     </cfloop>
     <cfset displayEmail = getDisplayEmail(u.EMAILPRIMARY, u.EMAILSECONDARY)>
     <cfset content &= "
@@ -254,68 +303,26 @@
     " />
 </cfloop>
 
+<cfif arrayLen(pageRows) EQ 0>
+    <cfset content &= "<tr><td colspan='5' class='text-center text-muted'>No records found.</td></tr>">
+</cfif>
+
 <cfset content &= "
     </tbody>
 </table>
-<div class='d-flex align-items-center gap-3 mt-3 mb-3'>
-    <button id='prevBtn' class='btn btn-sm btn-outline-secondary' disabled>&laquo; Prev</button>
-    <span id='pageInfo' class='text-muted small'></span>
-    <button id='nextBtn' class='btn btn-sm btn-outline-secondary'>Next &raquo;</button>
-</div>
-<script>
-(function() {
-    var sel = document.getElementById('pageSizeSelect');
-    var pageSize = sel ? (parseInt(sel.value) || 25) : 25;
-    var currentPage = 1;
-    function allRows() { return Array.from(document.querySelectorAll('##usersTable tbody tr')); }
-    function visibleRows() { return allRows().filter(function(r) { return r.dataset.pagehidden !== '1'; }); }
-    function applyPagination() {
-        var rows = visibleRows();
-        var total = rows.length;
-        var totalPages = Math.ceil(total / pageSize) || 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-        var start = (currentPage - 1) * pageSize;
-        var end = start + pageSize;
-        allRows().forEach(function(r) { r.style.display = 'none'; });
-        rows.forEach(function(r, idx) {
-            r.style.display = (idx >= start && idx < end) ? '' : 'none';
-        });
-        var infoEl = document.getElementById('pageInfo');
-        var prevEl = document.getElementById('prevBtn');
-        var nextEl = document.getElementById('nextBtn');
-        if (infoEl) infoEl.textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + total + ' total)';
-        if (prevEl) prevEl.disabled = currentPage <= 1;
-        if (nextEl) nextEl.disabled = currentPage >= totalPages;
-    }
-    var tabs = document.querySelectorAll('##orgTabs .nav-link');
-    tabs.forEach(function(tab) {
-        tab.addEventListener('click', function(e) {
-            e.preventDefault();
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            this.classList.add('active');
-            var filter = this.dataset.orgfilter;
-            allRows().forEach(function(row) {
-                if (filter === '') {
-                    row.dataset.pagehidden = '0';
-                } else if (filter === 'NOORGS') {
-                    row.dataset.pagehidden = (row.dataset.orgids === '') ? '0' : '1';
-                } else {
-                    var ids = row.dataset.orgids ? row.dataset.orgids.split(',') : [];
-                    row.dataset.pagehidden = (ids.indexOf(filter) >= 0) ? '0' : '1';
-                }
-            });
-            currentPage = 1;
-            applyPagination();
-        });
-    });
-    if (sel) sel.addEventListener('change', function() { pageSize = parseInt(this.value) || 25; currentPage = 1; applyPagination(); });
-    var prevEl = document.getElementById('prevBtn');
-    var nextEl = document.getElementById('nextBtn');
-    if (prevEl) prevEl.addEventListener('click', function() { if (currentPage > 1) { currentPage--; applyPagination(); } });
-    if (nextEl) nextEl.addEventListener('click', function() { var tp = Math.ceil(visibleRows().length / pageSize) || 1; if (currentPage < tp) { currentPage++; applyPagination(); } });
-    applyPagination();
-})();
-</script>
-" />
+">
+
+<!--- Pagination controls --->
+<cfif totalPages GT 1>
+    <cfset content &= "<nav><ul class='pagination pagination-sm flex-wrap'>">
+    <cfset content &= "<li class='page-item" & (currentPage == 1 ? " disabled" : "") & "'><a class='page-link' href='" & getPageLink(currentPage - 1) & "'>&laquo;</a></li>">
+    <cfloop from="1" to="#totalPages#" index="p">
+        <cfset content &= "<li class='page-item" & (p == currentPage ? " active" : "") & "'><a class='page-link' href='" & getPageLink(p) & "'>#p#</a></li>">
+    </cfloop>
+    <cfset content &= "<li class='page-item" & (currentPage == totalPages ? " disabled" : "") & "'><a class='page-link' href='" & getPageLink(currentPage + 1) & "'>&raquo;</a></li>">
+    <cfset content &= "</ul></nav>">
+</cfif>
+
+<cfset content &= "<p class='text-muted small'>Showing #sliceStart#&##8211;#sliceEnd# of #totalRecords# records</p>">
 
 <cfinclude template="/dir/admin/layout.cfm">
