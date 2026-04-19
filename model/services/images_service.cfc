@@ -2,11 +2,20 @@ component output="false" singleton {
 
     public any function init() {
         variables.ImagesDAO = createObject("component", "dao.images_DAO").init();
+        variables.MediaConfigService = createObject("component", "cfc.mediaConfig_service").init();
         return this;
     }
 
     public struct function getImages( required numeric userID ) {
-        return { success=true, data=variables.ImagesDAO.getImages( userID ) };
+        var images = variables.ImagesDAO.getImages( userID );
+
+        for ( var i = 1; i LTE arrayLen(images); i++ ) {
+            if ( structKeyExists(images[i], "IMAGEURL") ) {
+                images[i].IMAGEURL = variables.MediaConfigService.normalizePublishedUrl( images[i].IMAGEURL ?: "" );
+            }
+        }
+
+        return { success=true, data=images };
     }
 
     public struct function addImage( required struct data ) {
@@ -31,7 +40,13 @@ component output="false" singleton {
     }
 
     public struct function getWebThumbMap() {
-        return variables.ImagesDAO.getWebThumbMap();
+        var webThumbMap = variables.ImagesDAO.getWebThumbMap();
+
+        for ( var userID in webThumbMap ) {
+            webThumbMap[userID] = variables.MediaConfigService.normalizePublishedUrl( webThumbMap[userID] ?: "" );
+        }
+
+        return webThumbMap;
     }
 
 }

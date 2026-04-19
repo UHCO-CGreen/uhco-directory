@@ -23,14 +23,7 @@ component output="false" {
             admin : "UHCO_Identity_Admin"
         };
 
-        // Web root prefix: empty for local dev, "/UHCOidentity" for IIS sub-app
-        //application.webRoot = "";
-        //application.webRoot = "/UHCOidentity";
-        if (CGI.HTTP_HOST == "127.0.0.1" || CGI.HTTP_HOST == "localhost") {
-            application.webRoot = "";
-        } else {
-            application.webRoot = "";
-        }
+        application.webRoot = "";
 
         // UH API credentials
         application.uhApiToken  = "";
@@ -102,8 +95,42 @@ component output="false" {
 
         // Always available on every request
         request.webRoot = application.webRoot;
+        request.environmentName = _getEnvironmentName();
+        request.siteBaseUrl = _getRequestBaseUrl();
+        request.isProduction = (request.environmentName EQ "production");
 
         return true;
+    }
+
+    private string function _getEnvironmentName() {
+        var host = lCase(trim(cgi.http_host ?: cgi.server_name ?: ""));
+
+        if ( !len(host) ) {
+            return "local";
+        }
+
+        host = listFirst(host, ":");
+
+        if ( listFindNoCase("127.0.0.1,localhost", host) ) {
+            return "local";
+        }
+
+        return "production";
+    }
+
+    private string function _getRequestBaseUrl() {
+        var scheme = "http";
+        var host = trim(cgi.http_host ?: cgi.server_name ?: "127.0.0.1");
+
+        if (
+            (structKeyExists(cgi, "https") AND lCase(trim(cgi.https)) EQ "on")
+            OR (structKeyExists(cgi, "server_port_secure") AND val(cgi.server_port_secure) EQ 1)
+            OR (structKeyExists(cgi, "http_x_forwarded_proto") AND listFirst(cgi.http_x_forwarded_proto, ",") EQ "https")
+        ) {
+            scheme = "https";
+        }
+
+        return scheme & "://" & host;
     }
 
     // ── Error handling ─────────────────────────────────────────────────

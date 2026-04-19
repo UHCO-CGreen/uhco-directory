@@ -202,6 +202,13 @@
             overflow: auto;
             margin-left: 280px;
         }
+
+        .environment-toast {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 1085;
+        }
     </style>
 </head>
 
@@ -497,6 +504,30 @@
     </div><!--- /.main-content d-flex --->
 </div>
 
+<cfoutput>
+<div class="toast-container environment-toast">
+    <div
+        id="environmentToast"
+        class="toast border-0 shadow-sm"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-bs-autohide="false"
+        data-environment-name="#encodeForHTMLAttribute(request.environmentName)#"
+    >
+        <div class="toast-header #(request.isProduction ? "text-bg-danger" : "text-bg-success")# border-0">
+            <i class="bi #(request.isProduction ? "bi-broadcast-pin" : "bi-laptop")# me-2"></i>
+            <strong class="me-auto">Environment</strong>
+            <small>#encodeForHTML(ucase(left(request.environmentName, 1)) & mid(request.environmentName, 2, len(request.environmentName)))#</small>
+            <button type="button" class="btn-close btn-close-white ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body bg-white">
+            Current session is running in <strong>#encodeForHTML(request.environmentName)#</strong>.
+        </div>
+    </div>
+</div>
+</cfoutput>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 
 <cfif structKeyExists(variables, "pageScripts")>
@@ -602,6 +633,20 @@
         if (sidebar.classList.contains('collapsed')) {
             toggleIcon.classList.remove('bi-chevron-left');
             toggleIcon.classList.add('bi-chevron-right');
+        }
+
+        const environmentToastEl = document.getElementById('environmentToast');
+        if (environmentToastEl && window.bootstrap) {
+            const environmentKey = 'environmentToastDismissed:' + environmentToastEl.dataset.environmentName;
+            const environmentToast = bootstrap.Toast.getOrCreateInstance(environmentToastEl);
+
+            if (!sessionStorage.getItem(environmentKey)) {
+                environmentToast.show();
+            }
+
+            environmentToastEl.addEventListener('hidden.bs.toast', function() {
+                sessionStorage.setItem(environmentKey, 'true');
+            });
         }
         
         // Toggle sidebar on button click

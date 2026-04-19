@@ -19,6 +19,11 @@
     <cfargument name="searchTerm" type="string" required="true">
 
     <cfset var st = trim(arguments.searchTerm)>
+  <cfset var firstName = _userSearchGetValue(arguments.u, "FIRSTNAME,FirstName,firstName")>
+  <cfset var lastName = _userSearchGetValue(arguments.u, "LASTNAME,LastName,lastName")>
+  <cfset var primaryEmail = _userSearchGetValue(arguments.u, "EMAILPRIMARY,EmailPrimary,emailPrimary,EMAIL,Email,email")>
+  <cfset var preferredName = _userSearchGetValue(arguments.u, "PREFERREDNAME,PreferredName,preferredName,DISPLAYNAME,DisplayName,displayName")>
+  <cfset var titleValue = _userSearchGetValue(arguments.u, "TITLE1,Title1,title1,TITLE,Title,title")>
     <cfif NOT len(st)><cfreturn true></cfif>
 
     <!--- Split on || → OR groups (use chr(30) as safe interim delimiter) --->
@@ -65,32 +70,33 @@
 
                 <cfset condMatches = false>
                 <cfif fieldName EQ "firstname">
-                    <cfset condMatches = exactMatch
-                        ? (lCase(arguments.u.FIRSTNAME ?: "") EQ lCase(fieldVal))
-                        : findNoCase(fieldVal, arguments.u.FIRSTNAME ?: "")>
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(firstName, fieldVal)
+                    : _userSearchContains(firstName, fieldVal)>
                 <cfelseif fieldName EQ "lastname">
-                    <cfset condMatches = exactMatch
-                        ? (lCase(arguments.u.LASTNAME ?: "") EQ lCase(fieldVal))
-                        : findNoCase(fieldVal, arguments.u.LASTNAME ?: "")>
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(lastName, fieldVal)
+                    : _userSearchContains(lastName, fieldVal)>
                 <cfelseif fieldName EQ "emailprimary" OR fieldName EQ "primaryemail">
-                    <cfset condMatches = exactMatch
-                        ? (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(fieldVal))
-                        : findNoCase(fieldVal, arguments.u.EMAILPRIMARY ?: "")>
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(primaryEmail, fieldVal)
+                    : _userSearchContains(primaryEmail, fieldVal)>
                 <cfelseif fieldName EQ "email">
                     <cfif exactMatch>
-                        <cfset condMatches = (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(fieldVal))>
+                    <cfset condMatches = _userSearchEquals(primaryEmail, fieldVal)>
                     <cfelse>
-                        <cfset condMatches = findNoCase(fieldVal, arguments.u.EMAILPRIMARY ?: "")>
+                    <cfset condMatches = _userSearchContains(primaryEmail, fieldVal)>
                     </cfif>
                 <cfelseif fieldName EQ "title">
-                    <cfset condMatches = exactMatch
-                        ? (lCase(arguments.u.TITLE1 ?: "") EQ lCase(fieldVal))
-                        : findNoCase(fieldVal, arguments.u.TITLE1 ?: "")>
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(titleValue, fieldVal)
+                    : _userSearchContains(titleValue, fieldVal)>
                 <cfelse>
                     <!--- Unknown field: fall back to any-field match on the full original token --->
-                    <cfset condMatches = findNoCase(cond, arguments.u.FIRSTNAME ?: "") OR
-                                         findNoCase(cond, arguments.u.LASTNAME  ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "")>
+                  <cfset condMatches = _userSearchContains(firstName, cond) OR
+                             _userSearchContains(lastName, cond) OR
+                             _userSearchContains(primaryEmail, cond) OR
+                             _userSearchContains(preferredName, cond)>
                 </cfif>
 
             <cfelse>
@@ -103,13 +109,15 @@
                 </cfif>
 
                 <cfif exactMatch>
-                    <cfset condMatches = (lCase(arguments.u.FIRSTNAME ?: "") EQ lCase(cond)) OR
-                                         (lCase(arguments.u.LASTNAME  ?: "") EQ lCase(cond)) OR
-                                         (lCase(arguments.u.EMAILPRIMARY ?: "") EQ lCase(cond))>
+                  <cfset condMatches = _userSearchEquals(firstName, cond) OR
+                             _userSearchEquals(lastName, cond) OR
+                             _userSearchEquals(primaryEmail, cond) OR
+                             _userSearchEquals(preferredName, cond)>
                 <cfelse>
-                    <cfset condMatches = findNoCase(cond, arguments.u.FIRSTNAME ?: "") OR
-                                         findNoCase(cond, arguments.u.LASTNAME  ?: "") OR
-                                         findNoCase(cond, arguments.u.EMAILPRIMARY ?: "")>
+                  <cfset condMatches = _userSearchContains(firstName, cond) OR
+                             _userSearchContains(lastName, cond) OR
+                             _userSearchContains(primaryEmail, cond) OR
+                             _userSearchContains(preferredName, cond)>
                 </cfif>
             </cfif>
 
@@ -125,6 +133,47 @@
     </cfloop>
 
     <cfreturn false>
+</cffunction>
+
+<cffunction name="_userSearchGetValue" returntype="string" output="false">
+  <cfargument name="u" type="struct" required="true">
+  <cfargument name="keyList" type="string" required="true">
+
+  <cfset var keyName = "">
+  <cfset var rawValue = "">
+
+  <cfloop list="#arguments.keyList#" index="keyName">
+    <cfif structKeyExists(arguments.u, keyName)>
+      <cfset rawValue = arguments.u[keyName]>
+      <cfif isNull(rawValue)>
+        <cfreturn "">
+      </cfif>
+      <cfif isSimpleValue(rawValue)>
+        <cfreturn trim(toString(rawValue))>
+      </cfif>
+      <cfreturn trim(serializeJSON(rawValue))>
+    </cfif>
+  </cfloop>
+
+  <cfreturn "">
+</cffunction>
+
+<cffunction name="_userSearchContains" returntype="boolean" output="false">
+  <cfargument name="haystack" type="string" required="true">
+  <cfargument name="needle" type="string" required="true">
+
+  <cfif NOT len(trim(arguments.needle))>
+    <cfreturn false>
+  </cfif>
+
+  <cfreturn findNoCase(trim(arguments.needle), arguments.haystack) GT 0>
+</cffunction>
+
+<cffunction name="_userSearchEquals" returntype="boolean" output="false">
+  <cfargument name="leftValue" type="string" required="true">
+  <cfargument name="rightValue" type="string" required="true">
+
+  <cfreturn compareNoCase(trim(arguments.leftValue), trim(arguments.rightValue)) EQ 0>
 </cffunction>
 
 <!--- ── Search help modal (rendered once per page via cfinclude) ── --->

@@ -94,9 +94,7 @@
 </cfloop>
 
 <!--- ── Schedule helper — build the runner URL ── --->
-<cfset schedulerUrl = "http://" & cgi.SERVER_NAME
-    & (cgi.SERVER_PORT NEQ "80" AND cgi.SERVER_PORT NEQ "" ? ":" & cgi.SERVER_PORT : "")
-    & "/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json">
+<cfset schedulerUrl = request.siteBaseUrl & "/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Handle schedule form submission ── --->
 <cfset scheduleMsg = "">

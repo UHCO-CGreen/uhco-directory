@@ -10,7 +10,7 @@
 
 <!--- Feature flags based on list type --->
 <cfset needsAcademic      = listFindNoCase("all,alumni,current-students", listType) GT 0>
-<cfset needsImages        = listFindNoCase("current-students,faculty", listType) GT 0>
+<cfset needsImages        = listFindNoCase("current-students,faculty,staff,alumni,all", listType) GT 0>
 <cfset showPhoto          = needsImages>
 <cfset showGradYear       = needsAcademic>
 <cfset showOrgFilter      = listFindNoCase("problems,all,staff,inactive,faculty", listType) GT 0>
@@ -411,20 +411,20 @@
 <table class='table table-striped table-hover align-middle'>
     <thead class='table-dark'>
         <tr>
-            <th>##</th>
+            <th style='width: 50px; min-width: 50px;' class='text-center'>##</th>
 ">
 <cfif showPhoto>
-    <cfset content &= "            <th class='text-center'>Photo</th>
+    <cfset content &= "            <th style='width: 32px; min-width: 32px;' class='text-center'></th>
 ">
 </cfif>
 <cfset content &= "
-            <th><a href='#helpers.getSortLink("FIRSTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
-            <th><a href='#helpers.getSortLink("LASTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Last Name #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
-            <th><a href='#helpers.getSortLink("EMAIL", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("FIRSTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("LASTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Last Name #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("EMAIL", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
 ">
 <cfif showGradYear>
     <cfset content &= "
-            <th class='text-center'><a href='#helpers.getSortLink("CURRENTGRADYEAR", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Grad Year #(sortColumn == "CURRENTGRADYEAR" ? (sortDirection == "ASC" ? "↑" : "↓") : "")#</a></th>
+            <th class='text-center'><a href='#helpers.getSortLink("CURRENTGRADYEAR", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Grad Year #(sortColumn == "CURRENTGRADYEAR" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
 ">
 </cfif>
 <cfif showTitle>
@@ -433,9 +433,9 @@
 ">
 </cfif>
 <cfset content &= "
-            <th>Organizational Units</th>
-            <th>Flags</th>
-            <th>Actions</th>
+            <th style='width: 210px; min-width: 210px;'>Organizational Units</th>
+            <th style='width: 150px; min-width: 150px;'>Flags</th>
+            <th style='width: 160px; min-width: 160px;'>Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -450,14 +450,14 @@
     <cfset flagsHTML = "">
 
     <cfloop from="1" to="#arrayLen(userOrgsData)#" index="o">
-        <cfset orgsHTML &= "<span class='badge bg-primary me-1'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
+        <cfset orgsHTML &= "<span class='badge rounded-pill bg-primary text-wrap text-start' style='font-size: 0.7rem; line-height: 1.15;'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
     </cfloop>
 
     <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
         <cfif highlightFlags AND (userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH")>
-            <cfset flagsHTML &= "<span class='badge bg-danger me-1'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill bg-danger text-wrap text-start' style='font-size: 0.68rem; line-height: 1.15;'>#userFlags[f].FLAGNAME#</span>">
         <cfelse>
-            <cfset flagsHTML &= "<span class='badge bg-secondary me-1'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill bg-secondary text-wrap text-start' style='font-size: 0.68rem; line-height: 1.15;'>#userFlags[f].FLAGNAME#</span>">
         </cfif>
     </cfloop>
 
@@ -499,7 +499,12 @@
     <!--- Manage Images link (faculty / current-students with media admin role) --->
     <cfset mediaLink = "">
     <cfif showManageImages AND (request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN"))>
-        <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary'><i class='bi bi-pencil-square me-1'></i> Manage Images</a>">
+        <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary' title='Manage Images' data-bs-toggle='tooltip' data-bs-title='Manage Images'><i class='bi bi-card-image'></i></a>">
+    </cfif>
+
+    <cfset deleteLink = "">
+    <cfif request.hasRole("SUPER_ADMIN")>
+        <cfset deleteLink = "<a class='btn btn-sm btn-danger' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
     </cfif>
 
     <!--- Deceased icon (alumni only) --->
@@ -546,13 +551,13 @@
     </cfif>
 
     <cfset content &= "
-            <td>#orgsHTML#</td>
-            <td><small>#flagsHTML#</small></td>
-            <td>
-                <a class='btn btn-sm btn-info' href='/admin/users/edit.cfm?userID=#u.USERID#'>Edit</a>
-                <a class='btn btn-sm btn-secondary' href='/admin/users/view.cfm?userID=#u.USERID#'>View</a>
-                <a class='btn btn-sm btn-danger' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#'>Delete</a>
-                #mediaLink#
+            <td style='width: 210px; min-width: 210px;'><div class='d-flex flex-wrap gap-1 align-items-start'>#orgsHTML#</div></td>
+            <td style='width: 150px; min-width: 150px;'><div class='d-flex flex-wrap gap-1 align-items-start'>#flagsHTML#</div></td>
+            <td style='width: 165px; min-width: 165px;' class='text-end'><div class='d-flex flex-wrap gap-1 align-items-start'>
+                <a class='btn btn-sm btn-info' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>
+                <a class='btn btn-sm btn-secondary' href='/admin/users/view.cfm?userID=#u.USERID#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
+                #deleteLink#
+                #mediaLink#</div>
             </td>
         </tr>
     ">

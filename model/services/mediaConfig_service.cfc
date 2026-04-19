@@ -1,7 +1,6 @@
 component output="false" singleton {
 
     variables.publishedSiteBaseUrlKey = "media_published_site_base_url";
-    variables.defaultPublishedSiteBaseUrl = "http://127.0.0.1/";
     variables.publishedImagesSegment = "_published_images/";
 
     public any function init() {
@@ -10,11 +9,13 @@ component output="false" singleton {
     }
 
     public string function getPublishedSiteBaseUrl() {
+        var configuredBaseUrl = variables.AppConfigService.getValue(
+            configKey    = variables.publishedSiteBaseUrlKey,
+            defaultValue = ""
+        );
+
         return _normalizeBaseUrl(
-            variables.AppConfigService.getValue(
-                configKey    = variables.publishedSiteBaseUrlKey,
-                defaultValue = variables.defaultPublishedSiteBaseUrl
-            )
+            len(trim(configuredBaseUrl)) ? configuredBaseUrl : _getDefaultPublishedSiteBaseUrl()
         );
     }
 
@@ -40,6 +41,32 @@ component output="false" singleton {
 
     public string function buildPublishedUrl( required string filename ) {
         return getPublishedImageBaseUrl() & trim(arguments.filename);
+    }
+
+    public string function normalizePublishedUrl( required string imageUrl ) {
+        var normalizedInput = trim(arguments.imageUrl);
+        var imagePath = "";
+
+        if ( !len(normalizedInput) ) {
+            return "";
+        }
+
+        normalizedInput = replace(normalizedInput, "\\", "/", "all");
+
+        if ( left(normalizedInput, 1) EQ "/" ) {
+            imagePath = normalizedInput;
+        } else {
+            var markerPos = findNoCase("/_published_images/", normalizedInput);
+            if ( markerPos GT 0 ) {
+                imagePath = mid(normalizedInput, markerPos, len(normalizedInput));
+            }
+        }
+
+        if ( left(imagePath, len("/_published_images/")) EQ "/_published_images/" ) {
+            return getPublishedSiteBaseUrl() & mid(imagePath, 2, len(imagePath));
+        }
+
+        return normalizedInput;
     }
 
     public string function buildPublishedFilename(
@@ -87,7 +114,7 @@ component output="false" singleton {
         var schemePos = 0;
 
         if ( !len(normalized) ) {
-            normalized = variables.defaultPublishedSiteBaseUrl;
+            normalized = _getDefaultPublishedSiteBaseUrl();
         }
 
         normalized = replace(normalized, "\\", "/", "all");
@@ -116,6 +143,25 @@ component output="false" singleton {
         }
 
         return normalized;
+    }
+
+    private string function _getDefaultPublishedSiteBaseUrl() {
+        if ( structKeyExists(request, "siteBaseUrl") AND len(trim(request.siteBaseUrl ?: "")) ) {
+            return request.siteBaseUrl;
+        }
+
+        var scheme = "http";
+        var host = trim(cgi.http_host ?: cgi.server_name ?: "127.0.0.1");
+
+        if (
+            (structKeyExists(cgi, "https") AND lCase(trim(cgi.https)) EQ "on")
+            OR (structKeyExists(cgi, "server_port_secure") AND val(cgi.server_port_secure) EQ 1)
+            OR (structKeyExists(cgi, "http_x_forwarded_proto") AND listFirst(cgi.http_x_forwarded_proto, ",") EQ "https")
+        ) {
+            scheme = "https";
+        }
+
+        return scheme & "://" & host;
     }
 
     private string function _sanitizeInitial( required string rawValue ) {

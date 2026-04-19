@@ -48,11 +48,11 @@
         <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-outline-secondary'>
             <i class='bi bi-sliders me-1'></i> Manage Variant Types
         </a>
-    </div>
     ">
 </cfif>
 
 <cfset content &= "
+    </div>
 </div>
 <p class='text-muted'>Manage images and media variants for individual users.</p>
 

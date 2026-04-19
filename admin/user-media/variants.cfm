@@ -200,16 +200,7 @@
         <cfset v = variantMatrix[i]>
 
         <!--- ── Status badge ────────────────────────────────────────── --->
-        <cfset statusBadge = "">
-        <cfif v.STATUS EQ "current">
-            <cfset statusBadge = "<span class='badge bg-success'><i class='bi bi-check-circle me-1'></i>Current</span>">
-        <cfelseif v.STATUS EQ "stale">
-            <cfset statusBadge = "<span class='badge bg-warning text-dark'><i class='bi bi-arrow-clockwise me-1'></i>Stale</span>">
-        <cfelseif v.STATUS EQ "error">
-            <cfset statusBadge = "<span class='badge bg-danger'><i class='bi bi-x-circle me-1'></i>Error</span>">
-        <cfelse><!--- missing — not yet assigned to this source --->
-            <cfset statusBadge = "<span class='badge bg-secondary'><i class='bi bi-dash-circle me-1'></i>Not Assigned</span>">
-        </cfif>
+        <cfset statusBadge = "<span class='badge #encodeForHTML(v.DISPLAYSTATUSCLASS ?: "bg-secondary")#'><i class='bi bi-circle-fill me-1'></i>#encodeForHTML(v.DISPLAYSTATUSLABEL ?: "Unknown")#</span>">
 
         <!--- ── Last generated display ──────────────────────────────── --->
         <cfset generatedDisplay = "">
@@ -252,7 +243,25 @@
                 <td>
         ">
 
-        <cfif v.STATUS EQ "missing">
+        <cfif len(v.PREVIEWURL ?: "")>
+            <cfset content &= "
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-secondary me-1 js-variant-preview'
+                        data-bs-toggle='modal'
+                        data-bs-target='##variantPreviewModal'
+                        data-preview-url='#encodeForHTMLAttribute(v.PREVIEWURL ?: "")#'
+                        data-variant-name='#encodeForHTMLAttribute(v.DESCRIPTION ?: "")#'
+                        data-variant-code='#encodeForHTMLAttribute(v.CODE ?: "")#'
+                        data-variant-status='#encodeForHTMLAttribute(v.DISPLAYSTATUSLABEL ?: "")#'
+                        data-preview-source='#encodeForHTMLAttribute(v.PREVIEWSOURCE ?: "")#'
+                    >
+                        <i class='bi bi-eye me-1'></i> View
+                    </button>
+            ">
+        </cfif>
+
+        <cfif v.DISPLAYSTATUS EQ "not_assigned">
             <!--- Not yet assigned — show Assign button --->
             <cfset content &= "
                     <form method='post' class='d-inline'>
@@ -312,6 +321,82 @@
 <cfset content &= "
 </div>
 ">
+
+<cfset content &= "
+<div class='modal fade' id='variantPreviewModal' tabindex='-1' aria-labelledby='variantPreviewModalLabel' aria-hidden='true'>
+    <div class='modal-dialog modal-lg modal-dialog-centered'>
+        <div class='modal-content'>
+            <div class='modal-header'>
+                <h5 class='modal-title' id='variantPreviewModalLabel'>Variant Preview</h5>
+                <button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Close'></button>
+            </div>
+            <div class='modal-body text-center'>
+                <div class='small text-muted mb-3' id='variantPreviewMeta'></div>
+                <img
+                    id='variantPreviewImage'
+                    src=''
+                    alt='Variant preview'
+                    class='img-fluid rounded border d-none'
+                    style='max-height: 70vh;'
+                >
+                <div id='variantPreviewEmpty' class='text-muted py-5 d-none'>Preview not available.</div>
+            </div>
+        </div>
+    </div>
+</div>
+">
+
+<cfsavecontent variable="pageScripts">
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var previewModal = document.getElementById('variantPreviewModal');
+    if (!previewModal) {
+        return;
+    }
+
+    previewModal.addEventListener('show.bs.modal', function (event) {
+        var trigger = event.relatedTarget;
+        var previewImage = document.getElementById('variantPreviewImage');
+        var previewEmpty = document.getElementById('variantPreviewEmpty');
+        var previewMeta = document.getElementById('variantPreviewMeta');
+        var previewTitle = document.getElementById('variantPreviewModalLabel');
+
+        if (!trigger || !previewImage || !previewEmpty || !previewMeta || !previewTitle) {
+            return;
+        }
+
+        var previewUrl = trigger.getAttribute('data-preview-url') || '';
+        var variantName = trigger.getAttribute('data-variant-name') || 'Variant Preview';
+        var variantCode = trigger.getAttribute('data-variant-code') || '';
+        var variantStatus = trigger.getAttribute('data-variant-status') || '';
+        var previewSource = trigger.getAttribute('data-preview-source') || '';
+
+        previewTitle.textContent = variantName;
+        previewMeta.textContent = variantCode
+            ? (variantCode + (variantStatus ? ' | ' + variantStatus : '') + (previewSource ? ' | ' + previewSource : ''))
+            : (variantStatus + (previewSource ? ' | ' + previewSource : ''));
+
+        if (previewUrl) {
+            previewImage.src = previewUrl;
+            previewImage.alt = variantName;
+            previewImage.classList.remove('d-none');
+            previewEmpty.classList.add('d-none');
+        } else {
+            previewImage.src = '';
+            previewImage.classList.add('d-none');
+            previewEmpty.classList.remove('d-none');
+        }
+    });
+
+    previewModal.addEventListener('hidden.bs.modal', function () {
+        var previewImage = document.getElementById('variantPreviewImage');
+        if (previewImage) {
+            previewImage.src = '';
+        }
+    });
+});
+</script>
+</cfsavecontent>
 
 <!--- ── Publish All button ───────────────────────────────────────────────── --->
 <!---

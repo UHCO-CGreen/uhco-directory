@@ -69,9 +69,7 @@
 </cfloop>
 
 <!--- ── Scheduler URL ── --->
-<cfset schedulerUrl = "http://" & cgi.SERVER_NAME
-    & (cgi.SERVER_PORT NEQ "80" AND cgi.SERVER_PORT NEQ "" ? ":" & cgi.SERVER_PORT : "")
-    & "/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json">
+<cfset schedulerUrl = request.siteBaseUrl & "/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Schedule form handler ── --->
 <cfset scheduleMsg      = "">

@@ -4,8 +4,7 @@
 </cfif>
 
 <!--- ── Task definitions ─────────────────────────────────────────────────── --->
-<cfset baseUrl = "http://" & cgi.SERVER_NAME
-    & (cgi.SERVER_PORT NEQ "80" AND cgi.SERVER_PORT NEQ "" ? ":" & cgi.SERVER_PORT : "")>
+<cfset baseUrl = request.siteBaseUrl>
 
 <cfset tasks = [
     {
@@ -167,7 +166,7 @@
         <h1 class="mb-1"><i class="bi bi-clock-history me-2"></i>Scheduled Tasks</h1>
         <p class="text-muted mb-0">Enable, disable, and monitor all automated ColdFusion scheduled tasks.</p>
     </div>
-    <span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
+    <span class='badge #(request.isProduction ? "bg-danger" : "bg-success")# float-end'>Currently in: #encodeForHTML(ucase(left(request.environmentName, 1)) & mid(request.environmentName, 2, len(request.environmentName)))#</span>
 </div>
 
 <cfif len(actionMessage)>

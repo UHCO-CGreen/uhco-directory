@@ -60,6 +60,7 @@ component output="false" singleton {
         variables.VariantDAO = createObject("component", "dao.UserImageVariantDAO").init();
         variables.SourceDAO  = createObject("component", "dao.UserImageSourceDAO").init();
         variables.ImageProcessor = createObject("component", "cfc.ImageProcessor");
+        variables.ImagesService = createObject("component", "cfc.images_service").init();
 
         // Compute absolute paths from this CFC's location.
         // expandPath("/...") cannot be used — it resolves against the IIS site
@@ -118,12 +119,24 @@ component output="false" singleton {
             userID   = arguments.userID,
             sourceID = arguments.sourceID
         );
+        var publishedImagesResult = variables.ImagesService.getImages( arguments.userID );
+        var publishedImages = publishedImagesResult.success ? publishedImagesResult.data : [];
 
         // Index existing variant records by ImageVariantTypeID for O(1) lookup.
         // SourceKey is already resolved by the DAO's JOIN — no extra lookup needed.
         var variantIndex = {};
         for ( var v in variants ) {
             variantIndex[ v.IMAGEVARIANTTYPEID ] = v;
+        }
+
+        var publishedIndex = {};
+        for ( var publishedImage in publishedImages ) {
+            var publishedSourceID = val( publishedImage.USERIMAGESOURCEID ?: 0 );
+            var publishedVariantCode = lCase( trim( publishedImage.IMAGEVARIANT ?: "" ) );
+
+            if ( publishedSourceID GT 0 AND len(publishedVariantCode) ) {
+                publishedIndex[ _buildPublishedImageKey(publishedSourceID, publishedVariantCode) ] = publishedImage;
+            }
         }
 
         var matrix = [];
@@ -161,10 +174,109 @@ component output="false" singleton {
                 row.SOURCEDROPBOXPATH  = "";
             }
 
+            var publishedKey = _buildPublishedImageKey( val(row.USERIMAGESOURCEID ?: 0), lCase(trim(row.CODE ?: "")) );
+            var publishedRecord = structKeyExists(publishedIndex, publishedKey) ? publishedIndex[publishedKey] : {};
+            var displayState = _resolveDisplayState(row, publishedRecord);
+
+            row.HASPUBLISHEDIMAGE = !structIsEmpty(publishedRecord);
+            row.PUBLISHEDIMAGEURL = row.HASPUBLISHEDIMAGE ? (publishedRecord.IMAGEURL ?: "") : "";
+            row.PUBLISHEDAT       = row.HASPUBLISHEDIMAGE ? (publishedRecord.PUBLISHEDAT ?: "") : "";
+            row.DISPLAYSTATUS     = displayState.code;
+            row.DISPLAYSTATUSLABEL = displayState.label;
+            row.DISPLAYSTATUSCLASS = displayState.cssClass;
+            row.PREVIEWURL        = displayState.previewUrl;
+            row.PREVIEWSOURCE     = displayState.previewSource;
+
             arrayAppend(matrix, row);
         }
 
         return matrix;
+    }
+
+    private struct function _resolveDisplayState(
+        required struct variantRow,
+        struct publishedRecord = {}
+    ) {
+        var rawStatus = lCase( trim(arguments.variantRow.STATUS ?: "missing") );
+        var hasTempVariant = len( trim(arguments.variantRow.LOCALPATH ?: "") ) GT 0;
+        var hasPublishedImage = !structIsEmpty(arguments.publishedRecord);
+        var tempPreviewUrl = hasTempVariant ? (arguments.variantRow.LOCALPATH & "?v=" & getTickCount()) : "";
+        var publishedPreviewUrl = hasPublishedImage ? trim(arguments.publishedRecord.IMAGEURL ?: "") : "";
+
+        if ( rawStatus EQ "missing" ) {
+            return {
+                code = "not_assigned",
+                label = "Not Assigned",
+                cssClass = "bg-secondary",
+                previewUrl = "",
+                previewSource = ""
+            };
+        }
+
+        if ( rawStatus EQ "error" ) {
+            return {
+                code = "error",
+                label = "Error",
+                cssClass = "bg-danger",
+                previewUrl = hasTempVariant ? tempPreviewUrl : publishedPreviewUrl,
+                previewSource = hasTempVariant ? "staged" : (hasPublishedImage ? "published" : "")
+            };
+        }
+
+        if ( hasTempVariant ) {
+            if ( hasPublishedImage ) {
+                return {
+                    code = "outdated",
+                    label = "Outdated",
+                    cssClass = "bg-warning text-dark",
+                    previewUrl = tempPreviewUrl,
+                    previewSource = "staged"
+                };
+            }
+
+            return {
+                code = "staged",
+                label = "Staged",
+                cssClass = "bg-info text-dark",
+                previewUrl = tempPreviewUrl,
+                previewSource = "staged"
+            };
+        }
+
+        if ( hasPublishedImage ) {
+            if ( rawStatus EQ "stale" ) {
+                return {
+                    code = "outdated",
+                    label = "Outdated",
+                    cssClass = "bg-warning text-dark",
+                    previewUrl = publishedPreviewUrl,
+                    previewSource = "published"
+                };
+            }
+
+            return {
+                code = "published",
+                label = "Published",
+                cssClass = "bg-success",
+                previewUrl = publishedPreviewUrl,
+                previewSource = "published"
+            };
+        }
+
+        return {
+            code = "assigned",
+            label = "Assigned",
+            cssClass = "bg-secondary",
+            previewUrl = "",
+            previewSource = ""
+        };
+    }
+
+    private string function _buildPublishedImageKey(
+        required numeric userImageSourceID,
+        required string variantCode
+    ) {
+        return val(arguments.userImageSourceID) & "|" & lCase(trim(arguments.variantCode));
     }
 
     /**
