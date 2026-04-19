@@ -42,6 +42,7 @@ component output="false" {
 
         // Admin auth service (singleton)
         application.authService = new admin.AuthService();
+        application.userReviewAuthService = createObject("component", "cfc.UserReviewAuthService").init();
 
         return true;
     }
@@ -68,6 +69,26 @@ component output="false" {
 
             // API: no debug output, no session cookies
             cfsetting(showDebugOutput = false);
+        } else if (findNoCase("/userreview/", path) EQ 1) {
+            request.context    = "userreview";
+            request.datasource = application.datasources.admin;
+            request.userReviewAuth = application.userReviewAuthService;
+
+            var publicUserReviewPages = [
+                "/userreview/login.cfm",
+                "/userreview/authenticate.cfm",
+                "/userreview/logout.cfm"
+            ];
+
+            var isUserReviewPublicPage = arrayFind(publicUserReviewPages, path);
+
+            if (NOT isUserReviewPublicPage AND NOT application.userReviewAuthService.isLoggedIn()) {
+                location(application.webRoot & "/UserReview/login.cfm", false);
+            }
+
+            if (application.userReviewAuthService.isLoggedIn()) {
+                request.userReviewUser = application.userReviewAuthService.getSessionUser();
+            }
         } else {
             request.context    = "admin";
             request.datasource = application.datasources.admin;

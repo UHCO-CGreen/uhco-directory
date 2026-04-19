@@ -13,6 +13,8 @@
         "settings.admin_users.manage",
         "settings.admin_roles.manage",
         "settings.admin_permissions.manage",
+        "settings.user_review.manage",
+        "users.approve_user_review",
         "settings.import.manage",
         "settings.bulk_exclusions.manage",
         "settings.migrations.manage",
@@ -55,6 +57,20 @@
                     <i class="bi bi-sliders display-4 mb-3"></i>
                     <h5 class="card-title text-dark">Admin Permissions</h5>
                     <p class="card-text text-muted small">Create, edit, and retire permission definitions</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    </cfif>
+
+    <cfif request.hasAnyPermission(["settings.user_review.manage", "users.approve_user_review"] )>
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/user-review/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-person-lines-fill display-4 mb-3"></i>
+                    <h5 class="card-title text-dark">User Review</h5>
+                    <p class="card-text text-muted small">Configure self-service profile review and process submissions</p>
                 </div>
             </div>
         </a>

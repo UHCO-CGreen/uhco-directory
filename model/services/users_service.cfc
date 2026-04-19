@@ -19,6 +19,16 @@ component output="false" singleton {
         return { success=true, data=user };
     }
 
+    public struct function getUserByCougarnet( required string cougarnetID ) {
+        var user = variables.UsersDAO.getUserByCougarnet( trim(arguments.cougarnetID) );
+
+        if ( structIsEmpty( user ) ) {
+            return { success=false, message="User not found.", data={} };
+        }
+
+        return { success=true, data=user };
+    }
+
     /**
      * Create a user with validation and normalization
      */

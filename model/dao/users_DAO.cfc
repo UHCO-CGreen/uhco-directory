@@ -13,6 +13,61 @@ component extends="dao.BaseDAO" output="false" singleton {
         return (qry.recordCount > 0) ? qry.getRow(1) : {};
     }
 
+    public struct function getUserByCougarnet( required string cougarnetID ) {
+        var normalizedID = lCase(trim(arguments.cougarnetID));
+        var qry = executeQueryWithRetry(
+                        "
+                        SELECT TOP 1 u.*
+                        FROM Users u
+            WHERE EXISTS (
+                SELECT 1
+                FROM UserExternalIDs uei
+                INNER JOIN ExternalSystems es ON es.SystemID = uei.SystemID
+                WHERE uei.UserID = u.UserID
+                  AND LOWER(es.SystemName) LIKE '%cougarnet%'
+                  AND (
+                        LOWER(LTRIM(RTRIM(ISNULL(uei.ExternalValue, '')))) = :cn
+                     OR LOWER(
+                            CASE
+                                WHEN CHARINDEX('@', LTRIM(RTRIM(ISNULL(uei.ExternalValue, '')))) > 1
+                                    THEN LEFT(LTRIM(RTRIM(ISNULL(uei.ExternalValue, ''))), CHARINDEX('@', LTRIM(RTRIM(ISNULL(uei.ExternalValue, '')))) - 1)
+                                ELSE ''
+                            END
+                        ) = :cnAt
+                  )
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM UserEmails ue
+                WHERE ue.UserID = u.UserID
+                  AND (
+                        LOWER(LTRIM(RTRIM(ISNULL(ue.EmailType, '')))) IN ('cougarnet', 'central')
+                     OR LOWER(LTRIM(RTRIM(ISNULL(ue.EmailAddress, '')))) LIKE '%@cougarnet%'
+                     OR LOWER(LTRIM(RTRIM(ISNULL(ue.EmailAddress, '')))) LIKE '%@central%'
+                  )
+                  AND (
+                        LOWER(LTRIM(RTRIM(ISNULL(ue.EmailAddress, '')))) = :cnEmail
+                     OR LOWER(
+                            CASE
+                                WHEN CHARINDEX('@', LTRIM(RTRIM(ISNULL(ue.EmailAddress, '')))) > 1
+                                    THEN LEFT(LTRIM(RTRIM(ISNULL(ue.EmailAddress, ''))), CHARINDEX('@', LTRIM(RTRIM(ISNULL(ue.EmailAddress, '')))) - 1)
+                                ELSE ''
+                            END
+                        ) = :cnAt
+                  )
+            )
+                        ORDER BY u.UserID
+                        ",
+            {
+                cn = { value=normalizedID, cfsqltype="cf_sql_nvarchar" },
+                cnAt = { value=normalizedID, cfsqltype="cf_sql_nvarchar" },
+                cnEmail = { value=normalizedID, cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=60, fetchSize=10 }
+        );
+        return (qry.recordCount > 0) ? qry.getRow(1) : {};
+    }
+
     public array function getAllUsers() {
         var qry = executeQueryWithRetry(
             "SELECT * FROM Users ORDER BY LastName, FirstName",

@@ -11,8 +11,8 @@
     <div class="container">
       <div class="hero-card">
         <div class="eyebrow">System Documentation</div>
-        <h1>UHCO Ident</h1>
-        <p>UHCO Ident is the internal people-directory platform for the University of Houston College of Optometry. This docs site replaces the old root Word document with a browsable HTML reference covering architecture, data model, admin tools, API behavior, deployment, and operational notes.</p>
+        <h1>UHCO Identity</h1>
+        <p>UHCO Identity is the internal people-directory platform for the University of Houston College of Optometry. This docs site replaces the old root Word document with a browsable HTML reference covering architecture, data model, admin tools, API behavior, deployment, and operational notes.</p>
         <div class="hero-meta">
           <span>Adobe ColdFusion</span>
           <span>Microsoft SQL Server</span>
@@ -30,16 +30,17 @@
         <li><a href="#overview">1. Overview</a></li>
         <li><a href="#data-model">2. Core Data Model</a></li>
         <li><a href="#user-management">3. User Management</a></li>
-        <li><a href="#organizations">4. Organizations</a></li>
-        <li><a href="#flags">5. Flags</a></li>
-        <li><a href="#api">6. REST API</a></li>
-        <li><a href="#tokens-secrets">7. Tokens and Secrets</a></li>
-        <li><a href="#sync">8. UH Directory Sync</a></li>
-        <li><a href="#dq">9. Data Quality</a></li>
-        <li><a href="#tools">10. Bulk Tools</a></li>
-        <li><a href="#admin-ui">11. Admin Interface</a></li>
-        <li><a href="#architecture">12. Architecture</a></li>
-        <li><a href="#deployment">13. Deployment</a></li>
+        <li><a href="#user-review">4. UserReview Workflow</a></li>
+        <li><a href="#organizations">5. Organizations</a></li>
+        <li><a href="#flags">6. Flags</a></li>
+        <li><a href="#api">7. REST API</a></li>
+        <li><a href="#tokens-secrets">8. Tokens and Secrets</a></li>
+        <li><a href="#sync">9. UH Directory Sync</a></li>
+        <li><a href="#dq">10. Data Quality</a></li>
+        <li><a href="#tools">11. Bulk Tools</a></li>
+        <li><a href="#admin-ui">12. Admin Interface</a></li>
+        <li><a href="#architecture">13. Architecture</a></li>
+        <li><a href="#deployment">14. Deployment</a></li>
         <li><a href="#appendix">Appendix</a></li>
       </ul>
     </aside>
@@ -57,12 +58,14 @@
               <li>Front end: Bootstrap 5 and Bootstrap Icons in the admin interface</li>
               <li>Web server: IIS with URL Rewrite for API routing</li>
               <li>External integration: UH Directory API with Bearer token and HMAC secret</li>
+              <li>Self-service workflow: UserReview staged profile updates with admin approval</li>
             </ul>
           </div>
           <div>
             <h3>Application URL Structure</h3>
             <ul>
               <li><code>/admin/</code> administrative back-office</li>
+              <li><code>/UserReview/</code> end-user self-service review experience</li>
               <li><code>/api/v1/</code> REST API endpoints</li>
               <li><code>/cfc/</code> service components</li>
               <li><code>/dao/</code> DAO components</li>
@@ -110,6 +113,7 @@
               <tr><td><code>UserExternalIDs</code>, <code>ExternalSystems</code></td><td>Mappings to CougarNet, PeopleSoft, legacy systems, and other external IDs.</td></tr>
               <tr><td><code>Tokens</code>, <code>Secrets</code></td><td>Hashed API credentials and protected-data access controls.</td></tr>
               <tr><td><code>UserStudentProfile</code>, <code>UserAwards</code></td><td>Expanded student profile content and award records.</td></tr>
+              <tr><td><code>UserReviewSubmissions</code>, <code>UserReviewSubmissionFields</code></td><td>Staged self-service profile changes, admin resolutions, notes, and review history.</td></tr>
               <tr><td><code>DataQualityRuns</code>, <code>DataQualityIssues</code></td><td>Data-quality batch history and per-user issue tracking.</td></tr>
               <tr><td><code>UHSyncRuns</code>, <code>UHSyncDiffs</code>, <code>UHSyncGone</code>, <code>UHSyncNew</code></td><td>UH API sync run history and field-level comparisons.</td></tr>
               <tr><td><code>DataQualityExclusions</code></td><td>Per-user exclusions for known acceptable data-quality issues.</td></tr>
@@ -141,8 +145,46 @@
         <p>Admins can sync a single user from the UH Directory API and resolve field-by-field differences, or use a lightweight AJAX endpoint to refresh a single field directly from the upstream source.</p>
       </section>
 
+      <section class="card" id="user-review">
+        <h2>4. UserReview Workflow</h2>
+        <p>UserReview is a separate self-service flow that allows eligible users to stage profile changes without writing directly to the live <code>Users</code> record. Changes remain pending until an authorized admin approves or rejects them.</p>
+        <div class="grid two">
+          <div>
+            <h3>User Experience</h3>
+            <ul>
+              <li>Public entry point lives under <code>/UserReview/</code> with its own login and session namespace.</li>
+              <li>Eligibility is based on feature settings plus user flags such as Faculty and Staff, not the admin-role system.</li>
+              <li><code>Title1</code> and <code>EmailPrimary</code> are shown read-only for reference and cannot be edited.</li>
+              <li>Existing secondary emails, phones, and addresses are preloaded to prevent duplicate entry.</li>
+              <li>Plain <code>@uh.edu</code> addresses are excluded from editable secondary email rows; <code>@central.uh.edu</code> and <code>@cougarnet.uh.edu</code> are allowed.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Submission Lifecycle</h3>
+            <ol>
+              <li>User loads the form model from live profile data plus any unresolved pending changes.</li>
+              <li>Only actual diffs are stored; unchanged contact collections are ignored by canonical structural comparison.</li>
+              <li>Submission data is written to <code>UserReviewSubmissions</code> and <code>UserReviewSubmissionFields</code>.</li>
+              <li>Admins may approve or discard an entire submission or resolve individual fields.</li>
+              <li>Approved fields update live data immediately; discarded fields retain the current value.</li>
+              <li>Submission status becomes <code>approved</code>, <code>rejected</code>, or <code>partially_approved</code> after all fields are resolved.</li>
+            </ol>
+          </div>
+        </div>
+        <h3>Review Notes</h3>
+        <p>Discard actions require a reason. Notes are appended to <code>UserReviewSubmissions.ReviewNote</code>, shown on the admin review page, and surfaced back to the user when the most recent reviewed outcome is <code>rejected</code> or <code>partially_approved</code>. If the user creates a new pending submission, the prior review-update alert is suppressed until the new submission is reviewed.</p>
+        <h3>Key Files</h3>
+        <ul>
+          <li><code>UserReview/index.cfm</code>, <code>login.cfm</code>, <code>authenticate.cfm</code>, <code>save.cfm</code>, <code>layout.cfm</code></li>
+          <li><code>model/services/UserReviewAuthService.cfc</code> for end-user authentication and session state</li>
+          <li><code>model/services/userReview_service.cfc</code> for form modeling, diffing, and approval logic</li>
+          <li><code>model/dao/UserReview_DAO.cfc</code> for submission persistence and review-state queries</li>
+          <li><code>sql/create_user_review.sql</code> for schema and default app settings</li>
+        </ul>
+      </section>
+
       <section class="card" id="organizations">
-        <h2>4. Organizations</h2>
+        <h2>5. Organizations</h2>
         <p>Organizations provide the hierarchy used for browsing, filtering, and representing the college’s internal structure.</p>
         <div class="grid two">
           <div>
@@ -163,7 +205,7 @@
       </section>
 
       <section class="card" id="flags">
-        <h2>5. Flags</h2>
+        <h2>6. Flags</h2>
         <p>Flags are used for filtering, admin workflows, and API data protection.</p>
         <h3>Definition Model</h3>
         <ul>
@@ -177,7 +219,7 @@
       </section>
 
       <section class="card" id="api">
-        <h2>6. REST API</h2>
+        <h2>7. REST API</h2>
         <p>The API is rooted at <code>/api/v1/</code> and is read-only. All requests require a valid Bearer token, and some protected data additionally requires a secret.</p>
         <h3>Key Endpoints</h3>
         <pre><code>GET /api/v1/people
@@ -215,7 +257,7 @@ GET /api/v1/flags</code></pre>
       </section>
 
       <section class="card" id="tokens-secrets">
-        <h2>7. Tokens and Secrets</h2>
+        <h2>8. Tokens and Secrets</h2>
         <p>API tokens and secrets are managed separately because they solve different security problems.</p>
         <div class="grid two">
           <div>
@@ -240,7 +282,7 @@ GET /api/v1/flags</code></pre>
       </section>
 
       <section class="card" id="sync">
-        <h2>8. UH Directory Sync</h2>
+        <h2>9. UH Directory Sync</h2>
         <p>UHCO Ident maintains its own copy of staff and faculty data and periodically compares it against the upstream UH Directory API.</p>
         <h3>Credentials and Configuration</h3>
         <ul>
@@ -264,7 +306,7 @@ GET /api/v1/flags</code></pre>
       </section>
 
       <section class="card" id="dq">
-        <h2>9. Data Quality</h2>
+        <h2>10. Data Quality</h2>
         <p>The data-quality system audits the local database for missing or inconsistent information and stores findings for review.</p>
         <h3>Typical Issue Codes</h3>
         <div class="badge-list">
@@ -290,7 +332,7 @@ GET /api/v1/flags</code></pre>
       </section>
 
       <section class="card" id="tools">
-        <h2>10. Bulk Tools and Reporting</h2>
+        <h2>11. Bulk Tools and Reporting</h2>
         <p>The admin reporting area contains recurring import, audit, and migration utilities beyond sync and DQ.</p>
         <ul>
           <li><strong>CS Bulk Import:</strong> mass-creates new College of Science users with initial org and flag assignments.</li>
@@ -303,7 +345,7 @@ GET /api/v1/flags</code></pre>
       </section>
 
       <section class="card" id="admin-ui">
-        <h2>11. Admin Interface</h2>
+        <h2>12. Admin Interface</h2>
         <p>The admin side is a server-rendered Bootstrap application with shared layout, dashboard, reporting pages, and operational utilities.</p>
         <h3>Highlights</h3>
         <ul>
@@ -313,11 +355,19 @@ GET /api/v1/flags</code></pre>
           <li><code>clear_cache.cfm</code> and <code>resetapp.cfm</code> are operational maintenance pages.</li>
           <li><code>admin/access/</code> manages named access areas.</li>
           <li><code>admin/external/</code> manages external system definitions.</li>
+          <li><code>admin/settings/user-review/</code> combines UserReview configuration and submission processing.</li>
+        </ul>
+        <h3>Permission Model</h3>
+        <ul>
+          <li><code>settings.user_review.manage</code> controls UserReview feature configuration.</li>
+          <li><code>users.approve_user_review</code> controls submission review, approval, and rejection.</li>
+          <li>The UserReview admin landing page can show configuration, submissions, or both depending on the caller's granted permissions.</li>
+          <li>Review actions refresh the admin authorization context before writing approval metadata so stale sessions do not resolve fields with <code>AdminUserID = 0</code>.</li>
         </ul>
       </section>
 
       <section class="card" id="architecture">
-        <h2>12. Architecture and Code Structure</h2>
+        <h2>13. Architecture and Code Structure</h2>
         <p>UHCO Ident uses a simple three-layer design with request-time object creation and no dependency injection framework.</p>
         <div class="grid two">
           <div>
@@ -340,17 +390,19 @@ GET /api/v1/flags</code></pre>
           <li><code>queryToArray(query)</code> normalizes ColdFusion query results into uppercase-key structs.</li>
         </ul>
         <h3>Application Scope</h3>
-        <p><code>Application.cfc</code> loads API credentials into application scope on startup. The API sub-application in <code>api/v1/Application.cfc</code> disables sessions and converts unhandled failures into JSON 500 responses.</p>
+        <p><code>Application.cfc</code> loads API credentials into application scope on startup. The API sub-application in <code>api/v1/Application.cfc</code> disables sessions and converts unhandled failures into JSON 500 responses. The root application also initializes a separate UserReview auth service and routes <code>/UserReview/</code> requests through a distinct request context.</p>
       </section>
 
       <section class="card" id="deployment">
-        <h2>13. Deployment and Security</h2>
+        <h2>14. Deployment and Security</h2>
         <h3>Required Configuration</h3>
         <ul>
           <li>Set OS-level environment variables <code>UH_API_TOKEN</code> and <code>UH_API_SECRET</code>.</li>
           <li>Configure the ColdFusion datasource <code>UHCO_Directory</code>.</li>
           <li>Install the IIS rewrite rule that routes <code>/api/v1/*</code> to <code>/api/v1/index.cfm</code>.</li>
           <li>Schedule UH Sync and Data Quality tasks through the ColdFusion Scheduler.</li>
+          <li>Run the UserReview schema and permission seed scripts, including <code>sql/create_user_review.sql</code> and <code>sql/add_user_review_permissions.sql</code>.</li>
+          <li>Grant <code>settings.user_review.manage</code> and/or <code>users.approve_user_review</code> to the appropriate admin roles or direct admin users.</li>
         </ul>
         <h3>Compatibility Notes</h3>
         <ul>
@@ -385,9 +437,11 @@ GET /api/v1/flags</code></pre>
               <tr><td><code>admin/layout.cfm</code></td><td>Shared admin layout and navigation shell.</td></tr>
               <tr><td><code>admin/users/</code></td><td>User CRUD, sync, import, and profile management.</td></tr>
               <tr><td><code>admin/reporting/</code></td><td>UH Sync, data-quality, audit, and reporting tools.</td></tr>
+              <tr><td><code>admin/settings/user-review/</code></td><td>UserReview settings, submission queue, review UI, and approval endpoints.</td></tr>
               <tr><td><code>admin/flags/</code></td><td>Flag definition CRUD.</td></tr>
               <tr><td><code>admin/orgs/</code></td><td>Organization CRUD.</td></tr>
               <tr><td><code>admin/external/</code></td><td>External system CRUD.</td></tr>
+              <tr><td><code>UserReview/</code></td><td>End-user self-service profile review flow with separate authentication.</td></tr>
               <tr><td><code>api/v1/</code></td><td>REST API sub-application and route dispatcher.</td></tr>
               <tr><td><code>cfc/</code></td><td>Service layer components.</td></tr>
               <tr><td><code>dao/</code></td><td>DAO layer including <code>BaseDAO.cfc</code>.</td></tr>

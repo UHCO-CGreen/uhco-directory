@@ -447,6 +447,8 @@
                         "settings.admin_users.manage",
                         "settings.admin_roles.manage",
                         "settings.admin_permissions.manage",
+                        "settings.user_review.manage",
+                        "users.approve_user_review",
                         "settings.import.manage",
                         "settings.bulk_exclusions.manage",
                         "settings.migrations.manage",
