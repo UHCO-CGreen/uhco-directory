@@ -4,7 +4,7 @@
     Split from the combined uh_sync_report.cfm — shows the Gone + New tabs.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.uh_sync.view")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

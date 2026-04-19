@@ -5,6 +5,10 @@
       - Rollback a migration run
 --->
 
+<cfif NOT request.hasPermission("settings.migrations.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset migrationService = createObject("component", "cfc.gradMigration_service").init()>
 
 <!--- ── Rollback action ── --->

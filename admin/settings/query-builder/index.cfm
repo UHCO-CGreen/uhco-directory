@@ -1,9 +1,9 @@
 <!---
     Query Builder — Visual read-only SELECT query builder.
-    SUPER_ADMIN only. Tables and columns validated against INFORMATION_SCHEMA.
+    Permission: settings.query_builder.use. Tables and columns validated against INFORMATION_SCHEMA.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.query_builder.use")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

@@ -1,8 +1,5 @@
 <!--- ── Authorization ─────────────────────────────────────────────────────── --->
-<cfif NOT (
-    application.authService.hasRole("USER_MEDIA_ADMIN")
-    OR application.authService.hasRole("SUPER_ADMIN")
-)>
+<cfif NOT request.hasPermission("media.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -108,14 +105,20 @@
 
     <!--- ── Publish this variant ─────────────────────────────────────── --->
     <cfelseif action EQ "publish">
-        <cfset result = publishingService.publishVariant(
-            userID             = userID,
-            imageVariantTypeID = imageVariantTypeID,
-            userImageSourceID  = sourceID
-        )>
-        <cfset actionMessage      = result.message>
-        <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
-        <cfset publishSuccess     = result.success>
+        <cfif NOT request.hasPermission("media.publish")>
+            <cfset actionMessage = "You do not have permission to publish media.">
+            <cfset actionMessageClass = "alert-danger">
+            <cfset publishSuccess = false>
+        <cfelse>
+            <cfset result = publishingService.publishVariant(
+                userID             = userID,
+                imageVariantTypeID = imageVariantTypeID,
+                userImageSourceID  = sourceID
+            )>
+            <cfset actionMessage      = result.message>
+            <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
+            <cfset publishSuccess     = result.success>
+        </cfif>
 
         <!--- Refresh variant data --->
         <cfset variantMatrix = variantService.getVariantMatrix(userID, sourceID)>
@@ -228,7 +231,7 @@
 ">
 
 <!--- Publish button — only when a generated file exists --->
-<cfif hasGeneratedFile>
+<cfif hasGeneratedFile AND request.hasPermission("media.publish")>
     <cfset content &= "
             <form method='post' class='d-inline'>
                 <input type='hidden' name='action' value='publish'>

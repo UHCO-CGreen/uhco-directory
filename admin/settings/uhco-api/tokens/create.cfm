@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset content = "
 <h1>New API Token</h1>
 

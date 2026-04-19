@@ -1,10 +1,27 @@
 <!---
-    Settings Hub — SUPER_ADMIN only
+    Settings Hub
     Central dashboard with links to all settings sub-sections.
 --->
 
 <!--- ── Auth guard ── --->
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT (
+    request.hasPermission("settings.view")
+    OR request.hasAnyPermission([
+        "settings.app_config.manage",
+        "settings.media_config.manage",
+        "settings.api.manage",
+        "settings.admin_users.manage",
+        "settings.admin_roles.manage",
+        "settings.admin_permissions.manage",
+        "settings.import.manage",
+        "settings.bulk_exclusions.manage",
+        "settings.migrations.manage",
+        "settings.uh_sync.view",
+        "settings.query_builder.use",
+        "settings.scheduled_tasks.manage",
+        "settings.workflows.manage"
+    ])
+)>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -13,7 +30,7 @@
 <cfoutput>
 
 <h1 class="mb-1"><i class="bi bi-gear-fill me-2"></i>Settings</h1>
-<p class="text-muted">System configuration and administration tools. Super Admin access only.</p>
+<p class="text-muted">System configuration and administration tools.</p>
 
 <div class="row g-4 mt-3">
 
@@ -29,6 +46,20 @@
             </div>
         </a>
     </div>
+
+    <cfif request.hasPermission("settings.admin_permissions.manage")>
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/admin-permissions/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-sliders display-4 mb-3"></i>
+                    <h5 class="card-title text-dark">Admin Permissions</h5>
+                    <p class="card-text text-muted small">Create, edit, and retire permission definitions</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    </cfif>
 
     <!--- User Media Config --->
     <div class="col-md-6 col-lg-4">

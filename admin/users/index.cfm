@@ -74,12 +74,41 @@
 <cfif showOrgFilter>
     <cfset allOrgsResult = orgsService.getAllOrgs()>
     <cfset allOrgs = allOrgsResult.data>
-    <cfset topLevelOrgs = []>
+    <cfset orgChildrenByParent = {}>
+    <cfset orgIDs = {}>
+    <cfset rootOrgs = []>
+    <cfset filterableOrgLookup = {}>
     <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
         <cfset orgItem = allOrgs[iOrg]>
-        <cfif NOT (isNumeric(orgItem.PARENTORGID) AND val(orgItem.PARENTORGID) GT 0)>
-            <cfset arrayAppend(topLevelOrgs, orgItem)>
+        <cfset orgIDs[toString(orgItem.ORGID)] = true>
+    </cfloop>
+    <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
+        <cfset orgItem = allOrgs[iOrg]>
+        <cfset parentValue = trim((orgItem.PARENTORGID ?: "") & "")>
+        <cfset parentKey = "ROOT">
+        <cfif len(parentValue) AND structKeyExists(orgIDs, parentValue)>
+            <cfset parentKey = parentValue>
         </cfif>
+        <cfif NOT structKeyExists(orgChildrenByParent, parentKey)>
+            <cfset orgChildrenByParent[parentKey] = []>
+        </cfif>
+        <cfset arrayAppend(orgChildrenByParent[parentKey], orgItem)>
+    </cfloop>
+    <cfset rootOrgs = structKeyExists(orgChildrenByParent, "ROOT") ? orgChildrenByParent["ROOT"] : []>
+    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
+        <cfset rootOrg = rootOrgs[iRoot]>
+        <cfset childKey = toString(rootOrg.ORGID)>
+        <cfset childOrgs = structKeyExists(orgChildrenByParent, childKey) ? orgChildrenByParent[childKey] : []>
+        <cfloop from="1" to="#arrayLen(childOrgs)#" index="iChild">
+            <cfset childOrg = childOrgs[iChild]>
+            <cfset filterableOrgLookup[toString(childOrg.ORGID)] = childOrg.ORGNAME>
+            <cfset grandChildKey = toString(childOrg.ORGID)>
+            <cfset grandChildOrgs = structKeyExists(orgChildrenByParent, grandChildKey) ? orgChildrenByParent[grandChildKey] : []>
+            <cfloop from="1" to="#arrayLen(grandChildOrgs)#" index="iGrandChild">
+                <cfset grandChildOrg = grandChildOrgs[iGrandChild]>
+                <cfset filterableOrgLookup[toString(grandChildOrg.ORGID)] = grandChildOrg.ORGNAME>
+            </cfloop>
+        </cfloop>
     </cfloop>
 </cfif>
 
@@ -89,6 +118,31 @@
 <cfset selectedOrgFilter  = structKeyExists(url, "filterOrg")      ? trim(url.filterOrg)      : "">
 <cfset selectedGradYear   = structKeyExists(url, "filterGradYear") ? trim(url.filterGradYear) : "">
 <cfset selectedLetter     = structKeyExists(url, "letter") AND len(trim(url.letter)) ? ucase(left(trim(url.letter), 1)) : "">
+<cfset selectedOrgFilterIDs = []>
+<cfset selectedOrgFilterLookup = {}>
+<cfset includeNoOrgFilter = false>
+<cfif showOrgFilter AND len(selectedOrgFilter)>
+    <cfloop list="#selectedOrgFilter#" delimiters="," index="selectedOrgItemRaw">
+        <cfset selectedOrgItem = trim(selectedOrgItemRaw)>
+        <cfif len(selectedOrgItem)>
+            <cfif ucase(selectedOrgItem) EQ "NOORGS">
+                <cfset includeNoOrgFilter = true>
+            <cfelseif structKeyExists(filterableOrgLookup, toString(val(selectedOrgItem)))>
+                <cfset selectedOrgKey = toString(val(selectedOrgItem))>
+                <cfif NOT structKeyExists(selectedOrgFilterLookup, selectedOrgKey)>
+                    <cfset selectedOrgFilterLookup[selectedOrgKey] = true>
+                    <cfset arrayAppend(selectedOrgFilterIDs, selectedOrgKey)>
+                </cfif>
+            </cfif>
+        </cfif>
+    </cfloop>
+</cfif>
+<cfset selectedOrgFilter = arrayToList(selectedOrgFilterIDs)>
+<cfif includeNoOrgFilter>
+    <cfset selectedOrgFilter = len(selectedOrgFilter) ? "NOORGS," & selectedOrgFilter : "NOORGS">
+</cfif>
+<cfset selectedOrgFilterCount = arrayLen(selectedOrgFilterIDs) + (includeNoOrgFilter ? 1 : 0)>
+<cfset orgFilterHasSelection = selectedOrgFilterCount GT 0>
 <cfparam name="pageMessage" default="">
 <cfparam name="pageMessageClass" default="alert-info">
 
@@ -259,18 +313,16 @@
 </cfif>
 
 <!--- Org filter --->
-<cfif showOrgFilter AND selectedOrgFilter NEQ "">
+<cfif showOrgFilter AND orgFilterHasSelection>
     <cfset orgFiltered = []>
     <cfloop from="1" to="#arrayLen(filteredUsers)#" index="i">
         <cfset u = filteredUsers[i]>
         <cfset userOrgsList = structKeyExists(allUserOrgMap, toString(u.USERID)) ? allUserOrgMap[toString(u.USERID)] : []>
-        <cfif selectedOrgFilter EQ "NOORGS">
-            <cfif arrayLen(userOrgsList) EQ 0>
-                <cfset arrayAppend(orgFiltered, u)>
-            </cfif>
+        <cfif includeNoOrgFilter AND arrayLen(userOrgsList) EQ 0>
+            <cfset arrayAppend(orgFiltered, u)>
         <cfelse>
             <cfloop from="1" to="#arrayLen(userOrgsList)#" index="o">
-                <cfif toString(userOrgsList[o].ORGID) EQ selectedOrgFilter>
+                <cfif structKeyExists(selectedOrgFilterLookup, toString(userOrgsList[o].ORGID))>
                     <cfset arrayAppend(orgFiltered, u)>
                     <cfbreak>
                 </cfif>
@@ -315,6 +367,89 @@
 <!--- Precompute clear-filters link --->
 <cfset hasActiveFilters = (selectedFlagFilter NEQ "" OR selectedOrgFilter NEQ "" OR selectedGradYear NEQ "" OR searchTerm NEQ "" OR selectedLetter NEQ "")>
 <cfset clearLink = "?list=" & listType & "&sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage>
+<cfset orgFilterToggleButtonClass = orgFilterHasSelection ? "btn-primary" : "btn-outline-secondary">
+<cfset orgFilterToggleButtonHTML = "">
+<cfset orgFilterPanelHTML = "">
+<cfif showOrgFilter>
+    <cfset orgFilterToggleButtonHTML = "
+            <button type='button' class='btn btn-sm #orgFilterToggleButtonClass#' data-bs-toggle='collapse' data-bs-target='##orgFilterPanel' aria-expanded='#(orgFilterHasSelection ? "true" : "false")#' aria-controls='orgFilterPanel'>
+                <i class='bi bi-diagram-3 me-1'></i>Org Filters#(selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "")#
+            </button>
+    ">
+    <cfset orgFilterPanelHTML = "
+            <div class='w-100'>
+                <div id='orgFilterPanel' class='collapse#(orgFilterHasSelection ? " show" : "")# mt-2'>
+                    <div class='card border-light-subtle shadow-sm'>
+                        <div class='card-body p-3'>
+                            <div class='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3'>
+                                <div>
+                                    <div class='fw-semibold'>Organization Filters</div>
+                                    <div class='text-muted small'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
+                                </div>
+                            </div>
+                            <div class='form-check mb-3'>
+                                <input class='form-check-input' type='checkbox' name='filterOrg' value='NOORGS' id='filterOrgNoOrg'#(includeNoOrgFilter ? " checked" : "")#>
+                                <label class='form-check-label' for='filterOrgNoOrg'>No Org</label>
+                            </div>
+                            <div class='row row-cols-1 row-cols-xl-2 g-3'>
+    ">
+    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
+        <cfset rootOrg = rootOrgs[iRoot]>
+        <cfset childOrgs = structKeyExists(orgChildrenByParent, toString(rootOrg.ORGID)) ? orgChildrenByParent[toString(rootOrg.ORGID)] : []>
+        <cfset orgFilterPanelHTML &= "
+                                <div class='col'>
+                                    <div class='card h-100 border-light-subtle'>
+                                        <div class='card-header bg-white'>
+                                            <div class='fw-semibold'>#EncodeForHTML(rootOrg.ORGNAME)#</div>
+                                            #(len(trim(rootOrg.ORGDESCRIPTION ?: "")) ? "<div class='small text-muted mt-1'>" & EncodeForHTML(rootOrg.ORGDESCRIPTION) & "</div>" : "")#
+                                        </div>
+                                        <div class='card-body p-3'>
+        ">
+        <cfif arrayLen(childOrgs) EQ 0>
+            <cfset orgFilterPanelHTML &= "<div class='text-muted small'>No child organizations available.</div>">
+        <cfelse>
+            <cfloop from="1" to="#arrayLen(childOrgs)#" index="iChild">
+                <cfset childOrg = childOrgs[iChild]>
+                <cfset childOrgKey = toString(childOrg.ORGID)>
+                <cfset grandChildOrgs = structKeyExists(orgChildrenByParent, childOrgKey) ? orgChildrenByParent[childOrgKey] : []>
+                <cfset orgFilterPanelHTML &= "
+                                            <div class='mb-3'>
+                                                <div class='form-check mb-1'>
+                                                    <input class='form-check-input' type='checkbox' name='filterOrg' value='#childOrg.ORGID#' id='filterOrg#childOrg.ORGID#'#(structKeyExists(selectedOrgFilterLookup, childOrgKey) ? " checked" : "")#>
+                                                    <label class='form-check-label user-select-none' for='filterOrg#childOrg.ORGID#'>#EncodeForHTML(childOrg.ORGNAME)#</label>
+                                                </div>
+                ">
+                <cfif arrayLen(grandChildOrgs) GT 0>
+                    <cfset orgFilterPanelHTML &= "<div class='ms-4 mt-2 d-flex flex-column gap-2'>">
+                    <cfloop from="1" to="#arrayLen(grandChildOrgs)#" index="iGrandChild">
+                        <cfset grandChildOrg = grandChildOrgs[iGrandChild]>
+                        <cfset grandChildOrgKey = toString(grandChildOrg.ORGID)>
+                        <cfset orgFilterPanelHTML &= "
+                                                    <div class='form-check'>
+                                                        <input class='form-check-input' type='checkbox' name='filterOrg' value='#grandChildOrg.ORGID#' id='filterOrg#grandChildOrg.ORGID#'#(structKeyExists(selectedOrgFilterLookup, grandChildOrgKey) ? " checked" : "")#>
+                                                        <label class='form-check-label user-select-none small text-muted' for='filterOrg#grandChildOrg.ORGID#'>#EncodeForHTML(grandChildOrg.ORGNAME)#</label>
+                                                    </div>
+                        ">
+                    </cfloop>
+                    <cfset orgFilterPanelHTML &= "</div>">
+                </cfif>
+                <cfset orgFilterPanelHTML &= "</div>">
+            </cfloop>
+        </cfif>
+        <cfset orgFilterPanelHTML &= "
+                                        </div>
+                                    </div>
+                                </div>
+        ">
+    </cfloop>
+    <cfset orgFilterPanelHTML &= "
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    ">
+</cfif>
 
 <!--- ======================== BUILD PAGE CONTENT ======================== --->
 <cfset content = "
@@ -350,24 +485,8 @@
 
 <cfset content &= "
             </select>
+            #orgFilterToggleButtonHTML#
 ">
-
-<!--- Org filter (conditional) --->
-<cfif showOrgFilter>
-    <cfset content &= "
-            <label for='orgFilter' class='mb-0'>Org:</label>
-            <select name='filterOrg' id='orgFilter' class='form-select' style='width:auto;'>
-                <option value=''>All Orgs</option>
-                <option value='NOORGS'#(selectedOrgFilter == 'NOORGS' ? ' selected' : '')#>No Org</option>
-    ">
-    <cfloop from="1" to="#arrayLen(topLevelOrgs)#" index="iTab">
-        <cfset tabOrg = topLevelOrgs[iTab]>
-        <cfset content &= "<option value='#tabOrg.ORGID#'" & (selectedOrgFilter == toString(tabOrg.ORGID) ? " selected" : "") & ">#EncodeForHTML(tabOrg.ORGNAME)#</option>">
-    </cfloop>
-    <cfset content &= "
-            </select>
-    ">
-</cfif>
 
 <!--- Grad year filter (conditional) --->
 <cfif showGradFilter>
@@ -396,6 +515,7 @@
             </select>
             <button type='submit' class='btn btn-sm btn-secondary'>Apply Filter</button>
             " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
+            #orgFilterPanelHTML#
         </form>
     </div>
 </div>
@@ -498,12 +618,12 @@
 
     <!--- Manage Images link (faculty / current-students with media admin role) --->
     <cfset mediaLink = "">
-    <cfif showManageImages AND (request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN"))>
+    <cfif showManageImages AND request.hasPermission("media.edit")>
         <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary' title='Manage Images' data-bs-toggle='tooltip' data-bs-title='Manage Images'><i class='bi bi-card-image'></i></a>">
     </cfif>
 
     <cfset deleteLink = "">
-    <cfif request.hasRole("SUPER_ADMIN")>
+    <cfif request.hasPermission("users.delete")>
         <cfset deleteLink = "<a class='btn btn-sm btn-danger' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
     </cfif>
 

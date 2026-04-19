@@ -1,10 +1,10 @@
 <!---
     Import — Process / Results.
     Executes import from session temp file, or views past run details.
-    SUPER_ADMIN only.
+    Permission: settings.import.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.import.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

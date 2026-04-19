@@ -1,5 +1,5 @@
 <!--- ── User Media Config Hub ────────────────────────────────────────────── --->
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

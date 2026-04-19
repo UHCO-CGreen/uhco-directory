@@ -5,6 +5,10 @@
 --->
 
 <!--- ── URL params ── --->
+<cfif NOT request.hasPermission("settings.migrations.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset runID = ( structKeyExists(url, "runID") AND isNumeric(url.runID) ) ? val(url.runID) : 0>
 
 <cfif runID EQ 0>

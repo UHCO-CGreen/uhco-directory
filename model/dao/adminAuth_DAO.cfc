@@ -8,6 +8,21 @@ component extends="dao.BaseDAO" output="false" {
         super.init();        return this;
     }
 
+    public boolean function hasPermissionTables() {
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT CASE
+                    WHEN OBJECT_ID('dbo.AdminPermissions', 'U') IS NOT NULL
+                     AND OBJECT_ID('dbo.AdminRolePermissions', 'U') IS NOT NULL
+                     AND OBJECT_ID('dbo.AdminUserPermissions', 'U') IS NOT NULL
+                    THEN 1 ELSE 0 END AS has_tables
+            ",
+            params  = {},
+            options = { datasource = variables.dsn }
+        );
+        return val(qry.has_tables) EQ 1;
+    }
+
     /* ─────────────────── AdminRoles ─────────────────── */
 
     public array function getAllRoles() {
@@ -68,6 +83,218 @@ component extends="dao.BaseDAO" output="false" {
         executeQueryWithRetry(
             sql     = "DELETE FROM AdminRoles WHERE role_id = :roleID",
             params  = { roleID = { value = arguments.roleID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public array function getAllPermissions() {
+        if ( !hasPermissionTables() ) {
+            return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT permission_id, permission_key, display_name, category, description, is_system, is_active, sort_order
+                FROM AdminPermissions
+                ORDER BY category, sort_order, permission_key
+            ",
+            params  = {},
+            options = { datasource = variables.dsn }
+        );
+        return queryToArray(qry);
+    }
+
+    public struct function getPermissionByKey(required string permissionKey) {
+        if ( !hasPermissionTables() ) {
+            return {};
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT permission_id, permission_key, display_name, category, description, is_system, is_active, sort_order
+                FROM AdminPermissions
+                WHERE permission_key = :permissionKey
+            ",
+            params  = { permissionKey = { value = arguments.permissionKey, cfsqltype = "cf_sql_varchar" } },
+            options = { datasource = variables.dsn }
+        );
+        var arr = queryToArray(qry);
+        return arrayLen(arr) ? arr[1] : {};
+    }
+
+    public struct function getPermissionByID(required numeric permissionID) {
+        if ( !hasPermissionTables() ) {
+            return {};
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT permission_id, permission_key, display_name, category, description, is_system, is_active, sort_order
+                FROM AdminPermissions
+                WHERE permission_id = :permissionID
+            ",
+            params  = { permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+        var arr = queryToArray(qry);
+        return arrayLen(arr) ? arr[1] : {};
+    }
+
+    public numeric function createPermission(
+        required string permissionKey,
+        required string displayName,
+        required string category,
+        string description = "",
+        numeric sortOrder = 0,
+        boolean isActive = true,
+        boolean isSystem = false
+    ) {
+        if ( !hasPermissionTables() ) {
+            return 0;
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                INSERT INTO AdminPermissions (
+                    permission_key,
+                    display_name,
+                    category,
+                    description,
+                    is_system,
+                    is_active,
+                    sort_order,
+                    updated_at
+                )
+                OUTPUT INSERTED.permission_id
+                VALUES (
+                    :permissionKey,
+                    :displayName,
+                    :category,
+                    :description,
+                    :isSystem,
+                    :isActive,
+                    :sortOrder,
+                    GETDATE()
+                )
+            ",
+            params  = {
+                permissionKey = { value = arguments.permissionKey, cfsqltype = "cf_sql_varchar" },
+                displayName = { value = arguments.displayName, cfsqltype = "cf_sql_varchar" },
+                category = { value = arguments.category, cfsqltype = "cf_sql_varchar" },
+                description = { value = arguments.description, null = !len(trim(arguments.description)), cfsqltype = "cf_sql_varchar" },
+                isSystem = { value = arguments.isSystem ? 1 : 0, cfsqltype = "cf_sql_integer" },
+                isActive = { value = arguments.isActive ? 1 : 0, cfsqltype = "cf_sql_integer" },
+                sortOrder = { value = arguments.sortOrder, cfsqltype = "cf_sql_integer" }
+            },
+            options = { datasource = variables.dsn }
+        );
+        return val(qry.permission_id);
+    }
+
+    public void function updatePermission(
+        required numeric permissionID,
+        required string permissionKey,
+        required string displayName,
+        required string category,
+        string description = "",
+        numeric sortOrder = 0,
+        boolean isActive = true
+    ) {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "
+                UPDATE AdminPermissions
+                SET permission_key = :permissionKey,
+                    display_name = :displayName,
+                    category = :category,
+                    description = :description,
+                    is_active = :isActive,
+                    sort_order = :sortOrder,
+                    updated_at = GETDATE()
+                WHERE permission_id = :permissionID
+            ",
+            params  = {
+                permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" },
+                permissionKey = { value = arguments.permissionKey, cfsqltype = "cf_sql_varchar" },
+                displayName = { value = arguments.displayName, cfsqltype = "cf_sql_varchar" },
+                category = { value = arguments.category, cfsqltype = "cf_sql_varchar" },
+                description = { value = arguments.description, null = !len(trim(arguments.description)), cfsqltype = "cf_sql_varchar" },
+                isActive = { value = arguments.isActive ? 1 : 0, cfsqltype = "cf_sql_integer" },
+                sortOrder = { value = arguments.sortOrder, cfsqltype = "cf_sql_integer" }
+            },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public void function deletePermission(required numeric permissionID) {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "DELETE FROM AdminPermissions WHERE permission_id = :permissionID",
+            params  = { permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public array function getPermissionsForRole(required numeric roleID) {
+        if ( !hasPermissionTables() ) {
+            return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT p.permission_id, p.permission_key, p.display_name, p.category, p.description, p.sort_order
+                FROM AdminRolePermissions arp
+                INNER JOIN AdminPermissions p ON p.permission_id = arp.permission_id
+                WHERE arp.role_id = :roleID
+                  AND p.is_active = 1
+                ORDER BY p.category, p.sort_order, p.permission_key
+            ",
+            params  = { roleID = { value = arguments.roleID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+        return queryToArray(qry);
+    }
+
+    public void function assignPermissionToRole(required numeric roleID, required numeric permissionID) {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM AdminRolePermissions
+                    WHERE role_id = :roleID AND permission_id = :permissionID
+                )
+                INSERT INTO AdminRolePermissions (role_id, permission_id)
+                VALUES (:roleID, :permissionID)
+            ",
+            params  = {
+                roleID = { value = arguments.roleID, cfsqltype = "cf_sql_integer" },
+                permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" }
+            },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public void function revokePermissionFromRole(required numeric roleID, required numeric permissionID) {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "DELETE FROM AdminRolePermissions WHERE role_id = :roleID AND permission_id = :permissionID",
+            params  = {
+                roleID = { value = arguments.roleID, cfsqltype = "cf_sql_integer" },
+                permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" }
+            },
             options = { datasource = variables.dsn }
         );
     }
@@ -197,6 +424,98 @@ component extends="dao.BaseDAO" output="false" {
             },
             options = { datasource = variables.dsn }
         );
+    }
+
+    public array function getDirectPermissionsForUser(required numeric userID) {
+        if ( !hasPermissionTables() ) {
+            return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT p.permission_id, p.permission_key, p.display_name, p.category, p.description, p.sort_order
+                FROM AdminUserPermissions aup
+                INNER JOIN AdminPermissions p ON p.permission_id = aup.permission_id
+                WHERE aup.user_id = :userID
+                  AND p.is_active = 1
+                ORDER BY p.category, p.sort_order, p.permission_key
+            ",
+            params  = { userID = { value = arguments.userID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+        return queryToArray(qry);
+    }
+
+    public void function grantPermissionToUser(required numeric userID, required numeric permissionID, numeric grantedByUserID = 0, string notes = "") {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM AdminUserPermissions
+                    WHERE user_id = :userID AND permission_id = :permissionID
+                )
+                INSERT INTO AdminUserPermissions (user_id, permission_id, granted_by_user_id, notes)
+                VALUES (:userID, :permissionID, :grantedByUserID, :notes)
+            ",
+            params  = {
+                userID = { value = arguments.userID, cfsqltype = "cf_sql_integer" },
+                permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" },
+                grantedByUserID = { value = arguments.grantedByUserID, null = (arguments.grantedByUserID LTE 0), cfsqltype = "cf_sql_integer" },
+                notes = { value = arguments.notes, null = !len(trim(arguments.notes)), cfsqltype = "cf_sql_varchar" }
+            },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public void function revokePermissionFromUser(required numeric userID, required numeric permissionID) {
+        if ( !hasPermissionTables() ) {
+            return;
+        }
+
+        executeQueryWithRetry(
+            sql     = "DELETE FROM AdminUserPermissions WHERE user_id = :userID AND permission_id = :permissionID",
+            params  = {
+                userID = { value = arguments.userID, cfsqltype = "cf_sql_integer" },
+                permissionID = { value = arguments.permissionID, cfsqltype = "cf_sql_integer" }
+            },
+            options = { datasource = variables.dsn }
+        );
+    }
+
+    public array function getEffectivePermissionsForUser(required numeric userID) {
+        if ( !hasPermissionTables() ) {
+            return [];
+        }
+
+        var qry = executeQueryWithRetry(
+            sql     = "
+                SELECT DISTINCT permission_key, category, sort_order
+                FROM (
+                    SELECT p.permission_key, p.category, p.sort_order
+                    FROM AdminUserRoles aur
+                    INNER JOIN AdminRolePermissions arp ON arp.role_id = aur.role_id
+                    INNER JOIN AdminPermissions p ON p.permission_id = arp.permission_id
+                    WHERE aur.user_id = :userID
+                      AND p.is_active = 1
+
+                    UNION
+
+                    SELECT p.permission_key, p.category, p.sort_order
+                    FROM AdminUserPermissions aup
+                    INNER JOIN AdminPermissions p ON p.permission_id = aup.permission_id
+                    WHERE aup.user_id = :userID
+                      AND p.is_active = 1
+                ) permissions
+                ORDER BY category, sort_order, permission_key
+            ",
+            params  = { userID = { value = arguments.userID, cfsqltype = "cf_sql_integer" } },
+            options = { datasource = variables.dsn }
+        );
+        return queryToArray(qry);
     }
 
     public numeric function countUsersWithRole(required string roleName) {

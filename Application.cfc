@@ -75,6 +75,10 @@ component output="false" {
             // Expose role-check helpers on every admin request
             request.hasRole    = application.authService.hasRole;
             request.hasAnyRole = application.authService.hasAnyRole;
+            request.hasPermission = application.authService.hasPermission;
+            request.hasAnyPermission = application.authService.hasAnyPermission;
+            request.isActualSuperAdmin = application.authService.isActualSuperAdmin;
+            request.isImpersonating = application.authService.isImpersonating;
 
             // ── Admin authentication ───────────────────────────────────
             var publicPages = [

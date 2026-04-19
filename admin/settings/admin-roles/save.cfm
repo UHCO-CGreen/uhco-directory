@@ -1,9 +1,9 @@
 <!---
     Admin Roles — POST handler for create, update, delete.
-    SUPER_ADMIN only.
+    Permission: settings.admin_roles.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.admin_roles.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -32,6 +32,32 @@
                 <cfset redirectURL &= "?msg=" & urlEncodedFormat(result.message)>
             <cfelse>
                 <cfset redirectURL &= "?err=" & urlEncodedFormat(result.message)>
+            </cfif>
+        </cfcase>
+
+        <cfcase value="saveRolePermissions">
+            <cfset rid = structKeyExists(form, "roleID") AND isNumeric(form.roleID) ? val(form.roleID) : 0>
+            <cfset permissionIDList = structKeyExists(form, "permissionIDs") ? form.permissionIDs : "">
+            <cfset permissionIDs = []>
+            <cfif isArray(permissionIDList)>
+                <cfloop array="#permissionIDList#" index="permissionIDValue">
+                    <cfif isNumeric(permissionIDValue) AND val(permissionIDValue) GT 0>
+                        <cfset arrayAppend(permissionIDs, val(permissionIDValue))>
+                    </cfif>
+                </cfloop>
+            <cfelseif len(trim(permissionIDList & ""))>
+                <cfloop list="#permissionIDList#" delimiters="," index="permissionIDValue">
+                    <cfif isNumeric(permissionIDValue) AND val(permissionIDValue) GT 0>
+                        <cfset arrayAppend(permissionIDs, val(permissionIDValue))>
+                    </cfif>
+                </cfloop>
+            </cfif>
+            <cfset result = authSvc.saveRolePermissions(rid, permissionIDs)>
+            <cfif result.success>
+                <cfset application.authService.reloadAuthorization()>
+                <cfset redirectURL &= "?edit=" & rid & "&msg=" & urlEncodedFormat(result.message)>
+            <cfelse>
+                <cfset redirectURL &= "?edit=" & rid & "&err=" & urlEncodedFormat(result.message)>
             </cfif>
         </cfcase>
 

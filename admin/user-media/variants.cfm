@@ -1,8 +1,5 @@
 <!--- ── Authorization ─────────────────────────────────────────────────────── --->
-<cfif NOT (
-    application.authService.hasRole("USER_MEDIA_ADMIN")
-    OR application.authService.hasRole("SUPER_ADMIN")
-)>
+<cfif NOT request.hasPermission("media.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -72,19 +69,24 @@
 
     <!--- ── Publish all current variants ─────────────────────────────── --->
     <cfelseif action EQ "publishAll">
-        <cfset publishingService = createObject("component", "cfc.PublishingService").init()>
-        <cfset result = publishingService.publishAllVariants(userID, sourceID)>
-        <cfset actionMessage      = result.message>
-        <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
+        <cfif NOT request.hasPermission("media.publish")>
+            <cfset actionMessage = "You do not have permission to publish media.">
+            <cfset actionMessageClass = "alert-danger">
+        <cfelse>
+            <cfset publishingService = createObject("component", "cfc.PublishingService").init()>
+            <cfset result = publishingService.publishAllVariants(userID, sourceID)>
+            <cfset actionMessage      = result.message>
+            <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
 
-        <!--- Append per-variant details if there are mixed results --->
-        <cfif arrayLen(result.results) GT 0 AND NOT result.success>
-            <cfloop from="1" to="#arrayLen(result.results)#" index="px">
-                <cfset pr = result.results[px]>
-                <cfif NOT pr.success>
-                    <cfset actionMessage = actionMessage & " | " & pr.message>
-                </cfif>
-            </cfloop>
+            <!--- Append per-variant details if there are mixed results --->
+            <cfif arrayLen(result.results) GT 0 AND NOT result.success>
+                <cfloop from="1" to="#arrayLen(result.results)#" index="px">
+                    <cfset pr = result.results[px]>
+                    <cfif NOT pr.success>
+                        <cfset actionMessage = actionMessage & " | " & pr.message>
+                    </cfif>
+                </cfloop>
+            </cfif>
         </cfif>
 
     </cfif>
@@ -165,7 +167,7 @@
         <div class='d-flex align-items-center gap-2'>
 ">
 
-<cfif application.authService.hasRole("SUPER_ADMIN")>
+<cfif request.hasPermission("settings.media_config.manage")>
     <cfset content &= "
             <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-sm btn-outline-secondary'>
                 <i class='bi bi-sliders me-1'></i> Types
@@ -412,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </cfif>
 </cfloop>
 
-<cfif publishableCount GT 0>
+<cfif publishableCount GT 0 AND request.hasPermission("media.publish")>
     <cfset content &= "
     <div class='card mb-4 border-primary'>
         <div class='card-body d-flex justify-content-between align-items-center'>

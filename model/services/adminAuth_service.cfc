@@ -84,6 +84,206 @@ component output="false" {
         return result;
     }
 
+    /* ─────────────────── Permissions ─────────────────── */
+
+    public array function getAllPermissions() {
+        return variables.dao.getAllPermissions();
+    }
+
+    public struct function getPermissionByKey(required string permissionKey) {
+        return variables.dao.getPermissionByKey(arguments.permissionKey);
+    }
+
+    public struct function getPermissionByID(required numeric permissionID) {
+        return variables.dao.getPermissionByID(arguments.permissionID);
+    }
+
+    public struct function createPermission(
+        required string permissionKey,
+        required string displayName,
+        required string category,
+        string description = "",
+        numeric sortOrder = 0,
+        boolean isActive = true
+    ) {
+        var result = { success = false, message = "", permissionID = 0 };
+        var keyName = lCase(trim(arguments.permissionKey));
+        var displayLabel = trim(arguments.displayName);
+        var categoryName = lCase(trim(arguments.category));
+        var existing = {};
+
+        if (!len(keyName)) {
+            result.message = "Permission key is required.";
+            return result;
+        }
+
+        if (!reFind("^[a-z0-9_.]+$", keyName)) {
+            result.message = "Permission key may only contain lowercase letters, numbers, underscores, and periods.";
+            return result;
+        }
+
+        if (!len(displayLabel)) {
+            result.message = "Display name is required.";
+            return result;
+        }
+
+        if (!len(categoryName)) {
+            result.message = "Category is required.";
+            return result;
+        }
+
+        existing = variables.dao.getPermissionByKey(keyName);
+        if (structCount(existing)) {
+            result.message = "A permission with key '#keyName#' already exists.";
+            return result;
+        }
+
+        result.permissionID = variables.dao.createPermission(
+            permissionKey = keyName,
+            displayName = displayLabel,
+            category = categoryName,
+            description = trim(arguments.description),
+            sortOrder = val(arguments.sortOrder),
+            isActive = arguments.isActive,
+            isSystem = false
+        );
+        result.success = true;
+        result.message = "Permission '#keyName#' created.";
+        return result;
+    }
+
+    public struct function updatePermission(
+        required numeric permissionID,
+        required string permissionKey,
+        required string displayName,
+        required string category,
+        string description = "",
+        numeric sortOrder = 0,
+        boolean isActive = true
+    ) {
+        var result = { success = false, message = "" };
+        var keyName = lCase(trim(arguments.permissionKey));
+        var displayLabel = trim(arguments.displayName);
+        var categoryName = lCase(trim(arguments.category));
+        var permissionRecord = variables.dao.getPermissionByID(arguments.permissionID);
+        var existing = {};
+
+        if (!structCount(permissionRecord)) {
+            result.message = "Permission not found.";
+            return result;
+        }
+
+        if (!len(displayLabel)) {
+            result.message = "Display name is required.";
+            return result;
+        }
+
+        if (!len(categoryName)) {
+            result.message = "Category is required.";
+            return result;
+        }
+
+        if (!len(keyName)) {
+            result.message = "Permission key is required.";
+            return result;
+        }
+
+        if (!reFind("^[a-z0-9_.]+$", keyName)) {
+            result.message = "Permission key may only contain lowercase letters, numbers, underscores, and periods.";
+            return result;
+        }
+
+        if (val(permissionRecord.IS_SYSTEM) EQ 1 AND keyName != lCase(trim(permissionRecord.PERMISSION_KEY))) {
+            result.message = "System permission keys cannot be renamed.";
+            return result;
+        }
+
+        existing = variables.dao.getPermissionByKey(keyName);
+        if (structCount(existing) AND existing.PERMISSION_ID != arguments.permissionID) {
+            result.message = "A permission with key '#keyName#' already exists.";
+            return result;
+        }
+
+        variables.dao.updatePermission(
+            permissionID = arguments.permissionID,
+            permissionKey = keyName,
+            displayName = displayLabel,
+            category = categoryName,
+            description = trim(arguments.description),
+            sortOrder = val(arguments.sortOrder),
+            isActive = arguments.isActive
+        );
+        result.success = true;
+        result.message = "Permission updated.";
+        return result;
+    }
+
+    public struct function deletePermission(required numeric permissionID) {
+        var result = { success = false, message = "" };
+        var permissionRecord = variables.dao.getPermissionByID(arguments.permissionID);
+
+        if (!structCount(permissionRecord)) {
+            result.message = "Permission not found.";
+            return result;
+        }
+
+        if (val(permissionRecord.IS_SYSTEM) EQ 1) {
+            result.message = "System permissions cannot be deleted.";
+            return result;
+        }
+
+        variables.dao.deletePermission(arguments.permissionID);
+        result.success = true;
+        result.message = "Permission '#permissionRecord.PERMISSION_KEY#' deleted.";
+        return result;
+    }
+
+    public array function getPermissionsForRole(required numeric roleID) {
+        return variables.dao.getPermissionsForRole(arguments.roleID);
+    }
+
+    public struct function saveRolePermissions(required numeric roleID, required array permissionIDArray) {
+        var result = { success = false, message = "" };
+        var role = variables.dao.getRoleByID(arguments.roleID);
+        var existingPermissions = [];
+        var existingPermissionIDs = {};
+        var requestedPermissionIDs = {};
+        var permissionRow = {};
+        var requestedPermissionID = 0;
+
+        if (!structCount(role)) {
+            result.message = "Role not found.";
+            return result;
+        }
+
+        existingPermissions = variables.dao.getPermissionsForRole(arguments.roleID);
+        for (permissionRow in existingPermissions) {
+            existingPermissionIDs[toString(permissionRow.PERMISSION_ID)] = true;
+        }
+
+        for (requestedPermissionID in arguments.permissionIDArray) {
+            if (isNumeric(requestedPermissionID) AND val(requestedPermissionID) GT 0) {
+                requestedPermissionIDs[toString(val(requestedPermissionID))] = true;
+            }
+        }
+
+        for (permissionRow in existingPermissions) {
+            if (!structKeyExists(requestedPermissionIDs, toString(permissionRow.PERMISSION_ID))) {
+                variables.dao.revokePermissionFromRole(arguments.roleID, permissionRow.PERMISSION_ID);
+            }
+        }
+
+        for (requestedPermissionID in arguments.permissionIDArray) {
+            if (isNumeric(requestedPermissionID) AND val(requestedPermissionID) GT 0 AND !structKeyExists(existingPermissionIDs, toString(val(requestedPermissionID)))) {
+                variables.dao.assignPermissionToRole(arguments.roleID, val(requestedPermissionID));
+            }
+        }
+
+        result.success = true;
+        result.message = "Role permissions updated.";
+        return result;
+    }
+
     /* ─────────────────── Users ─────────────────── */
 
     public array function getAllUsers() {
@@ -194,6 +394,56 @@ component output="false" {
         variables.dao.revokeRole(arguments.userID, arguments.roleID);
         result.success = true;
         result.message = "Role revoked.";
+        return result;
+    }
+
+    public array function getDirectPermissionsForUser(required numeric userID) {
+        return variables.dao.getDirectPermissionsForUser(arguments.userID);
+    }
+
+    public array function getEffectivePermissionsForUser(required numeric userID) {
+        return variables.dao.getEffectivePermissionsForUser(arguments.userID);
+    }
+
+    public struct function saveUserDirectPermissions(required numeric userID, required array permissionIDArray, numeric grantedByUserID = 0) {
+        var result = { success = false, message = "" };
+        var user = variables.dao.getUserByID(arguments.userID);
+        var existingPermissions = [];
+        var existingPermissionIDs = {};
+        var requestedPermissionIDs = {};
+        var permissionRow = {};
+        var requestedPermissionID = 0;
+
+        if (!structCount(user)) {
+            result.message = "User not found.";
+            return result;
+        }
+
+        existingPermissions = variables.dao.getDirectPermissionsForUser(arguments.userID);
+        for (permissionRow in existingPermissions) {
+            existingPermissionIDs[toString(permissionRow.PERMISSION_ID)] = true;
+        }
+
+        for (requestedPermissionID in arguments.permissionIDArray) {
+            if (isNumeric(requestedPermissionID) AND val(requestedPermissionID) GT 0) {
+                requestedPermissionIDs[toString(val(requestedPermissionID))] = true;
+            }
+        }
+
+        for (permissionRow in existingPermissions) {
+            if (!structKeyExists(requestedPermissionIDs, toString(permissionRow.PERMISSION_ID))) {
+                variables.dao.revokePermissionFromUser(arguments.userID, permissionRow.PERMISSION_ID);
+            }
+        }
+
+        for (requestedPermissionID in arguments.permissionIDArray) {
+            if (isNumeric(requestedPermissionID) AND val(requestedPermissionID) GT 0 AND !structKeyExists(existingPermissionIDs, toString(val(requestedPermissionID)))) {
+                variables.dao.grantPermissionToUser(arguments.userID, val(requestedPermissionID), arguments.grantedByUserID);
+            }
+        }
+
+        result.success = true;
+        result.message = "Direct user permissions updated.";
         return result;
     }
 

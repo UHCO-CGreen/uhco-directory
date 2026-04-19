@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset secretService = createObject("component", "cfc.secret_service").init()>
 <cfset secrets = secretService.getAllSecrets()>
 

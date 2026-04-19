@@ -300,7 +300,7 @@
                     </li>
                 </ul>
             </li>
-            <cfif request.hasRole("USER_MEDIA_ADMIN") or request.hasRole("SUPER_ADMIN")>
+            <cfif request.hasPermission("media.view")>
             <li class="nav-item">
                 <a class="nav-link" href="#request.webRoot#/admin/user-media/index.cfm">
                     <i class="bi bi-collection-fill sidebar-icon"></i>
@@ -431,8 +431,30 @@
                     <div class="col-9 user">
                     <i class="bi bi-person-circle me-2"></i>
                     <cfoutput>#session.user.displayName#</cfoutput>
+                    <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+                        <cfset sidebarImpersonation = application.authService.getImpersonationState()>
+                        <div class="mt-2 ms-4">
+                            <span class="badge text-bg-warning text-dark" title="Current effective access">
+                                <i class="bi bi-person-down me-1"></i><cfoutput>#encodeForHTML(sidebarImpersonation.label ?: "Impersonating")#</cfoutput>
+                            </span>
+                        </div>
+                    </cfif>
                     </div>
-                    <cfif structKeyExists(session.user, "isSuperAdmin") AND session.user.isSuperAdmin>
+                    <cfif request.hasPermission("settings.view") OR request.hasAnyPermission([
+                        "settings.app_config.manage",
+                        "settings.media_config.manage",
+                        "settings.api.manage",
+                        "settings.admin_users.manage",
+                        "settings.admin_roles.manage",
+                        "settings.admin_permissions.manage",
+                        "settings.import.manage",
+                        "settings.bulk_exclusions.manage",
+                        "settings.migrations.manage",
+                        "settings.uh_sync.view",
+                        "settings.query_builder.use",
+                        "settings.scheduled_tasks.manage",
+                        "settings.workflows.manage"
+                    ])>
                     <div class="col-3 justify-content-center settings">
                         <a href="#request.webRoot#/admin/settings/" class="text-white settings" title="Settings" id="settingsGear">
                         <i class="bi bi-gear-fill"></i> 
@@ -459,6 +481,23 @@
         }
     </script>
     <main class="flex-fill p-4" style="min-width:0; overflow-x:hidden;">
+        <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+            <cfset impersonationState = application.authService.getImpersonationState()>
+            <cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
+            <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3" role="alert">
+                <div>
+                    <strong>Impersonation active.</strong>
+                    You are currently using <strong><cfoutput>#encodeForHTML(impersonationState.label ?: "")#</cfoutput></strong>.
+                </div>
+                <form method="post" action="#request.webRoot#/admin/settings/admin-users/save.cfm" class="mb-0">
+                    <input type="hidden" name="action" value="clearImpersonation">
+                    <input type="hidden" name="returnURL" value="<cfoutput>#encodeForHTMLAttribute(currentRequestUrl)#</cfoutput>">
+                    <button type="submit" class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-x-octagon me-1"></i>Stop Impersonating
+                    </button>
+                </form>
+            </div>
+        </cfif>
         <cfoutput>#content#</cfoutput>
         
         <cfif isDefined('url.dump')><cfdump var="#session.user#">

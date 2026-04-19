@@ -1,9 +1,9 @@
 <!---
     Edit Bulk Exclusion Type — flags, codes, label, icon.
-    SUPER_ADMIN only.
+    Permission: settings.bulk_exclusions.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.bulk_exclusions.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

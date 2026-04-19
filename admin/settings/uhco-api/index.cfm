@@ -1,9 +1,9 @@
 <!---
     UHCO API — Settings hub for Tokens & Secrets.
-    SUPER_ADMIN only.
+    Permission: settings.api.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.api.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

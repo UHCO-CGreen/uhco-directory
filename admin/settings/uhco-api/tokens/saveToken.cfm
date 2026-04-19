@@ -1,3 +1,7 @@
+<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfif NOT (CGI.REQUEST_METHOD EQ "POST")
     OR NOT structKeyExists(form, "tokenName")
     OR NOT len(trim(form.tokenName))

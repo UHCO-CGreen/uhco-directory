@@ -20,6 +20,10 @@
     <cfset triggeredBy = trim(form.triggeredBy)>
 </cfif>
 
+<cfif triggeredBy NEQ "scheduled" AND NOT request.hasPermission("settings.migrations.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset returnJson = structKeyExists(url, "format") AND lCase(trim(url.format)) EQ "json">
 <cfset forceRun   = structKeyExists(url, "force")  AND url.force EQ "true">
 

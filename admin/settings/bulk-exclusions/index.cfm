@@ -1,9 +1,9 @@
 <!---
     Bulk Exclusions Dashboard — run, view status, recent history.
-    SUPER_ADMIN only.
+    Permission: settings.bulk_exclusions.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.bulk_exclusions.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

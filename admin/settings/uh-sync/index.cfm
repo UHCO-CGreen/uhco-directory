@@ -1,9 +1,9 @@
 <!---
     UH Sync Hub — overview of sync reports.
-    SUPER_ADMIN only.
+    Permission: settings.uh_sync.view.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.uh_sync.view")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

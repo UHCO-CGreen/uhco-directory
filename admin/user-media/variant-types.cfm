@@ -1,5 +1,5 @@
-<!--- ── Authorization: SUPER_ADMIN only ─────────────────────────────────── --->
-<cfif NOT application.authService.hasRole("SUPER_ADMIN")>
+<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
+<cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

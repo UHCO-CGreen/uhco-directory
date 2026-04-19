@@ -348,7 +348,7 @@
     Images
 ">
 
-<cfif request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN")>
+<cfif request.hasPermission("media.edit")>
     <cfset content &= "
     <a href='/admin/user-media/sources.cfm?userid=#url.userID#'
        class='btn btn-sm btn-outline-primary'>

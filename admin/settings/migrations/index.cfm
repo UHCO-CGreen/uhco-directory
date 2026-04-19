@@ -1,9 +1,9 @@
 <!---
     Migrations Hub — Settings sub-section.
-    SUPER_ADMIN only.
+    Permission: settings.migrations.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.migrations.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

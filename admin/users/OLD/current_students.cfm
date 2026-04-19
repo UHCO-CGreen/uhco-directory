@@ -249,7 +249,7 @@
     <cfset hasOrigChange = (isNumeric(u.ORIGINALGRADYEAR) AND val(u.ORIGINALGRADYEAR) GT 0) ? true : false>
     <cfset gradYearDisplay = len(gradYear) ? gradYear & (hasOrigChange ? " *" : "") : "">
     <cfset thumbURL = structKeyExists(webThumbMap, toString(u.USERID)) ? webThumbMap[toString(u.USERID)] : "">
-    <cfif request.hasRole("USER_MEDIA_ADMIN") OR request.hasRole("SUPER_ADMIN")>
+    <cfif request.hasPermission("media.edit")>
         <cfset mediaLink= "
                     <a href='/admin/user-media/sources.cfm?userid=#u.USERID#'
                     class='btn btn-sm btn-outline-primary'>

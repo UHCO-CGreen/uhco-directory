@@ -1,9 +1,9 @@
 <!---
     Workflows Hub — placeholder.
-    SUPER_ADMIN only.
+    Permission: settings.workflows.manage.
 --->
 
-<cfif NOT request.hasRole("SUPER_ADMIN")>
+<cfif NOT request.hasPermission("settings.workflows.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 

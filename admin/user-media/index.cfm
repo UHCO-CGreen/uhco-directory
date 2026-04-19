@@ -1,7 +1,4 @@
-<cfif NOT (
-    application.authService.hasRole("USER_MEDIA_ADMIN")
-    OR application.authService.hasRole("SUPER_ADMIN")
-)>
+<cfif NOT request.hasPermission("media.view")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -35,12 +32,17 @@
 <div class='d-flex justify-content-between align-items-center mb-2'>
     <h1>User Media</h1>
     <div class='d-flex gap-2'>
+">
+
+<cfif request.hasPermission("media.publish")>
+    <cfset content &= "
         <a href='#request.webRoot#/admin/user-media/bulk-transfer.cfm' class='btn btn-outline-secondary'>
             <i class='bi bi-arrow-left-right me-1'></i> Bulk Transfer
         </a>
-">
+    ">
+</cfif>
 
-<cfif application.authService.hasRole("SUPER_ADMIN")>
+<cfif request.hasPermission("settings.media_config.manage")>
     <cfset content &= "
         <a href='/admin/settings/media-config/filename-patterns.cfm' class='btn btn-outline-secondary'>
             <i class='bi bi-file-earmark-text me-1'></i> Filename Patterns
