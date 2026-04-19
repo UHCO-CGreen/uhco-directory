@@ -10,6 +10,17 @@
   password = form.password
 )>
 
+<!--- Debugging: dump the authentication result and auth service state 
+<cfdump var="#authResult#" label="Authentication Result">
+<cfif authResult.success>
+  <cfset application.authService.createSession(authResult.user)>
+
+  <cfdump var="#application.authService#" label="Auth Service">
+  <cfdump var="#request.webRoot#" label="Web Root">
+</cfif>
+<cfabort>--->
+
+
 <cfif authResult.success>
   <cfset application.authService.createSession(authResult.user)>
   <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">

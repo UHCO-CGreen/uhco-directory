@@ -3,7 +3,7 @@ component output="false" {
     this.name              = "UHCOidentity";
     this.sessionManagement = true;
     this.sessionTimeout    = createTimeSpan(0, 8, 0, 0);
-    this.setClientCookies  = false;       // Admin sets cookies manually
+    this.setClientCookies  = true;
     this.showDebugOutput   = false;
     this.postParametersLimit = 10000;
 
