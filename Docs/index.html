@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UHCO Ident Documentation</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <div class="hero-card">
+        <div class="eyebrow">System Documentation</div>
+        <h1>UHCO Ident</h1>
+        <p>UHCO Ident is the internal people-directory platform for the University of Houston College of Optometry. This docs site replaces the old root Word document with a browsable HTML reference covering architecture, data model, admin tools, API behavior, deployment, and operational notes.</p>
+        <div class="hero-meta">
+          <span>Adobe ColdFusion</span>
+          <span>Microsoft SQL Server</span>
+          <span>IIS + URL Rewrite</span>
+          <span>Admin UI + REST API</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container layout">
+    <aside class="sidebar">
+      <h2>Contents</h2>
+      <ul class="toc">
+        <li><a href="#overview">1. Overview</a></li>
+        <li><a href="#data-model">2. Core Data Model</a></li>
+        <li><a href="#user-management">3. User Management</a></li>
+        <li><a href="#organizations">4. Organizations</a></li>
+        <li><a href="#flags">5. Flags</a></li>
+        <li><a href="#api">6. REST API</a></li>
+        <li><a href="#tokens-secrets">7. Tokens and Secrets</a></li>
+        <li><a href="#sync">8. UH Directory Sync</a></li>
+        <li><a href="#dq">9. Data Quality</a></li>
+        <li><a href="#tools">10. Bulk Tools</a></li>
+        <li><a href="#admin-ui">11. Admin Interface</a></li>
+        <li><a href="#architecture">12. Architecture</a></li>
+        <li><a href="#deployment">13. Deployment</a></li>
+        <li><a href="#appendix">Appendix</a></li>
+      </ul>
+    </aside>
+
+    <div class="content">
+      <section class="card" id="overview">
+        <h2>1. Overview</h2>
+        <p>UHCO Ident is the authoritative directory application for UHCO faculty, staff, current students, and alumni. It centralizes roster management, syncs with the university-wide UH Directory API, and exposes its own secured REST API for downstream systems such as Modern Campus.</p>
+        <div class="grid two">
+          <div>
+            <h3>Technology Stack</h3>
+            <ul>
+              <li>Back end: Adobe ColdFusion, developed on CF2025 and deployed on CF2021</li>
+              <li>Database: Microsoft SQL Server via datasource <code>UHCO_Directory</code></li>
+              <li>Front end: Bootstrap 5 and Bootstrap Icons in the admin interface</li>
+              <li>Web server: IIS with URL Rewrite for API routing</li>
+              <li>External integration: UH Directory API with Bearer token and HMAC secret</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Application URL Structure</h3>
+            <ul>
+              <li><code>/admin/</code> administrative back-office</li>
+              <li><code>/api/v1/</code> REST API endpoints</li>
+              <li><code>/cfc/</code> service components</li>
+              <li><code>/dao/</code> DAO components</li>
+              <li><code>/includes/</code> shared helper partials</li>
+              <li><code>/sql/</code> schema and migration scripts</li>
+              <li><code>/xml/</code> XML data used by the UH API integration</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="data-model">
+        <h2>2. Core Data Model</h2>
+        <p>All data is stored in SQL Server and hangs off the central <code>Users</code> table. The model is effectively a star pattern with user identity at the center and related records branching by concern.</p>
+        <h3>Primary User Fields</h3>
+        <div class="badge-list">
+          <span class="badge">UserID</span>
+          <span class="badge">UH_API_ID</span>
+          <span class="badge">FirstName / LastName</span>
+          <span class="badge">PreferredName</span>
+          <span class="badge">Degrees</span>
+          <span class="badge">Pronouns</span>
+          <span class="badge">EmailPrimary</span>
+          <span class="badge">Phone</span>
+          <span class="badge">Room / Building</span>
+          <span class="badge">Division / Department</span>
+          <span class="badge">Title1 / Title2 / Title3</span>
+          <span class="badge">Active</span>
+        </div>
+        <h3>Supporting Tables</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Table Group</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>UserFlags</code>, <code>UserFlagAssignments</code></td><td>Categorical user labels such as Faculty, Staff, Current-Student, Alumni, and No UH.</td></tr>
+              <tr><td><code>Organizations</code>, <code>UserOrganizations</code></td><td>Hierarchical org structure and user memberships.</td></tr>
+              <tr><td><code>UserAcademicInfo</code></td><td>Graduation year, program, and degree metadata for students and alumni.</td></tr>
+              <tr><td><code>UserAddresses</code></td><td>Mailing and home addresses beyond the primary office fields.</td></tr>
+              <tr><td><code>UserImages</code></td><td>Published image URLs and sort order.</td></tr>
+              <tr><td><code>UserExternalIDs</code>, <code>ExternalSystems</code></td><td>Mappings to CougarNet, PeopleSoft, legacy systems, and other external IDs.</td></tr>
+              <tr><td><code>Tokens</code>, <code>Secrets</code></td><td>Hashed API credentials and protected-data access controls.</td></tr>
+              <tr><td><code>UserStudentProfile</code>, <code>UserAwards</code></td><td>Expanded student profile content and award records.</td></tr>
+              <tr><td><code>DataQualityRuns</code>, <code>DataQualityIssues</code></td><td>Data-quality batch history and per-user issue tracking.</td></tr>
+              <tr><td><code>UHSyncRuns</code>, <code>UHSyncDiffs</code>, <code>UHSyncGone</code>, <code>UHSyncNew</code></td><td>UH API sync run history and field-level comparisons.</td></tr>
+              <tr><td><code>DataQualityExclusions</code></td><td>Per-user exclusions for known acceptable data-quality issues.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="user-management">
+        <h2>3. User Management</h2>
+        <p>The <code>admin/users/</code> area is the core administrative workspace for managing directory records. The app treats five user groupings as first-class admin views: Faculty, Staff, Current Students, Alumni, and Inactive.</p>
+        <h3>User List</h3>
+        <ul>
+          <li>Paginated, sortable table with filters driven by tabs and query-string state.</li>
+          <li>Dedicated “Needs Attention” view for records carrying flags like <code>Admin - Check</code> or <code>No UH</code>.</li>
+          <li>Bulk flag and organization lookups are loaded up front to avoid N+1 queries.</li>
+          <li>Sort links are generated by helpers and the active sort column is highlighted.</li>
+        </ul>
+        <h3>User Profile View</h3>
+        <p>The profile view uses <code>directory_service.getFullProfile(userID)</code> and renders identity, contact info, titles, photo gallery, organizations, flags, external IDs, addresses, academic info, sync history, and data-quality exclusions.</p>
+        <h3>Create, Edit, Delete</h3>
+        <ul>
+          <li><code>new.cfm</code> creates a blank user record.</li>
+          <li><code>edit.cfm</code> loads the same save flow with existing data.</li>
+          <li><code>saveUser.cfm</code> validates required fields and email format before writing via <code>users_service.saveUser()</code>.</li>
+          <li>Delete flows hard-delete the user and rely on related table cleanup to remove dependent rows.</li>
+        </ul>
+        <h3>Per-User UH API Sync</h3>
+        <p>Admins can sync a single user from the UH Directory API and resolve field-by-field differences, or use a lightweight AJAX endpoint to refresh a single field directly from the upstream source.</p>
+      </section>
+
+      <section class="card" id="organizations">
+        <h2>4. Organizations</h2>
+        <p>Organizations provide the hierarchy used for browsing, filtering, and representing the college’s internal structure.</p>
+        <div class="grid two">
+          <div>
+            <h3>Structure</h3>
+            <ul>
+              <li><code>OrgID</code>, <code>OrgName</code>, <code>OrgAbbr</code></li>
+              <li><code>ParentOrgID</code> supports a self-referential tree</li>
+              <li><code>OrgType</code> controls display grouping</li>
+              <li><code>SortOrder</code> controls sequence</li>
+              <li><code>Active</code> hides retired orgs from display and API output</li>
+            </ul>
+          </div>
+          <div>
+            <h3>User Assignments</h3>
+            <p><code>UserOrganizations</code> allows multiple org memberships per user with start and end dates. Admin pages support add/remove membership management directly from the user profile.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="flags">
+        <h2>5. Flags</h2>
+        <p>Flags are used for filtering, admin workflows, and API data protection.</p>
+        <h3>Definition Model</h3>
+        <ul>
+          <li><code>FlagID</code>, <code>FlagName</code>, <code>FlagDescription</code></li>
+          <li><code>Protected</code> marks flags that require a valid secret to be returned in API responses</li>
+          <li><code>SortOrder</code> and <code>Active</code> control display and retirement behavior</li>
+        </ul>
+        <div class="note">
+          <strong>Protected data behavior:</strong> flags such as Current-Student and Alumni are filtered from API responses unless the caller presents a valid secret that unlocks those protected flags.
+        </div>
+      </section>
+
+      <section class="card" id="api">
+        <h2>6. REST API</h2>
+        <p>The API is rooted at <code>/api/v1/</code> and is read-only. All requests require a valid Bearer token, and some protected data additionally requires a secret.</p>
+        <h3>Key Endpoints</h3>
+        <pre><code>GET /api/v1/people
+GET /api/v1/people/{id}
+GET /api/v1/people/{id}/flags
+GET /api/v1/people/{id}/organizations
+GET /api/v1/people/{id}/academic
+GET /api/v1/people/{id}/addresses
+GET /api/v1/people/{id}/externalids
+GET /api/v1/organizations
+GET /api/v1/organizations/{id}
+GET /api/v1/flags</code></pre>
+        <h3>People Query Parameters</h3>
+        <ul>
+          <li><code>search</code> full-text search across identity and email fields</li>
+          <li><code>flag</code> filter by flag name</li>
+          <li><code>org</code> filter by organization ID</li>
+          <li><code>class</code> filter by academic cohort year</li>
+          <li><code>limit</code> max 500, default 50</li>
+          <li><code>offset</code> pagination offset</li>
+          <li><code>format</code> <code>json</code> or <code>xml</code></li>
+        </ul>
+        <h3>Token Validation Pipeline</h3>
+        <ol>
+          <li>Authorization header is present and correctly formatted.</li>
+          <li>SHA-256 hash of the token matches a stored record.</li>
+          <li>Token is not revoked.</li>
+          <li>Token is not expired.</li>
+          <li>Caller IP satisfies allowlist or CIDR rules.</li>
+          <li>Requested scope is permitted.</li>
+          <li><code>LastUsedAt</code> is updated on success.</li>
+        </ol>
+        <h3>Error Format</h3>
+        <pre><code>{ "error": "message", "status": 401 }</code></pre>
+      </section>
+
+      <section class="card" id="tokens-secrets">
+        <h2>7. Tokens and Secrets</h2>
+        <p>API tokens and secrets are managed separately because they solve different security problems.</p>
+        <div class="grid two">
+          <div>
+            <h3>Tokens</h3>
+            <ul>
+              <li>Grant API access</li>
+              <li>Store only SHA-256 hashes, never the raw token</li>
+              <li>Track scope, allowlist, expiration, revocation, and last used time</li>
+              <li>Can be revoked or permanently deleted</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Secrets</h3>
+            <ul>
+              <li>Unlock protected flag and organization data</li>
+              <li>Also store only SHA-256 hashes</li>
+              <li>Define which protected flags a client may see</li>
+              <li>Use the same one-time reveal lifecycle as tokens</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="sync">
+        <h2>8. UH Directory Sync</h2>
+        <p>UHCO Ident maintains its own copy of staff and faculty data and periodically compares it against the upstream UH Directory API.</p>
+        <h3>Credentials and Configuration</h3>
+        <ul>
+          <li><code>UH_API_TOKEN</code> Bearer token</li>
+          <li><code>UH_API_SECRET</code> HMAC signing secret</li>
+        </ul>
+        <div class="note">
+          <strong>Important:</strong> the source documentation notes hardcoded fallback credentials in <code>admin/reporting/run_uh_sync_report.cfm</code>. Those should be removed and replaced with environment-only configuration.
+        </div>
+        <h3>Bulk Sync Flow</h3>
+        <ol>
+          <li>Load all local users with a non-null <code>UH_API_ID</code>.</li>
+          <li>Retrieve current staff and faculty from the UH API.</li>
+          <li>Build a lookup keyed by <code>UH_API_ID</code>.</li>
+          <li>Compare each local record field by field.</li>
+          <li>Write differences to <code>UHSyncDiffs</code>.</li>
+          <li>Track local-only records in <code>UHSyncGone</code>.</li>
+          <li>Track upstream-only people in <code>UHSyncNew</code>.</li>
+          <li>Create a <code>UHSyncRun</code> record with counts and metadata.</li>
+        </ol>
+      </section>
+
+      <section class="card" id="dq">
+        <h2>9. Data Quality</h2>
+        <p>The data-quality system audits the local database for missing or inconsistent information and stores findings for review.</p>
+        <h3>Typical Issue Codes</h3>
+        <div class="badge-list">
+          <span class="badge">NO_EMAIL</span>
+          <span class="badge">NO_PHONE</span>
+          <span class="badge">NO_ROOM</span>
+          <span class="badge">NO_BUILDING</span>
+          <span class="badge">NO_TITLE</span>
+          <span class="badge">NO_DEPT</span>
+          <span class="badge">NO_ORG</span>
+          <span class="badge">NO_FLAG</span>
+          <span class="badge">NO_PHOTO</span>
+          <span class="badge">NO_UH_ID</span>
+          <span class="badge">DUP_EMAIL</span>
+          <span class="badge">DUP_UH_ID</span>
+          <span class="badge">INACTIVE_ORG</span>
+          <span class="badge">INACTIVE_FLAG</span>
+          <span class="badge">NO_ACADEMIC</span>
+          <span class="badge">NO_GRAD_YEAR</span>
+          <span class="badge">MISSING_PREFERRED</span>
+        </div>
+        <p>Excluded issues can be suppressed per user via <code>DataQualityExclusions</code> when a known exception is acceptable.</p>
+      </section>
+
+      <section class="card" id="tools">
+        <h2>10. Bulk Tools and Reporting</h2>
+        <p>The admin reporting area contains recurring import, audit, and migration utilities beyond sync and DQ.</p>
+        <ul>
+          <li><strong>CS Bulk Import:</strong> mass-creates new College of Science users with initial org and flag assignments.</li>
+          <li><strong>CS Alumni Bulk Import:</strong> creates alumni records with graduation metadata.</li>
+          <li><strong>CS Migration Tool:</strong> one-time legacy data migration utility.</li>
+          <li><strong>OD Student Audit:</strong> compares the student roster against enrollment-related data.</li>
+          <li><strong>UH People Import:</strong> interactive import from the UH API.</li>
+          <li><strong>UH People — DB Not In API:</strong> finds local records whose <code>UH_API_ID</code> no longer appears upstream.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="admin-ui">
+        <h2>11. Admin Interface</h2>
+        <p>The admin side is a server-rendered Bootstrap application with shared layout, dashboard, reporting pages, and operational utilities.</p>
+        <h3>Highlights</h3>
+        <ul>
+          <li><code>dashboard.cfm</code> shows DQ and sync status badges plus quick navigation.</li>
+          <li><code>layout.cfm</code> provides the shell, sidebar, current user display, and navigation.</li>
+          <li><code>diagnostic.cfm</code> surfaces runtime environment and connectivity information.</li>
+          <li><code>clear_cache.cfm</code> and <code>resetapp.cfm</code> are operational maintenance pages.</li>
+          <li><code>admin/access/</code> manages named access areas.</li>
+          <li><code>admin/external/</code> manages external system definitions.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="architecture">
+        <h2>12. Architecture and Code Structure</h2>
+        <p>UHCO Ident uses a simple three-layer design with request-time object creation and no dependency injection framework.</p>
+        <div class="grid two">
+          <div>
+            <h3>Layer Overview</h3>
+            <ul>
+              <li>Presentation layer: <code>.cfm</code> pages in <code>admin/</code> and <code>api/v1/</code></li>
+              <li>Service layer: CFCs in <code>cfc/</code></li>
+              <li>Data access layer: CFCs in <code>dao/</code>, all extending <code>BaseDAO.cfc</code></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Instantiation Pattern</h3>
+            <pre><code>&lt;cfset svc = createObject("component", "cfc.users_service").init()&gt;</code></pre>
+            <p>Objects are constructed per request. Existing <code>singleton</code> metadata in components is only descriptive and has no runtime effect in ColdFusion.</p>
+          </div>
+        </div>
+        <h3>BaseDAO Utilities</h3>
+        <ul>
+          <li><code>executeQueryWithRetry(sql, params, options)</code> retries transient connection errors with backoff.</li>
+          <li><code>queryToArray(query)</code> normalizes ColdFusion query results into uppercase-key structs.</li>
+        </ul>
+        <h3>Application Scope</h3>
+        <p><code>Application.cfc</code> loads API credentials into application scope on startup. The API sub-application in <code>api/v1/Application.cfc</code> disables sessions and converts unhandled failures into JSON 500 responses.</p>
+      </section>
+
+      <section class="card" id="deployment">
+        <h2>13. Deployment and Security</h2>
+        <h3>Required Configuration</h3>
+        <ul>
+          <li>Set OS-level environment variables <code>UH_API_TOKEN</code> and <code>UH_API_SECRET</code>.</li>
+          <li>Configure the ColdFusion datasource <code>UHCO_Directory</code>.</li>
+          <li>Install the IIS rewrite rule that routes <code>/api/v1/*</code> to <code>/api/v1/index.cfm</code>.</li>
+          <li>Schedule UH Sync and Data Quality tasks through the ColdFusion Scheduler.</li>
+        </ul>
+        <h3>Compatibility Notes</h3>
+        <ul>
+          <li>Developed on ColdFusion 2025 and compatible with ColdFusion 2021.</li>
+          <li><code>queryExecute</code> return type support is available in CF2021.</li>
+          <li>Undocumented <code>fetchSize</code> options are ignored safely in CF2021.</li>
+          <li><code>arraySort()</code> closure callbacks and <code>qry.getRow(1)</code> are supported on the deployed version line.</li>
+        </ul>
+        <h3>Security Follow-Ups</h3>
+        <ul>
+          <li>Remove hardcoded fallback API credentials.</li>
+          <li>Restrict <code>admin/</code> with proper authentication controls.</li>
+          <li>Lock down <code>admin/diagnostic.cfm</code> to admins only.</li>
+          <li>Enforce HTTPS for all admin and API traffic.</li>
+          <li>Review token IP allowlists and rotate UH API credentials periodically.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="appendix">
+        <h2>Appendix: File and Folder Reference</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>Application.cfc</code></td><td>Root application configuration and environment bootstrap.</td></tr>
+              <tr><td><code>admin/</code></td><td>Administrative interface pages and operational tools.</td></tr>
+              <tr><td><code>admin/layout.cfm</code></td><td>Shared admin layout and navigation shell.</td></tr>
+              <tr><td><code>admin/users/</code></td><td>User CRUD, sync, import, and profile management.</td></tr>
+              <tr><td><code>admin/reporting/</code></td><td>UH Sync, data-quality, audit, and reporting tools.</td></tr>
+              <tr><td><code>admin/flags/</code></td><td>Flag definition CRUD.</td></tr>
+              <tr><td><code>admin/orgs/</code></td><td>Organization CRUD.</td></tr>
+              <tr><td><code>admin/external/</code></td><td>External system CRUD.</td></tr>
+              <tr><td><code>api/v1/</code></td><td>REST API sub-application and route dispatcher.</td></tr>
+              <tr><td><code>cfc/</code></td><td>Service layer components.</td></tr>
+              <tr><td><code>dao/</code></td><td>DAO layer including <code>BaseDAO.cfc</code>.</td></tr>
+              <tr><td><code>sql/</code></td><td>Schema creation, migration, and utility scripts.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Generated from the legacy UHCO Ident root documentation and converted to HTML for easier maintenance.</p>
+    </div>
+  </footer>
+</body>
+</html>
