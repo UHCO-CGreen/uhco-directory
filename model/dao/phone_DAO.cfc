@@ -13,6 +13,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getPhoneTypes() {
+        var qry = executeQueryWithRetry(
+            "SELECT DISTINCT PhoneType FROM UserPhone WHERE NULLIF(LTRIM(RTRIM(PhoneType)), '') IS NOT NULL ORDER BY PhoneType",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+        return queryToArray(qry);
+    }
+
     public void function replacePhones( required numeric userID, required array phones ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry(

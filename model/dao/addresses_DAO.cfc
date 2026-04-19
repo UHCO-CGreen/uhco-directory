@@ -13,6 +13,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getAddressTypes() {
+        var qry = executeQueryWithRetry(
+            "SELECT DISTINCT AddressType FROM UserAddresses WHERE NULLIF(LTRIM(RTRIM(AddressType)), '') IS NOT NULL ORDER BY AddressType",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+        return queryToArray(qry);
+    }
+
     public numeric function createAddress( required struct data ) {
         var q = executeQueryWithRetry(
             "

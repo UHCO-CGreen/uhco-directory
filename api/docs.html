@@ -724,6 +724,9 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                 <div class="card-body">
                                         <p class="mb-3">Returns a lightweight list of active users flagged as <code>Clinical-Attending</code>. This quickpull is intended for consumers that need a curated roster without the full person profile payload.</p>
 
+                                        <h6>Configurable Response Sections</h6>
+                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
+
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>
 
@@ -755,6 +758,9 @@ GET /api/v1/flags?return=xml&amp;token=uhcs_...</pre>
                                 </div>
                                 <div class="card-body">
                                         <p class="mb-3">Returns active alumni for a single graduation year as a flat list, filtered to a specific academic program organization. Each result includes the matched <code>PROGRAM</code>, a combined <code>FULLNAME</code>, and image URLs for the <code>interactive_roster</code>, <code>KIOSK_ROSTER</code>, and <code>KIOSK_PROFILE</code> variants. This endpoint is protected because it exposes alumni data.</p>
+
+                                        <h6>Configurable Response Sections</h6>
+                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
@@ -808,6 +814,9 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                 </div>
                                 <div class="card-body">
                                         <p class="mb-3">Returns a single alumni-oriented quickpull record by <code>UserID</code>, including academic fields, externship and hometown details, earned degrees, awards, and image URLs when available.</p>
+
+                                        <h6>Configurable Response Sections</h6>
+                                        <p>Admin users can enable additional sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, the returned record may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires both a valid API token and a valid secret that unlocks the <code>Alumni</code> flag.</p>
@@ -865,6 +874,9 @@ GET /api/v1/quickpulls/gradclass?year=2026&amp;program=PhD+Program&amp;secret=uh
                                 </div>
                                 <div class="card-body">
                                         <p class="mb-3">Returns active users flagged as <code>Deans</code>, enriched with a combined <code>FULLNAME</code> and the first available <code>KIOSK_NON_GRID</code> image URL for each person.</p>
+
+                                        <h6>Configurable Response Sections</h6>
+                                        <p>Admin users can enable additional per-user sections in <strong>Settings &gt; UHCO API</strong>. Depending on configuration, rows may also include <code>GENERAL</code>, <code>CONTACT</code>, <code>BIOGRAPHICAL</code>, <code>IMAGES</code>, <code>EXTERNALIDS</code>, <code>ORGANIZATIONS</code>, and <code>FLAGS</code>.</p>
 
                                         <h6>Authentication</h6>
                                         <p>Requires a valid API token with <code>read</code> scope. No secret is required.</p>

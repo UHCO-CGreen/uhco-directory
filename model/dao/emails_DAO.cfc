@@ -13,6 +13,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getEmailTypes() {
+        var qry = executeQueryWithRetry(
+            "SELECT DISTINCT EmailType FROM UserEmails WHERE NULLIF(LTRIM(RTRIM(EmailType)), '') IS NOT NULL ORDER BY EmailType",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=100 }
+        );
+        return queryToArray(qry);
+    }
+
     public void function replaceEmails( required numeric userID, required array emails ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry(

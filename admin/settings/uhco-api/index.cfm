@@ -11,6 +11,8 @@
 <cfset secretService = createObject("component", "cfc.secret_service").init()>
 <cfset tokens  = tokenService.getAllTokens()>
 <cfset secrets = secretService.getAllSecrets()>
+<cfset actionMessage = trim(url.msg ?: "")>
+<cfset actionError = trim(url.error ?: "")>
 
 <cfset activeTokens  = 0>
 <cfset activeSecrets = 0>
@@ -35,10 +37,17 @@
 <h1 class="mb-1"><i class="bi bi-braces me-2"></i>UHCO API</h1>
 <p class="text-muted mb-4">Manage API tokens and secrets for external integrations.</p>
 
+<cfif len(actionMessage)>
+    <div class="alert alert-success">#encodeForHTML(actionMessage)#</div>
+</cfif>
+<cfif len(actionError)>
+    <div class="alert alert-danger">#encodeForHTML(actionError)#</div>
+</cfif>
+
 <div class="row g-4">
 
     <!--- Tokens Card --->
-    <div class="col-md-6">
+    <div class="col-lg-4 col-md-6">
         <a href="tokens/index.cfm" class="text-decoration-none">
             <div class="card h-100 shadow-sm border-start border-primary border-3">
                 <div class="card-body">
@@ -59,7 +68,7 @@
     </div>
 
     <!--- Secrets Card --->
-    <div class="col-md-6">
+    <div class="col-lg-4 col-md-6">
         <a href="secrets/index.cfm" class="text-decoration-none">
             <div class="card h-100 shadow-sm border-start border-warning border-3">
                 <div class="card-body">
@@ -73,6 +82,27 @@
                     <div class="d-flex gap-3">
                         <span class="badge bg-warning-subtle text-warning fs-6">#arrayLen(secrets)# total</span>
                         <span class="badge bg-success-subtle text-success fs-6">#activeSecrets# active</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!--- Quickpull Settings Card --->
+    <div class="col-lg-4 col-md-12">
+        <a href="quickpulls/index.cfm" class="text-decoration-none">
+            <div class="card h-100 shadow-sm border-start border-success border-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="bi bi-diagram-3 fs-2 text-success me-3"></i>
+                        <div>
+                            <h5 class="card-title text-dark mb-0">Quickpulls</h5>
+                            <p class="card-text text-muted small mb-0">Choose endpoint-specific return items, image variants, contact types, orgs, and flags</p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="badge bg-success-subtle text-success fs-6">4 endpoints</span>
+                        <span class="badge bg-secondary-subtle text-secondary fs-6">Item-level config</span>
                     </div>
                 </div>
             </div>
