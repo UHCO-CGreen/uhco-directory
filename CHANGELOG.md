@@ -1,7 +1,8 @@
-﻿# Changelog
+# Changelog
 
 _Auto-generated from git history._
 
+- 2026-04-19 | Update: 1 added, 1 modified (Chris Green)
 - 2026-04-18 | minor fixes (Chris Green)
 - 2026-04-17 | First Commit (Chris Green)
 - 2026-04-06 | Standardize server-side pagination across all user list pages (Green)
