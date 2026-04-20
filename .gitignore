@@ -22,6 +22,7 @@ admin/reporting/OLD/
 users/OLD/
 reporting/OLD/
 GIT_CHEATSHEET.md
+CHANGELOG.md
 DB_MIGRATIONS.md
 ADMIN_PERMISSIONS_PLAN.md
 DEPLOY_TASKS.md
