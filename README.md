@@ -94,15 +94,6 @@ This project does not have a package-manager-based bootstrap flow. A working env
 
 If application state needs to be rebuilt after config changes, the app supports `?reinit=true` in requests via [Application.cfc](Application.cfc).
 
-## Deployment
-
-This workspace includes VS Code tasks that copy files directly to production:
-
-- `Deploy Current File to Production`
-- `Deploy Folder to Production`
-
-Deployment details are documented in [DEPLOY_TASKS.md](DEPLOY_TASKS.md).
-
 ## Database Notes
 
 Important tables include:
