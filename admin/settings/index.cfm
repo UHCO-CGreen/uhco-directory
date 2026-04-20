@@ -96,7 +96,7 @@
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-clock-history display-4 mb-3"></i>
-                    <h5 class="card-title text-dark">Scheduled Tasks <span class="badge bg-warning text-dark">Alpha</span></h5>
+                    <h5 class="card-title text-dark">Scheduled Tasks <span class="badge bg-info text-dark">Beta</span></h5>
                     <p class="card-text text-muted small">Enable, disable, and configure automated tasks</p>
                 </div>
             </div>
@@ -122,7 +122,7 @@
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-funnel display-4 mb-3"></i>
-                    <h5 class="card-title text-dark">Bulk Exclusions <span class="badge bg-warning text-dark">Alpha</span></h5>
+                    <h5 class="card-title text-dark">Bulk Exclusions <span class="badge bg-info text-dark">Beta</span></h5>
                     <p class="card-text text-muted small">Data quality exclusion rules by user type</p>
                 </div>
             </div>
@@ -161,7 +161,7 @@
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-upload display-4 mb-3"></i>
-                    <h5 class="card-title text-dark">Import Data <span class="badge bg-warning text-dark">Alpha</span></h5>
+                    <h5 class="card-title text-dark">Import Data <span class="badge bg-info text-dark">Beta</span></h5>
                     <p class="card-text text-muted small">Import users, flags, organizations via CSV or Excel</p>
                 </div>
             </div>

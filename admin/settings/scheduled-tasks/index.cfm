@@ -54,6 +54,18 @@
         timeout        = 600,
         dashboardLink  = "/admin/reporting/uh_sync_report.cfm",
         runNowLink     = "/admin/reporting/run_uh_sync_report.cfm"
+    },
+    {
+        key            = "UHCO_HometownProfileSync",
+        label          = "Hometown Profile Sync",
+        icon           = "bi-geo-alt",
+        color          = "secondary",
+        description    = "Checks Hometown addresses for Alumni and Current-Students, and fills blank UserStudentProfile hometown city/state values when available.",
+        endpoint       = "/admin/settings/scheduled-tasks/run_hometown_sync.cfm?triggeredBy=scheduled&format=json",
+        startTime      = "04:00 AM",
+        timeout        = 600,
+        dashboardLink  = "",
+        runNowLink     = "/admin/settings/scheduled-tasks/run_hometown_sync.cfm"
     }
 ]>
 
@@ -99,6 +111,31 @@
 <!--- ── Handle POST actions ──────────────────────────────────────────────── --->
 <cfset actionMessage      = "">
 <cfset actionMessageClass = "alert-success">
+
+<cfif structKeyExists(url, "msg")>
+    <cfset messageTaskKey = trim(url.taskKey ?: "")>
+    <cfset messageTaskLabel = "Scheduled task">
+
+    <cfloop from="1" to="#arrayLen(tasks)#" index="ti">
+        <cfif tasks[ti].key EQ messageTaskKey>
+            <cfset messageTaskLabel = tasks[ti].label>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+
+    <cfif url.msg EQ "ran">
+        <cfset actionMessage = "<strong>#encodeForHTML(messageTaskLabel)#</strong> ran successfully.">
+        <cfif isNumeric(url.total ?: "")>
+            <cfset actionMessage &= " Synced #val(url.total)# profile(s).">
+            <cfif isNumeric(url.updated ?: "") OR isNumeric(url.inserted ?: "")>
+                <cfset actionMessage &= " (Updated: #val(url.updated ?: 0)#, Inserted: #val(url.inserted ?: 0)#)">
+            </cfif>
+        </cfif>
+    <cfelseif url.msg EQ "error">
+        <cfset actionMessage = "<strong>#encodeForHTML(messageTaskLabel)#</strong> failed: #encodeForHTML(url.err ?: 'Unknown error')#">
+        <cfset actionMessageClass = "alert-danger">
+    </cfif>
+</cfif>
 
 <cfif cgi.request_method EQ "POST">
     <cfset action  = trim(form.action ?: "")>
@@ -154,6 +191,26 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<style>
+.task-masonry {
+    column-count: 2;
+    column-gap: 1.5rem;
+}
+
+.task-masonry-item {
+    display: inline-block;
+    width: 100%;
+    margin: 0 0 1.5rem;
+    break-inside: avoid;
+}
+
+@media (max-width: 991.98px) {
+    .task-masonry {
+        column-count: 1;
+    }
+}
+</style>
+
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -198,119 +255,134 @@
 </div>
 
 <!--- ── Task Cards ───────────────────────────────────────────────────────── --->
-<div class="row g-4">
+<div class="task-masonry">
 <cfloop from="1" to="#arrayLen(tasks)#" index="i">
     <cfset t = tasks[i]>
     <cfset lr = structKeyExists(latestRuns, t.key) ? latestRuns[t.key] : {}>
     <cfset hasRun = NOT structIsEmpty(lr)>
     <cfset fullUrl = baseUrl & t.endpoint>
+    <cfset collapseId = "taskCollapse_" & t.key>
 
-    <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-#t.color# bg-opacity-10 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-#t.color#">
-                    <i class="bi #t.icon# me-2"></i>#encodeForHTML(t.label)#
-                </h5>
-                <cfif structKeyExists(enabledTasks, t.key)>
-                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Enabled</span>
-                <cfelse>
-                    <span class="badge bg-secondary">Disabled</span>
-                </cfif>
+    <div class="task-masonry-item">
+        <div class="card shadow-sm">
+            <div class="card-header bg-#t.color# bg-opacity-10 p-0">
+                <button class="btn w-100 text-start p-3 border-0 rounded-0 d-flex justify-content-between align-items-center #(i EQ 1 ? '' : 'collapsed')#"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="###collapseId#"
+                    aria-expanded="false"
+                        aria-controls="#collapseId#">
+                    <span>
+                        <span class="h5 mb-0 text-#t.color# d-inline-flex align-items-center">
+                            <i class="bi #t.icon# me-2"></i>#encodeForHTML(t.label)#
+                        </span>
+                    </span>
+                    <span class="d-inline-flex align-items-center gap-2">
+                        <cfif structKeyExists(enabledTasks, t.key)>
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Enabled</span>
+                        <cfelse>
+                            <span class="badge bg-secondary">Disabled</span>
+                        </cfif>
+                        <i class="bi bi-chevron-down text-muted"></i>
+                    </span>
+                </button>
             </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">#encodeForHTML(t.description)#</p>
+            <div id="#collapseId#" class="collapse">
+                <div class="card-body">
+                    <p class="small text-muted mb-3">#encodeForHTML(t.description)#</p>
 
-                <!--- Schedule details --->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <div class="small text-muted">Scheduled Time</div>
-                        <strong>#encodeForHTML(t.startTime)#</strong> <span class="text-muted small">daily</span>
+                    <!--- Schedule details --->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="small text-muted">Scheduled Time</div>
+                            <strong>#encodeForHTML(t.startTime)#</strong> <span class="text-muted small">daily</span>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted">Timeout</div>
+                            <strong>#t.timeout#s</strong> <span class="text-muted small">(#int(t.timeout / 60)# min)</span>
+                        </div>
                     </div>
-                    <div class="col-6">
-                        <div class="small text-muted">Timeout</div>
-                        <strong>#t.timeout#s</strong> <span class="text-muted small">(#int(t.timeout / 60)# min)</span>
+
+                    <!--- Last run info --->
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Last Run</div>
+                        <cfif hasRun>
+                            <cfset runDate = "">
+                            <cfif structKeyExists(lr, "RUNAT")>
+                                <cfset runDate = lr.RUNAT>
+                            <cfelseif structKeyExists(lr, "RANON")>
+                                <cfset runDate = lr.RANON>
+                            <cfelseif structKeyExists(lr, "CREATEDAT")>
+                                <cfset runDate = lr.CREATEDAT>
+                            </cfif>
+                            <cfset triggeredBy = "">
+                            <cfif structKeyExists(lr, "TRIGGEREDBY")>
+                                <cfset triggeredBy = lr.TRIGGEREDBY>
+                            </cfif>
+                            <span class="badge bg-light text-dark border">
+                                <i class="bi bi-clock me-1"></i>
+                                <cfif len(runDate)>
+                                    #isDate(runDate) ? dateTimeFormat(runDate, "MMM d, yyyy h:nn tt") : encodeForHTML(runDate)#
+                                <cfelse>
+                                    Unknown date
+                                </cfif>
+                            </span>
+                            <cfif len(triggeredBy)>
+                                <span class="badge bg-light text-muted border ms-1">
+                                    #encodeForHTML(triggeredBy)#
+                                </span>
+                            </cfif>
+                        <cfelse>
+                            <span class="text-muted small">No runs recorded</span>
+                        </cfif>
+                    </div>
+
+                    <!--- Endpoint URL (copyable) --->
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Endpoint URL</div>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control form-control-sm font-monospace"
+                                   value="#encodeForHTMLAttribute(fullUrl)#" readonly id="url_#t.key#">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('url_#t.key#').value)"
+                                    title="Copy URL">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!--- Last run info --->
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">Last Run</div>
-                    <cfif hasRun>
-                        <cfset runDate = "">
-                        <cfif structKeyExists(lr, "RUNAT")>
-                            <cfset runDate = lr.RUNAT>
-                        <cfelseif structKeyExists(lr, "RANON")>
-                            <cfset runDate = lr.RANON>
-                        <cfelseif structKeyExists(lr, "CREATEDAT")>
-                            <cfset runDate = lr.CREATEDAT>
-                        </cfif>
-                        <cfset triggeredBy = "">
-                        <cfif structKeyExists(lr, "TRIGGEREDBY")>
-                            <cfset triggeredBy = lr.TRIGGEREDBY>
-                        </cfif>
-                        <span class="badge bg-light text-dark border">
-                            <i class="bi bi-clock me-1"></i>
-                            <cfif len(runDate)>
-                                #isDate(runDate) ? dateTimeFormat(runDate, "MMM d, yyyy h:nn tt") : encodeForHTML(runDate)#
-                            <cfelse>
-                                Unknown date
-                            </cfif>
-                        </span>
-                        <cfif len(triggeredBy)>
-                            <span class="badge bg-light text-muted border ms-1">
-                                #encodeForHTML(triggeredBy)#
-                            </span>
-                        </cfif>
+                <!--- Card footer with actions --->
+                <cfset isEnabled = structKeyExists(enabledTasks, t.key)>
+                <div class="card-footer bg-light d-flex flex-wrap gap-2">
+                    <cfif isEnabled>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="disable">
+                            <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove scheduled task">
+                                    <i class="bi bi-x-circle me-1"></i> Disable
+                            </button>
+                        </form>
                     <cfelse>
-                        <span class="text-muted small">No runs recorded</span>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="enable">
+                            <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
+                            <button type="submit" class="btn btn-sm btn-success" title="Enable daily schedule">
+                                <i class="bi bi-check-circle me-1"></i> Enable
+                            </button>
+                        </form>
+                    </cfif>
+                    <cfif len(t.runNowLink)>
+                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-play-fill me-1"></i> Run Now
+                        </a>
+                    </cfif>
+                    <cfif len(t.dashboardLink)>
+                        <a href="#encodeForHTMLAttribute(t.dashboardLink)#" class="btn btn-sm btn-outline-secondary ms-auto">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Dashboard
+                        </a>
                     </cfif>
                 </div>
-
-                <!--- Endpoint URL (copyable) --->
-                <div class="mb-3">
-                    <div class="small text-muted mb-1">Endpoint URL</div>
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control form-control-sm font-monospace"
-                               value="#encodeForHTMLAttribute(fullUrl)#" readonly id="url_#t.key#">
-                        <button class="btn btn-outline-secondary" type="button"
-                                onclick="navigator.clipboard.writeText(document.getElementById('url_#t.key#').value)"
-                                title="Copy URL">
-                            <i class="bi bi-clipboard"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!--- Card footer with actions --->
-            <cfset isEnabled = structKeyExists(enabledTasks, t.key)>
-            <div class="card-footer bg-light d-flex flex-wrap gap-2">
-                <cfif isEnabled>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="disable">
-                        <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove scheduled task">
-                                <i class="bi bi-x-circle me-1"></i> Disable
-                        </button>
-                    </form>
-                <cfelse>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="enable">
-                        <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                        <button type="submit" class="btn btn-sm btn-success" title="Enable daily schedule">
-                            <i class="bi bi-check-circle me-1"></i> Enable
-                        </button>
-                    </form>
-                </cfif>
-                <cfif len(t.runNowLink)>
-                    <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-play-fill me-1"></i> Run Now
-                    </a>
-                </cfif>
-                <cfif len(t.dashboardLink)>
-                    <a href="#encodeForHTMLAttribute(t.dashboardLink)#" class="btn btn-sm btn-outline-secondary ms-auto">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> Dashboard
-                    </a>
-                </cfif>
             </div>
         </div>
     </div>
@@ -324,6 +396,7 @@
     </div>
     <div class="card-body small text-muted">
         <ul class="mb-0">
+            <li>Each task card header can be clicked to expand or collapse its details and actions.</li>
             <li><strong>Enable</strong> registers (or re-registers) the task in the ColdFusion Scheduler to run daily at the configured time.</li>
             <li><strong>Disable</strong> removes the task from the ColdFusion Scheduler entirely.</li>
             <li>Tasks can also be managed directly in the ColdFusion Administrator under <em>Server Settings &rarr; Scheduled Tasks</em>.</li>
