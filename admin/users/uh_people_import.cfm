@@ -134,7 +134,7 @@
                                 <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
                                    class='btn btn-sm btn-success ms-1'>Quick Import</a>
                             </cfif>
-                            <form method='post' style='display:inline;'>
+                            <form method='post' class='admin-inline-form'>
                                 <input type='hidden' name='deleteFromStaging' value='1'>
                                 <input type='hidden' name='deleteUHApiID' value='#stagingRecords.uhApiId#'>
                                 <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>
@@ -301,7 +301,7 @@
                 <cfset content &= "
                                 <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
                                    class='btn btn-sm btn-success ms-1'>Quick Import</a>
-                                <form method='post' style='display:inline;'>
+                                <form method='post' class='admin-inline-form'>
                                     <input type='hidden' name='deleteFromStaging' value='1'>
                                     <input type='hidden' name='deleteUHApiID' value='#row.uhApiId#'>
                                     <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>

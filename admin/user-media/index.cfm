@@ -61,7 +61,7 @@
 <div class='card mb-4'>
     <div class='card-body'>
         <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
-            <div class='input-group' style='min-width:260px; flex:1;'>
+            <div class='input-group admin-search-input-xl'>
                 <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
                 <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(searchTerm)#'>
             </div>

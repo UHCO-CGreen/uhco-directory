@@ -145,6 +145,7 @@
      Page content
      ═══════════════════════════════════════════════════════════════════════ --->
 <cfset content = "
+<div class='settings-page settings-variant-types-page'>
 <nav aria-label='breadcrumb' class='mb-3'>
     <ol class='breadcrumb'>
         <li class='breadcrumb-item'><a href='/admin/settings/'>Settings</a></li>
@@ -175,7 +176,7 @@
      Add / Edit Form
      ═══════════════════════════════════════════════════════════════════════ --->
 <cfset content &= "
-<div class='card mb-4'>
+<div class='card mb-4 settings-shell'>
     <div class='card-header fw-semibold'>
         <i class='bi bi-#editMode ? 'pencil-square' : 'plus-circle'# me-1'></i>
         #editMode ? 'Edit' : 'New'# Variant Type
@@ -283,18 +284,18 @@
      Existing Variant Types Table
      ═══════════════════════════════════════════════════════════════════════ --->
 <cfset content &= "
-<div class='card mb-4'>
+<div class='card mb-4 settings-shell settings-summary-card'>
     <div class='card-header d-flex justify-content-between align-items-center'>
         <span class='fw-semibold'><i class='bi bi-grid-3x3-gap me-1'></i> All Variant Types</span>
-        <span class='badge bg-secondary'>#arrayLen(allTypes)#</span>
+        <span class='badge settings-badge-count'>#arrayLen(allTypes)#</span>
     </div>
 ">
 
 <cfif arrayLen(allTypes) GT 0>
     <cfset content &= "
     <div class='table-responsive'>
-        <table class='table table-hover align-middle mb-0'>
-            <thead class='table-dark'>
+        <table class='table table-hover align-middle mb-0 settings-table'>
+            <thead>
                 <tr>
                     <th>Code</th>
                     <th>Description</th>
@@ -330,13 +331,17 @@
                 <td class='text-center small'>#vtDims#</td>
                 <td class='text-center'>#vtCrop ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
                 <td class='text-center'>#vtResize ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
-                <td class='text-center'>#vtActive ? '<span class=""badge bg-success"">Active</span>' : '<span class=""badge bg-secondary"">Inactive</span>'#</td>
+                <td class='text-center'>#vtActive ? '<span class=""badge settings-badge-active"">Active</span>' : '<span class=""badge bg-secondary"">Inactive</span>'#</td>
                 <td>
-                    <div class='d-flex gap-1'>
-                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-outline-primary'>
-                            <i class='bi bi-pencil'></i>
+                    <div class='settings-action-group'>
+                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
+                            <i class='bi bi-pencil-square'></i>
                         </a>
-                        <button type='button' class='btn btn-sm btn-outline-danger'
+                        <button type='button' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete'
+                                title='Delete Variant Type'
+                                data-bs-toggle='tooltip'
+                                data-bs-title='Delete Variant Type'
+                                aria-label='Delete Variant Type'
                                 data-bs-toggle='modal'
                                 data-bs-target='##deleteModal'
                                 data-vt-id='#vtID#'
@@ -371,7 +376,7 @@
      Processing Modes Reference
      ═══════════════════════════════════════════════════════════════════════ --->
 <cfset content &= "
-<div class='card mb-4'>
+<div class='card mb-4 settings-shell settings-reference-card'>
     <div class='card-header fw-semibold'><i class='bi bi-info-circle me-1'></i> Processing Modes</div>
     <div class='card-body'>
         <table class='table table-sm mb-0'>
@@ -404,10 +409,10 @@
      Delete Confirmation Modal
      ═══════════════════════════════════════════════════════════════════════ --->
 <cfset content &= "
-<div class='modal fade' id='deleteModal' tabindex='-1' aria-labelledby='deleteModalLabel' aria-hidden='true'>
+<div class='modal fade settings-danger-modal' id='deleteModal' tabindex='-1' aria-labelledby='deleteModalLabel' aria-hidden='true'>
     <div class='modal-dialog'>
         <div class='modal-content'>
-            <div class='modal-header bg-danger text-white'>
+            <div class='modal-header text-white'>
                 <h5 class='modal-title' id='deleteModalLabel'>
                     <i class='bi bi-exclamation-triangle me-1'></i> Delete Variant Type
                 </h5>
@@ -459,5 +464,7 @@
 }());
 </script>
 ">
+
+<cfset content &= "</div>">
 
 <cfinclude template="/admin/layout.cfm">

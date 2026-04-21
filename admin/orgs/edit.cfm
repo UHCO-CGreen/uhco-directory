@@ -21,6 +21,8 @@
 <cfset orgDisplay = (isNumeric(org.DISPLAY ?: '') AND val(org.DISPLAY) EQ 1) ? 1 : 0>
 
 <cfset content = "
+<div class='orgs-page'>
+<div class='orgs-form-shell'>
 <h1>Edit Organizational Unit</h1>
 
 <form class='mt-4' method='post' action='saveOrg.cfm'>
@@ -79,6 +81,9 @@
     <button type='submit' class='btn btn-primary'>Update Organizational Unit</button>
     <a href='/admin/orgs/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
 </form>
+
+</div>
+</div>
 ">
 
 <cfinclude template="/admin/layout.cfm">

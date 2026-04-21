@@ -183,6 +183,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-quickpulls-edit-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -210,18 +211,18 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
     <div class="alert alert-danger">#encodeForHTML(actionError)#</div>
 </cfif>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 settings-shell settings-reference-card">
     <div class="card-body">
         <div class="small text-uppercase text-muted fw-semibold mb-2">Default Return Items</div>
         <div class="d-flex flex-wrap gap-2">
             <cfloop array="#quickpull.baseFields#" index="baseField">
-                <span class="badge text-bg-light border">#encodeForHTML(baseField)#</span>
+                <span class="badge settings-badge-neutral">#encodeForHTML(baseField)#</span>
             </cfloop>
         </div>
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 settings-shell settings-reference-card">
     <div class="card-body">
         <div class="small text-uppercase text-muted fw-semibold mb-2">Additional Return Items</div>
         <cfif arrayLen(additionalReturnItems)>
@@ -244,7 +245,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
 <form method="post" action="save.cfm">
     <input type="hidden" name="quickpullType" value="#encodeForHTMLAttribute(quickpull.key)#">
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">General</h5></div>
         <div class="card-body">
             <p class="text-muted small">Selected values are appended as top-level keys on each quickpull row.</p>
@@ -263,7 +264,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">Contact</h5></div>
         <div class="card-body">
             <p class="text-muted small">Emails append as EMAIL_TYPE, phones append as PHONE_TYPE, and addresses append as ADDRESS_TYPE.</p>
@@ -317,7 +318,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">Biographical</h5></div>
         <div class="card-body">
             <div class="row g-2">
@@ -335,7 +336,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">Images</h5></div>
         <div class="card-body">
             <p class="text-muted small">Selected variants append as IMAGE_VARIANTCODE using the first matching published image URL.</p>
@@ -354,7 +355,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">External IDs</h5></div>
         <div class="card-body">
             <p class="text-muted small">Selected systems append as EXTERNALID_SYSTEMNAME.</p>
@@ -373,7 +374,7 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
         <div class="card-header"><h5 class="mb-0">Organizations And Flags</h5></div>
         <div class="card-body">
             <cfif NOT isDefaultReturnItem(defaultReturnItemSet, "Organizations And Flags", "ORGANIZATIONS")>
@@ -396,6 +397,8 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         <a href="index.cfm" class="btn btn-outline-secondary">Cancel</a>
     </div>
 </form>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

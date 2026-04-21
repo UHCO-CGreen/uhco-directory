@@ -75,6 +75,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-query-builder">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -95,8 +96,8 @@
 </cfif>
 
 <!--- ── Builder Card ── --->
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-dark text-white">
+<div class="card shadow-sm mb-4 settings-shell settings-builder-shell">
+    <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Build Query</h5>
     </div>
     <div class="card-body">
@@ -119,7 +120,7 @@
         </div>
 
         <!--- Columns --->
-        <div class="mb-3" id="columnsSection" style="display:none">
+        <div class="mb-3 admin-hidden" id="columnsSection">
             <label class="form-label fw-semibold">Columns</label>
             <div class="mb-2">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAll">Select All</button>
@@ -129,7 +130,7 @@
         </div>
 
         <!--- WHERE conditions --->
-        <div class="mb-3" id="conditionsSection" style="display:none">
+        <div class="mb-3 admin-hidden" id="conditionsSection">
             <label class="form-label fw-semibold">
                 WHERE Conditions
                 <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="btnAddCondition">
@@ -140,7 +141,7 @@
         </div>
 
         <!--- ORDER BY --->
-        <div class="mb-3" id="orderSection" style="display:none">
+        <div class="mb-3 admin-hidden" id="orderSection">
             <label class="form-label fw-semibold">
                 ORDER BY
                 <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="btnAddOrder">
@@ -151,17 +152,17 @@
         </div>
 
         <!--- SQL preview --->
-        <div class="mb-3" id="sqlPreviewSection" style="display:none">
+        <div class="mb-3 admin-hidden" id="sqlPreviewSection">
             <label class="form-label fw-semibold">SQL Preview</label>
-            <pre id="sqlPreview" class="bg-light border rounded p-3 mb-0 font-monospace small"></pre>
+            <pre id="sqlPreview" class="settings-query-preview p-3 mb-0 font-monospace small"></pre>
         </div>
 
         <!--- Execute button --->
-        <div class="d-flex gap-2" id="executeSection" style="display:none">
+        <div class="d-flex gap-2 admin-hidden" id="executeSection">
             <button type="button" class="btn btn-primary" id="btnExecute">
                 <i class="bi bi-play-fill me-1"></i> Execute Query
             </button>
-            <button type="button" class="btn btn-outline-secondary" id="btnExportCsv" style="display:none">
+            <button type="button" class="btn btn-outline-secondary admin-hidden" id="btnExportCsv">
                 <i class="bi bi-filetype-csv me-1"></i> Export CSV
             </button>
         </div>
@@ -170,15 +171,15 @@
 </div>
 
 <!--- ── Results Card ── --->
-<div class="card shadow-sm mb-4" id="resultsCard" style="display:none">
+<div class="card shadow-sm mb-4 admin-hidden settings-shell settings-results-shell" id="resultsCard">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-table me-2"></i>Results</h5>
         <span id="resultsMeta" class="text-muted small"></span>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive" style="max-height:500px; overflow:auto">
-            <table class="table table-sm table-striped table-hover align-middle mb-0" id="resultsTable">
-                <thead class="table-dark sticky-top" id="resultsHead"></thead>
+        <div class="table-responsive admin-scroll-panel">
+            <table class="table table-sm table-striped table-hover align-middle mb-0 settings-table" id="resultsTable">
+                <thead id="resultsHead"></thead>
                 <tbody id="resultsBody"></tbody>
             </table>
         </div>
@@ -186,9 +187,11 @@
 </div>
 
 <!--- ── Loading spinner --->
-<div id="loadingOverlay" style="display:none" class="text-center py-4">
+<div id="loadingOverlay" class="text-center py-4 admin-hidden settings-query-loading">
     <div class="spinner-border text-primary" role="status"></div>
     <p class="text-muted mt-2">Running query...</p>
+</div>
+
 </div>
 
 </cfoutput>
@@ -319,7 +322,7 @@
             '<div class="col-md-3"><select class="form-select form-select-sm cond-col">' + colOpts + '</select></div>' +
             '<div class="col-md-2"><select class="form-select form-select-sm cond-op">' + opOpts + '</select></div>' +
             '<div class="col-md-5"><input type="text" class="form-control form-control-sm cond-val" placeholder="Value"></div>' +
-            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-outline-danger cond-remove"><i class="bi bi-x"></i></button></div>';
+            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete cond-remove" title="Remove Condition" aria-label="Remove Condition"><i class="bi bi-x"></i></button></div>';
         $condRows.appendChild(row);
 
         row.querySelector('.cond-col').addEventListener('change', updatePreview);
@@ -352,7 +355,7 @@
             '<div class="col-md-4"><select class="form-select form-select-sm order-col">' + colOpts + '</select></div>' +
             '<div class="col-md-3"><select class="form-select form-select-sm order-dir">' +
                 '<option value="ASC">ASC</option><option value="DESC">DESC</option></select></div>' +
-            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-outline-danger order-remove"><i class="bi bi-x"></i></button></div>';
+            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete order-remove" title="Remove Order By" aria-label="Remove Order By"><i class="bi bi-x"></i></button></div>';
         $orderRows.appendChild(row);
 
         row.querySelector('.order-col').addEventListener('change', updatePreview);

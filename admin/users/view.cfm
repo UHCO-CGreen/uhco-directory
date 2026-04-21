@@ -195,8 +195,20 @@
     </cfif>
 </cfif>
 
+<cfset userAliasesHtml = "">
+<cfif arrayLen(userAliases)>
+    <cfset userAliasesHtml = "<div class='mb-2'><strong>Aliases:</strong><ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userAliases)#" index="aliasIndex">
+        <cfset aliasItem = userAliases[aliasIndex]>
+        <cfset aliasTypeHtml = len(trim(aliasItem.ALIASTYPE ?: "")) ? " <span class='badge bg-secondary users-view-badge'>" & EncodeForHTML(aliasItem.ALIASTYPE) & "</span>" : "">
+        <cfset aliasInactiveHtml = val(aliasItem.ISACTIVE ?: 0) NEQ 1 ? " <span class='badge bg-light text-dark users-view-badge'>Inactive</span>" : "">
+        <cfset userAliasesHtml &= "<li>" & EncodeForHTML(aliasItem.DISPLAYNAME ?: "") & aliasTypeHtml & aliasInactiveHtml & "</li>">
+    </cfloop>
+    <cfset userAliasesHtml &= "</ul></div>">
+</cfif>
+
 <cfset quickMatchHtml = "
-<div class='card card-body mb-3 mt-4'>
+<div class='card card-body mb-3 mt-4 users-view-quickmatch'>
     <h5 class='mb-2'>Quick API Match</h5>
     <p class='text-muted mb-2'>Compare this user by first and last name against UH API.</p>
     <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline'>
@@ -256,21 +268,24 @@
 </cfif>
 
 <cfset content = "
-<img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2' style=' object-fit: cover;'>
-<h1>#(len(prefix) ? prefix & ' ' : '')##profile.user.FIRSTNAME# #profile.user.LASTNAME##(len(suffix) ? ', ' & suffix : '')#</h1>
-#SubTitle#
+<div class='users-view-page'>
+<div class='users-view-header clearfix'>
+<img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
+<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##profile.user.FIRSTNAME# #profile.user.LASTNAME##(len(suffix) ? ', ' & suffix : '')#</h1>
+<div class='users-view-subtitle'>#SubTitle#</div>
+</div>
 
 
 #quickMatchHtml#
 
 <div class='row mt-4'>
     <div class='col-md-6'>
-        <div class='card mb-3'>
+        <div class='card mb-3 users-view-card'>
             <div class='card-header fw-semibold'>General Information</div>
             <div class='card-body'>
                 #(len(preferredName) ? '<p><strong>Preferred Name:</strong> ' & EncodeForHTML(preferredName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
                 #(len(maidenName)    ? '<p><strong>Maiden Name:</strong> '    & EncodeForHTML(maidenName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
-' & (arrayLen(userAliases) ? '<div class="mb-2"><strong>Aliases:</strong><ul class="mb-0">' & userAliases.reduce(function(acc, al) { return acc & '<li>' & EncodeForHTML(al.DISPLAYNAME) & ' <span class="badge bg-secondary">' & EncodeForHTML(al.ALIASTYPE) & '</span>' & (val(al.ISACTIVE) NEQ 1 ? ' <span class="badge bg-light text-dark">Inactive</span>' : '') & '</li>'; }, '') & '</ul></div>' : '') & '
+    #userAliasesHtml#
                 #(len(pronouns)      ? '<p><strong>Pronouns:</strong> '        & EncodeForHTML(pronouns)      & '</p>' : '')#
                 #(len(emailPrimary)  ? '<p><strong>Email (@uh):</strong> '      & EncodeForHTML(emailPrimary)  & '</p>' : '')#
                 #(len(phone)         ? '<p><strong>Phone:</strong> '            & EncodeForHTML(phone)         & '</p>' : '')#
@@ -281,7 +296,7 @@
             </div>
         </div>
         #( hasAddress ? "
-        <div class='card mb-3'>
+        <div class='card mb-3 users-view-card'>
             <div class='card-header fw-semibold'>Address</div>
             <div class='card-body'>
                 #(len(room)          ? '<p><strong>Room:</strong> '                  & EncodeForHTML(room)          & '</p>' : '')#
@@ -296,16 +311,18 @@
     </div>
 
     <div class='col-md-3'>
-        <div class='card mb-3'>
+        <div class='card mb-3 users-view-card'>
             <div class='card-header fw-semibold'>Flags</div>
             <div class='card-body'>
 " />
 
 <cfif arrayLen(profile.flags) gt 0>
+    <cfset content &= "<div class='users-view-pill-stack'>">
     <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
         <cfset flag = profile.flags[f]>
-        <cfset content &= "<span class='badge bg-info'>#flag.FLAGNAME#</span> ">
+        <cfset content &= "<span class='badge rounded-pill users-view-badge users-view-badge-flag'>#EncodeForHTML(flag.FLAGNAME)#</span>">
     </cfloop>
+    <cfset content &= "</div>">
 <cfelse>
     <cfset content &= "<p class='text-muted'>No flags assigned</p>">
 </cfif>
@@ -316,18 +333,18 @@
     </div>
 
     <div class='col-md-3'>
-        <div class='card mb-3'>
+        <div class='card mb-3 users-view-card'>
             <div class='card-header fw-semibold'>Organizations</div>
             <div class='card-body'>
-                <ul class='list-unstyled mb-0'>
+            <ul class='list-unstyled mb-0 users-view-org-list'>
 " />
 
 <cfif arrayLen(profile.organizations) gt 0>
     <cfloop from="1" to="#arrayLen(profile.organizations)#" index="o">
         <cfset org = profile.organizations[o]>
-        <cfset orgLine = EncodeForHTML(org.ORGNAME)>
+        <cfset orgLine = "<span class='badge rounded-pill users-view-badge users-view-badge-org'>" & EncodeForHTML(org.ORGNAME) & "</span>">
         <cfif len(trim(org.ROLETITLE ?: ""))>
-            <cfset orgLine &= " <span class='text-muted small'>(&nbsp;" & EncodeForHTML(org.ROLETITLE) & "&nbsp;)</span>">
+            <cfset orgLine &= "<span class='text-muted small users-view-org-role'>(&nbsp;" & EncodeForHTML(org.ROLETITLE) & "&nbsp;)</span>">
         </cfif>
         <cfset content &= "<li>#orgLine#</li>">
     </cfloop>
@@ -344,7 +361,7 @@
 
 <hr>
 
-<h3 class='d-flex justify-content-between align-items-center'>
+<h3 class='d-flex justify-content-between align-items-center users-view-images-header users-view-section-title'>
     Images
 ">
 
@@ -375,7 +392,7 @@
         <cfset arrayAppend(variantGroups[vKey], img)>
     </cfloop>
 
-    <cfset content &= "<div class='accordion' id='imagesAccordion'>">
+    <cfset content &= "<div class='accordion users-view-images-accordion' id='imagesAccordion'>">
 
     <cfloop from="1" to="#arrayLen(variantOrder)#" index="gi">
         <cfset gKey   = variantOrder[gi]>
@@ -397,8 +414,8 @@
                         aria-expanded='#gi EQ 1 ? "true" : "false"#'
                         aria-controls='#collapseID#'>
                     <span class='fw-semibold'>#gLabel#</span>
-                    <span class='badge bg-secondary ms-2'>#gCount#</span>
-                    #len(gDim) ? "<span class='text-muted small ms-2'>" & gDim & "</span>" : ""#
+                    <span class='badge users-view-image-count-badge ms-2'>#gCount#</span>
+                    #len(gDim) ? "<span class='users-view-image-dimension small ms-2'>" & gDim & "</span>" : ""#
                 </button>
             </h2>
             <div id='#collapseID#' class='accordion-collapse collapse #gi EQ 1 ? "show" : ""#'
@@ -438,7 +455,7 @@
 </cfif>
 
 <cfif showAcademicInfo>
-    <cfset content &= "<hr><h3>Academic Info</h3><div>">
+    <cfset content &= "<hr><h3 class='users-view-section-title'>Academic Info</h3><div>">
 
     <cfif structCount(profile.academic) gt 0>
         <cfset ac = profile.academic>
@@ -458,8 +475,8 @@
 <!--- ── Biographical Information card ── --->
 <cfset hasBioInfo = isDate(userDOB) OR len(userGender) OR arrayLen(userAddresses) GT 0>
 <cfif hasBioInfo>
-    <cfset content &= "<hr><h3>Biographical Information</h3>">
-    <cfset content &= "<div class='card mb-3'><div class='card-body'>">
+    <cfset content &= "<hr><h3 class='users-view-section-title'>Biographical Information</h3>">
+    <cfset content &= "<div class='card mb-3 users-view-card'><div class='card-body'>">
     <cfif isDate(userDOB)>
         <cfset content &= "<p><strong>Date of Birth:</strong> " & dateFormat(userDOB, 'mmmm d, yyyy') & "</p>">
     </cfif>
@@ -469,8 +486,8 @@
     <cfset content &= "</div></div>">
 </cfif>
 <cfif arrayLen(userAddresses) GT 0>
-    <cfif NOT hasBioInfo><cfset content &= "<hr><h3>Biographical Information</h3>"></cfif>
-    <cfset content &= "<div class='card mb-3'><div class='card-header fw-semibold'>Addresses</div><div class='card-body'>">
+    <cfif NOT hasBioInfo><cfset content &= "<hr><h3 class='users-view-section-title'>Biographical Information</h3>"></cfif>
+    <cfset content &= "<div class='card mb-3 users-view-card'><div class='card-header fw-semibold'>Addresses</div><div class='card-body'>">
 </cfif>
 <cfloop from="1" to="#arrayLen(userAddresses)#" index="adI">
     <cfset addrItem = userAddresses[adI]>
@@ -495,7 +512,7 @@
 </cfif>
 
 <cfif showStudentProfile>
-    <cfset content &= "<hr><h3>Student Profile</h3><div class='row'>">
+    <cfset content &= "<hr><h3 class='users-view-section-title'>Student Profile</h3><div class='row'>">
     <cfset content &= "<div class='col-md-6'>">
     <cfif len(spCommAge) AND isNumeric(spCommAge)> <cfset content &= "<p><strong>Commencement Age:</strong> " & int(spCommAge) & "</p>"> </cfif>
     <cfif len(spFirstExt)>  <cfset content &= "<p><strong>First Externship:</strong> " & EncodeForHTML(spFirstExt)  & "</p>"> </cfif>
@@ -507,7 +524,7 @@
             <cfset award = spAwards[aw]>
             <cfset awardLine = "<li class='list-group-item px-0'>" & EncodeForHTML(award.AWARDNAME)>
             <cfif len(trim(award.AWARDTYPE ?: ""))>
-                <cfset awardLine &= " <span class='badge bg-secondary ms-1'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
+                <cfset awardLine &= " <span class='badge bg-secondary ms-1 users-view-badge'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
             </cfif>
             <cfset awardLine &= "</li>">
             <cfset content &= awardLine>
@@ -519,9 +536,10 @@
 
 <cfset content &= "
 <div class='mt-4'>
-    " & (uhApiId != "" ? "<a href='/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2'>UH Sync</a>" : "") & "
+    " & (uhApiId != "" ? "<a href='/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2 users-view-badge'>UH Sync</a>" : "") & "
     <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#' class='btn btn-primary'>Edit</a>
     <a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
+</div>
 </div>
 " />
 

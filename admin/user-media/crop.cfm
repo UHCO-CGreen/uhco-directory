@@ -207,8 +207,7 @@
         <div class='card-body text-center'>
             <img src='#encodeForHTMLAttribute(previewUrl)#'
                  alt='Generated variant preview'
-                 class='img-fluid rounded border'
-                 style='max-height: 400px;'>
+                  class='img-fluid rounded border media-preview-image'>
             <p class='text-muted small mt-2 mb-0'>
                 File: #encodeForHTML(variant.LOCALPATH)#
                 &mdash; #targetWidth# &times; #targetHeight# px
@@ -243,11 +242,11 @@
             <span class='text-muted fw-normal ms-2'>Target: #targetWidth# &times; #targetHeight# px</span>
         </div>
         <div class='card-body p-0'>
-            <div style='max-height: 80vh; background: ##1a1a1a;'>
+            <div class='media-crop-stage'>
                 <img id='cropSourceImage'
                      src='#encodeForHTMLAttribute(sourceUrl)#'
                      alt='Source image'
-                     style='display:block; max-width:100%;'>
+                     class='media-crop-source'>
             </div>
         </div>
         <div class='card-footer d-flex justify-content-between align-items-center'>

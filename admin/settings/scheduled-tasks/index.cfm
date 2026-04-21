@@ -191,26 +191,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
-<style>
-.task-masonry {
-    column-count: 2;
-    column-gap: 1.5rem;
-}
-
-.task-masonry-item {
-    display: inline-block;
-    width: 100%;
-    margin: 0 0 1.5rem;
-    break-inside: avoid;
-}
-
-@media (max-width: 991.98px) {
-    .task-masonry {
-        column-count: 1;
-    }
-}
-</style>
-
+<div class="settings-page settings-scheduled-tasks-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -234,12 +215,12 @@
 </cfif>
 
 <!--- ── Nightly Run-Order Timeline ───────────────────────────────────────── --->
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-dark text-white">
+<div class="card shadow-sm mb-4 settings-shell settings-summary-card">
+    <div class="card-header">
         <h6 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Nightly Run Order</h6>
     </div>
     <div class="card-body py-3">
-        <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="settings-task-timeline">
             <cfloop from="1" to="#arrayLen(tasks)#" index="i">
                 <span class="badge bg-#tasks[i].color# bg-opacity-75 fs-6 py-2 px-3">
                     <i class="bi #tasks[i].icon# me-1"></i>
@@ -265,6 +246,7 @@
 
     <div class="task-masonry-item">
         <div class="card shadow-sm">
+            <div class="settings-task-card">
             <div class="card-header bg-#t.color# bg-opacity-10 p-0">
                 <button class="btn w-100 text-start p-3 border-0 rounded-0 d-flex justify-content-between align-items-center #(i EQ 1 ? '' : 'collapsed')#"
                         type="button"
@@ -354,27 +336,27 @@
 
                 <!--- Card footer with actions --->
                 <cfset isEnabled = structKeyExists(enabledTasks, t.key)>
-                <div class="card-footer bg-light d-flex flex-wrap gap-2">
+                <div class="card-footer d-flex flex-wrap gap-2 settings-action-group">
                     <cfif isEnabled>
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="disable">
                             <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove scheduled task">
-                                    <i class="bi bi-x-circle me-1"></i> Disable
+                            <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Disable Task" data-bs-toggle="tooltip" data-bs-title="Disable Task" aria-label="Disable Task">
+                                    <i class="bi bi-x-circle"></i>
                             </button>
                         </form>
                     <cfelse>
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="enable">
                             <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                            <button type="submit" class="btn btn-sm btn-success" title="Enable daily schedule">
-                                <i class="bi bi-check-circle me-1"></i> Enable
+                            <button type="submit" class="btn btn-sm btn-success users-list-action-button" title="Enable Task" data-bs-toggle="tooltip" data-bs-title="Enable Task" aria-label="Enable Task">
+                                <i class="bi bi-check-circle"></i>
                             </button>
                         </form>
                     </cfif>
                     <cfif len(t.runNowLink)>
-                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-play-fill me-1"></i> Run Now
+                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Run Task Now" data-bs-toggle="tooltip" data-bs-title="Run Task Now" aria-label="Run Task Now">
+                            <i class="bi bi-play-fill"></i>
                         </a>
                     </cfif>
                     <cfif len(t.dashboardLink)>
@@ -384,14 +366,15 @@
                     </cfif>
                 </div>
             </div>
+            </div>
         </div>
     </div>
 </cfloop>
 </div>
 
 <!--- ── Notes Card ───────────────────────────────────────────────────────── --->
-<div class="card shadow-sm mt-4">
-    <div class="card-header bg-light">
+<div class="card shadow-sm mt-4 settings-shell settings-task-notes">
+    <div class="card-header">
         <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Notes</h6>
     </div>
     <div class="card-body small text-muted">
@@ -404,6 +387,8 @@
             <li>Endpoint URLs are shown for reference. You can paste them into CF Administrator or use them to trigger tasks via external schedulers.</li>
         </ul>
     </div>
+</div>
+
 </div>
 
 </cfoutput>

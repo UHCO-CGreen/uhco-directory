@@ -11,6 +11,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-quickpulls-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -41,7 +42,7 @@
         <cfset config = quickpullService.getQuickpullConfig(quickpull.key)>
         <cfset selectedItemCount = arrayLen(config.generalFields) + arrayLen(config.emailTypes) + arrayLen(config.phoneTypes) + arrayLen(config.addressTypes) + arrayLen(config.biographicalItems) + arrayLen(config.imageVariants) + arrayLen(config.externalSystems) + (config.appendOrganizations ? 1 : 0) + (config.appendFlags ? 1 : 0)>
         <div class="col-lg-6">
-            <div class="card shadow-sm h-100">
+            <div class="card shadow-sm h-100 settings-hub-card settings-hub-card--primary">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                         <div>
@@ -49,13 +50,13 @@
                             <div class="small text-muted font-monospace mb-2">#encodeForHTML(quickpull.endpoint)#</div>
                             <p class="text-muted small mb-0">#encodeForHTML(quickpull.description)#</p>
                         </div>
-                        <span class="badge bg-secondary-subtle text-secondary">#selectedItemCount# appended items</span>
+                        <span class="badge settings-badge-count">#selectedItemCount# appended items</span>
                     </div>
 
                     <div class="small text-uppercase text-muted fw-semibold mb-2">Default Return Items</div>
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <cfloop array="#quickpull.baseFields#" index="baseField">
-                            <span class="badge text-bg-light border">#encodeForHTML(baseField)#</span>
+                            <span class="badge settings-badge-neutral">#encodeForHTML(baseField)#</span>
                         </cfloop>
                     </div>
 
@@ -66,6 +67,8 @@
             </div>
         </div>
     </cfloop>
+</div>
+
 </div>
 
 </cfoutput>

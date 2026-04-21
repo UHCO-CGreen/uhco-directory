@@ -73,6 +73,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-uh-sync-changed-fields-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -125,10 +126,10 @@
 <cfif arrayLen(recentRuns)>
 
 <div class="collapse mb-3" id="historyPanel">
-    <div class="card card-body">
+    <div class="card card-body settings-shell">
         <h6 class="mb-2">Recent Runs</h6>
-        <table class="table table-sm table-bordered mb-0">
-            <thead class="table-dark">
+        <table class="table table-sm table-bordered mb-0 settings-table">
+            <thead>
                 <tr>
                     <th>Run</th><th>Date/Time (UTC)</th><th>Triggered By</th>
                     <th>Compared</th><th>Diffs</th><th>Gone</th><th>New</th><th></th>
@@ -207,9 +208,9 @@
         No field differences found#(len(filterField) ? " for the selected filter" : "")#.
     </div>
 <cfelse>
-    <div class="table-responsive">
-    <table class="table table-sm table-striped table-hover align-middle">
-        <thead class="table-dark">
+    <div class="table-responsive settings-shell">
+    <table class="table table-sm table-striped table-hover align-middle settings-table mb-0">
+        <thead>
             <tr>
                 <th>User</th>
                 <th>Field</th>
@@ -259,6 +260,8 @@
 </cfif>
 
 </cfif><!--- end currentRun check --->
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

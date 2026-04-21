@@ -1,0 +1,17 @@
+{
+  "name": "uhco-ident-styles",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:icons && npm run build:styles",
+    "build:icons": "node scripts/copy-bootstrap-icons.mjs",
+    "build:styles": "sass --no-source-map --style=compressed --load-path=node_modules assets/scss/admin.scss:assets/css/admin.css assets/scss/userreview.scss:assets/css/userreview.css assets/scss/api-docs.scss:assets/css/api-docs.css",
+    "watch:styles": "sass --watch --no-source-map --style=expanded --load-path=node_modules assets/scss/admin.scss:assets/css/admin.css assets/scss/userreview.scss:assets/css/userreview.css assets/scss/api-docs.scss:assets/css/api-docs.css"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.11.3"
+  },
+  "devDependencies": {
+    "sass": "^1.89.0"
+  }
+}

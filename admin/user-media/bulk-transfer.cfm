@@ -248,7 +248,7 @@
             <cfset content &= "
             <tr>
                 <td>
-                    <img src='#encodeForHTMLAttribute(row.sourcePath)#' alt='#encodeForHTMLAttribute(row.filename)#' class='rounded border' style='width:72px; height:72px; object-fit:cover;'>
+                    <img src='#encodeForHTMLAttribute(row.sourcePath)#' alt='#encodeForHTMLAttribute(row.filename)#' class='rounded border admin-thumb-72'>
                 </td>
                 <td>
                     <div class='fw-semibold'>#encodeForHTML(row.filename)#</div>

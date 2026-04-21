@@ -27,6 +27,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-media-config-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -45,11 +46,11 @@
 
     <!--- Publishing Settings Card --->
     <div class="col-md-6">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm h-100 settings-hub-card settings-hub-card--warning">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex align-items-center mb-3">
                     <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="bi bi-globe fs-3 text-info"></i>
+                        <i class="bi bi-globe fs-3 settings-hub-icon settings-hub-icon--warning"></i>
                     </div>
                     <div>
                         <h5 class="card-title mb-0">Publishing Settings</h5>
@@ -71,11 +72,11 @@
 
     <!--- Filename Patterns Card --->
     <div class="col-md-6">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm h-100 settings-hub-card settings-hub-card--primary">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex align-items-center mb-3">
                     <div class="bg-primary bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="bi bi-file-earmark-text fs-3 text-primary"></i>
+                        <i class="bi bi-file-earmark-text fs-3 settings-hub-icon"></i>
                     </div>
                     <div>
                         <h5 class="card-title mb-0">Filename Patterns</h5>
@@ -88,10 +89,10 @@
                 </p>
                 <div class="d-flex gap-3 mb-3">
                     <div>
-                        <span class="badge bg-secondary">#arrayLen(patterns)# total</span>
+                        <span class="badge settings-badge-count">#arrayLen(patterns)# total</span>
                     </div>
                     <div>
-                        <span class="badge bg-success">#activePatterns# active</span>
+                        <span class="badge settings-badge-active">#activePatterns# active</span>
                     </div>
                 </div>
                 <div class="mt-auto">
@@ -105,11 +106,11 @@
 
     <!--- Variant Types Card --->
     <div class="col-md-6">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm h-100 settings-hub-card settings-hub-card--success">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex align-items-center mb-3">
                     <div class="bg-success bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="bi bi-sliders fs-3 text-success"></i>
+                        <i class="bi bi-sliders fs-3 settings-hub-icon settings-hub-icon--success"></i>
                     </div>
                     <div>
                         <h5 class="card-title mb-0">Variant Types</h5>
@@ -122,10 +123,10 @@
                 </p>
                 <div class="d-flex gap-3 mb-3">
                     <div>
-                        <span class="badge bg-secondary">#arrayLen(allTypes)# total</span>
+                        <span class="badge settings-badge-count">#arrayLen(allTypes)# total</span>
                     </div>
                     <div>
-                        <span class="badge bg-success">#activeTypes# active</span>
+                        <span class="badge settings-badge-active">#activeTypes# active</span>
                     </div>
                 </div>
                 <div class="mt-auto">
@@ -136,6 +137,8 @@
             </div>
         </div>
     </div>
+
+</div>
 
 </div>
 

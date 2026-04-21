@@ -42,6 +42,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-admin-roles-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -67,9 +68,9 @@
 </cfif>
 
 <!--- ── Create / Edit form ── --->
-<div class="card border-0 shadow-sm mt-3 mb-4">
+<div class="card border-0 shadow-sm mt-3 mb-4 settings-shell">
     <div class="card-body">
-        <h5 class="mb-3">
+        <h5 class="mb-3 settings-section-title">
             <cfif structCount(editRole)>
                 <i class="bi bi-pencil me-2"></i>Edit Role
             <cfelse>
@@ -102,9 +103,9 @@
 </div>
 
 <cfif structCount(editRole)>
-<div class="card border-0 shadow-sm mt-3 mb-4">
+<div class="card border-0 shadow-sm mt-3 mb-4 settings-shell">
     <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-sliders me-2"></i>Default Permissions for #encodeForHTML(editRole.ROLE_NAME)#</h5>
+        <h5 class="mb-3 settings-section-title"><i class="bi bi-sliders me-2"></i>Default Permissions for #encodeForHTML(editRole.ROLE_NAME)#</h5>
         <cfif editRole.ROLE_NAME EQ "SUPER_ADMIN">
             <div class="alert alert-light border mb-0">
                 SUPER_ADMIN is still a code-level override. Default permission bundles are not used for this role.
@@ -120,7 +121,7 @@
                 <div class="row g-3">
                     <cfloop array="#permissionCategoryOrder#" index="permissionCategory">
                         <div class="col-md-6">
-                            <div class="border rounded p-3 h-100">
+                            <div class="settings-category-card h-100">
                                 <div class="fw-semibold text-capitalize mb-2">#encodeForHTML(permissionCategory)#</div>
                                 <cfloop array="#permissionsByCategory[permissionCategory]#" index="permissionItem">
                                     <div class="form-check mb-2">
@@ -147,12 +148,12 @@
 </cfif>
 
 <!--- ── Roles table ── --->
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm settings-shell">
     <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-list-ul me-2"></i>All Roles</h5>
+        <h5 class="mb-3 settings-section-title"><i class="bi bi-list-ul me-2"></i>All Roles</h5>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0 settings-table">
+                <thead>
                     <tr>
                         <th>ID</th>
                         <th>Role Name</th>
@@ -167,10 +168,10 @@
                         <td>#r.ROLE_ID#</td>
                         <td><span class="badge bg-primary">#encodeForHTML(r.ROLE_NAME)#</span></td>
                         <td>
-                            <span class="badge bg-secondary me-1">#arrayLen(currentRolePermissions)# total</span>
+                            <span class="badge settings-badge-count me-1">#arrayLen(currentRolePermissions)# total</span>
                             <cfif arrayLen(currentRolePermissions)>
                                 <cfloop from="1" to="#min(arrayLen(currentRolePermissions), 3)#" index="permissionIndex">
-                                    <span class="badge bg-light text-dark border me-1">#encodeForHTML(currentRolePermissions[permissionIndex].PERMISSION_KEY)#</span>
+                                    <span class="badge border settings-badge-neutral me-1">#encodeForHTML(currentRolePermissions[permissionIndex].PERMISSION_KEY)#</span>
                                 </cfloop>
                                 <cfif arrayLen(currentRolePermissions) GT 3>
                                     <span class="text-muted small">+ #arrayLen(currentRolePermissions) - 3# more</span>
@@ -180,14 +181,15 @@
                             </cfif>
                         </td>
                         <td class="text-end">
-                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-outline-primary" title="Edit">
-                                <i class="bi bi-pencil"></i>
+                            <div class="settings-action-group">
+                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Edit Role" data-bs-toggle="tooltip" data-bs-title="Edit Role" aria-label="Edit Role">
+                                <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif r.ROLE_NAME NEQ "SUPER_ADMIN">
                                 <form method="post" action="/admin/settings/admin-roles/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deleteRole">
                                     <input type="hidden" name="roleID" value="#r.ROLE_ID#">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
+                                    <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Delete Role" data-bs-toggle="tooltip" data-bs-title="Delete Role" aria-label="Delete Role"
                                             onclick="return confirm('Delete role #encodeForJavaScript(r.ROLE_NAME)#? This will remove it from all users.')">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -197,6 +199,7 @@
                                     <i class="bi bi-lock"></i>
                                 </button>
                             </cfif>
+                            </div>
                         </td>
                     </tr>
                 </cfloop>
@@ -215,6 +218,8 @@
             <i class="bi bi-sliders me-1"></i>Manage Permission Definitions
         </a>
     </cfif>
+</div>
+
 </div>
 
 </cfoutput>

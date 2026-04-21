@@ -171,7 +171,7 @@
             Schedule the report to run automatically at 2:00 AM each day via the ColdFusion Scheduler.
             Alternatively, add the URL below to the CF Administrator manually.
         </p>
-        <div class='input-group mb-3' style='max-width:700px;'>
+        <div class='input-group mb-3 report-scheduler-input'>
             <input type='text' class='form-control form-control-sm font-monospace'
                    value='#EncodeForHTMLAttribute(schedulerUrl)#' readonly id='schedUrlInput'>
             <button class='btn btn-sm btn-outline-secondary'
@@ -355,7 +355,7 @@
             <td>#EncodeForHTML(row.EMAILPRIMARY)#</td>
             <td>#badgesHtml#</td>
             <td class='text-nowrap'>
-                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-info py-0'>Edit</a>#syncBtnHtml#
+                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-info py-0 users-list-action-button users-list-action-button-edit' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User' aria-label='Edit User'><i class='bi bi-pencil-square'></i></a>#syncBtnHtml#
             </td>
         </tr>
         ">

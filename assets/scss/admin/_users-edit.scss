@@ -1,0 +1,315 @@
+.users-edit-page {
+  color: #213547;
+}
+
+.users-edit-header {
+  gap: 1rem;
+}
+
+.users-edit-header h1 {
+  margin-bottom: 0;
+  color: #18344d;
+}
+
+.users-edit-record-status {
+  min-width: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.users-edit-record-status .form-label,
+.users-edit-record-status .form-check-label {
+  color: #fff;
+}
+
+.users-edit-tabs {
+  gap: 0.35rem;
+  border-bottom: 0;
+}
+
+.users-edit-tabs .nav-link {
+  border: 1px solid #c7d2de;
+  border-radius: 0.65rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
+  color: #35516a;
+  font-weight: 600;
+}
+
+.users-edit-tabs .nav-link:hover,
+.users-edit-tabs .nav-link:focus {
+  border-color: #98b2ca;
+  color: #16324a;
+}
+
+.users-edit-tabs .nav-link.active {
+  border-color: #22384d;
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  color: #fff;
+}
+
+.users-edit-tab-content {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0 0.9rem 0.9rem 0.9rem;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.users-edit-tab-pane {
+  padding: 1.25rem;
+}
+
+.users-edit-tab-content > .tab-pane {
+  padding: 1.25rem;
+}
+
+.users-edit-sync-panel {
+  border-radius: 0.9rem;
+  border-color: #d6b15e;
+  background: linear-gradient(180deg, #fff9e9 0%, #fff4d5 100%);
+  color: #5b4818;
+  box-shadow: 0 12px 28px rgba(145, 104, 18, 0.1);
+}
+
+.users-edit-sync-panel-header {
+  border-bottom-color: rgba(145, 104, 18, 0.16) !important;
+}
+
+.users-edit-sync-table {
+  margin-bottom: 0.75rem;
+}
+
+.users-edit-sync-table-head th {
+  background: #f7ebc1;
+  color: #5a4715;
+}
+
+.users-edit-item-card,
+.degree-card,
+.award-card,
+.users-edit-org-card,
+.users-edit-extids-shell {
+  border-color: rgba(31, 41, 55, 0.08);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+
+.users-edit-item-card-body,
+.degree-card .card-body,
+.award-card .card-body,
+.users-edit-org-card-body,
+.users-edit-extids-shell {
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+
+.users-edit-org-card-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8fb 100%);
+}
+
+.users-edit-org-description {
+  background: rgba(238, 243, 248, 0.85);
+}
+
+.users-edit-secondary-button,
+.users-edit-outline-button,
+.users-edit-warning-button,
+.users-edit-success-button,
+.users-edit-danger-button {
+  font-weight: 600;
+}
+
+.users-edit-secondary-button {
+  border-color: #bcc8d4;
+  background: #eef3f7;
+  color: #33495d;
+}
+
+.users-edit-secondary-button:hover,
+.users-edit-secondary-button:focus {
+  border-color: #9eb0c2;
+  background: #e2eaf1;
+  color: #22384d;
+}
+
+.users-edit-outline-button {
+  border-color: #8ac2e2;
+  background: #f4fbff;
+  color: #12466c;
+}
+
+.users-edit-outline-button:hover,
+.users-edit-outline-button:focus {
+  border-color: #69acd5;
+  background: #e6f5fd;
+  color: #0f3c5d;
+}
+
+.users-edit-success-button {
+  border-color: #3d8b61;
+  background: linear-gradient(180deg, #4ca06f 0%, #3d8b61 100%);
+  color: #fff;
+}
+
+.users-edit-success-button:hover,
+.users-edit-success-button:focus {
+  border-color: #32704e;
+  background: linear-gradient(180deg, #418e63 0%, #32704e 100%);
+  color: #fff;
+}
+
+.users-edit-danger-button {
+  border-color: #b03a4b;
+  background: #fff2f4;
+  color: #8d2337;
+}
+
+.users-edit-danger-button:hover,
+.users-edit-danger-button:focus {
+  border-color: #98293c;
+  background: #ffe7eb;
+  color: #771d2d;
+}
+
+.users-edit-warning-button:hover,
+.users-edit-warning-button:focus,
+.users-edit-org-role-button:hover,
+.users-edit-org-role-button:focus {
+  color: #16324a;
+}
+
+.users-edit-page .btn-primary {
+  border-color: #0f4c81;
+  background: linear-gradient(180deg, #1b669e 0%, #0f4c81 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.users-edit-page .btn-primary:hover,
+.users-edit-page .btn-primary:focus {
+  border-color: #0b3b64;
+  background: linear-gradient(180deg, #175884 0%, #0b3b64 100%);
+  color: #fff;
+}
+
+.users-edit-page .btn-success {
+  border-color: #3d8b61;
+  background: linear-gradient(180deg, #4ca06f 0%, #3d8b61 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.users-edit-page .btn-success:hover,
+.users-edit-page .btn-success:focus {
+  border-color: #32704e;
+  background: linear-gradient(180deg, #418e63 0%, #32704e 100%);
+  color: #fff;
+}
+
+.users-edit-page .btn-outline-primary {
+  border-color: #8ac2e2;
+  background: #f4fbff;
+  color: #12466c;
+  font-weight: 600;
+}
+
+.users-edit-page .btn-outline-primary:hover,
+.users-edit-page .btn-outline-primary:focus {
+  border-color: #69acd5;
+  background: #e6f5fd;
+  color: #0f3c5d;
+}
+
+.users-edit-page .btn-outline-secondary {
+  border-color: #bcc8d4;
+  background: #eef3f7;
+  color: #33495d;
+  font-weight: 600;
+}
+
+.users-edit-page .btn-outline-secondary:hover,
+.users-edit-page .btn-outline-secondary:focus {
+  border-color: #9eb0c2;
+  background: #e2eaf1;
+  color: #22384d;
+}
+
+.users-edit-page .btn-outline-danger {
+  border-color: #b03a4b;
+  background: #fff2f4;
+  color: #8d2337;
+  font-weight: 600;
+}
+
+.users-edit-page .btn-outline-danger:hover,
+.users-edit-page .btn-outline-danger:focus {
+  border-color: #98293c;
+  background: #ffe7eb;
+  color: #771d2d;
+}
+
+.users-edit-scroll-panel {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.users-edit-bio-editor {
+  min-height: 200px;
+}
+
+.users-edit-org-chevron {
+  transition: transform 0.2s;
+}
+
+.users-edit-org-chevron[aria-expanded='true'] {
+  transform: rotate(180deg);
+}
+
+.users-edit-diff-col-field {
+  width: 20%;
+}
+
+.users-edit-diff-col-local,
+.users-edit-diff-col-api {
+  width: 32%;
+}
+
+.users-edit-diff-col-actions {
+  width: 16%;
+}
+
+.users-edit-org-role-button {
+  display: none;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.users-edit-org-role-button.is-visible {
+  display: inline-flex;
+}
+
+@media (max-width: 991.98px) {
+  .users-edit-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .users-edit-record-status {
+    width: 100%;
+  }
+
+  .users-edit-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .users-edit-tabs .nav-item {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .users-edit-tab-pane {
+    padding: 1rem;
+  }
+}

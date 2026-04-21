@@ -43,6 +43,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-grad-migration-detail-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -64,7 +65,7 @@
 <!--- ── Run Metadata ── --->
 <div class="row mt-4 g-3">
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Grad Year</h6>
                 <h3 class="card-title text-primary">#run.GRADYEAR#</h3>
@@ -72,7 +73,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Status</h6>
                 <h4>
@@ -88,7 +89,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Targeted</h6>
                 <h3 class="card-title">#run.TOTALTARGETED#</h3>
@@ -96,7 +97,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Migrated</h6>
                 <h3 class="card-title text-success">#run.TOTALMIGRATED#</h3>
@@ -104,7 +105,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Errors</h6>
                 <h3 class="card-title <cfif run.TOTALERRORS GT 0>text-danger<cfelse>text-muted</cfif>">#run.TOTALERRORS#</h3>
@@ -112,7 +113,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Mode</h6>
                 <h4 class="card-title">#run.MODE#</h4>
@@ -122,7 +123,7 @@
 </div>
 
 <!--- ── Additional metadata ── --->
-<div class="card mt-3">
+<div class="card mt-3 settings-shell settings-reference-card">
     <div class="card-body">
         <div class="row">
             <div class="col-md-4">
@@ -174,7 +175,7 @@
 </cfif>
 
 <!--- ── Per-User Details ── --->
-<div class="card mt-4">
+<div class="card mt-4 settings-shell settings-summary-card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-people me-2"></i>User Details (#arrayLen(details)#)</h5>
     </div>
@@ -183,7 +184,7 @@
             <p class="text-muted">No detail records found.</p>
         <cfelse>
             <div class="table-responsive">
-                <table class="table table-sm table-striped">
+                <table class="table table-sm table-striped settings-table">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -243,6 +244,8 @@
 </div>
 
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

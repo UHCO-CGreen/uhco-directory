@@ -31,21 +31,14 @@
 </div>
 
 <div class='d-flex gap-2'>
-    <form method='POST' action='/admin/users/deleteProcess.cfm' style='display: inline;'>
+    <form method='POST' action='/admin/users/deleteProcess.cfm' class='admin-inline-form'>
         <input type='hidden' name='userID' value='#user.USERID#'>
-        <button type='submit' class='btn btn-danger btn-lg' onclick='return confirm('Are you absolutely sure? This cannot be undone.');'>
+        <button type='submit' class='btn btn-danger btn-lg admin-delete-action' onclick='return confirm('Are you absolutely sure? This cannot be undone.');'>
             Yes, Delete Permanently
         </button>
     </form>
     <a href='/admin/users/index.cfm' class='btn btn-secondary btn-lg'>Cancel</a>
 </div>
-
-<style>
-    .btn-lg {
-        padding: 0.75rem 2rem;
-        font-size: 1.1rem;
-    }
-</style>
 " />
 
 <cfinclude template="/admin/layout.cfm">

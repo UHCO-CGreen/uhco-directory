@@ -7,16 +7,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><cfoutput>#encodeForHTML(pageTitle)#</cfoutput></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        body { background: #f4f6f8; }
-        .ur-shell { max-width: 1100px; margin: 0 auto; }
-        .ur-header { background: linear-gradient(135deg, #0f3d56, #1b6a8f); color: #fff; border-radius: 1rem; }
-        .ur-card { border: 0; border-radius: 1rem; box-shadow: 0 0.5rem 1.25rem rgba(16, 24, 40, 0.08); }
-        .row-card { border: 1px solid #dde3ea; border-radius: 0.85rem; padding: 1rem; background: #fff; }
-        .mono { font-family: Consolas, 'Courier New', monospace; }
-    </style>
+    <link rel="stylesheet" href="/assets/css/userreview.css">
+    <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/bootstrap-icons.css">
 </head>
 <body>
 <div class="container py-4 py-lg-5 ur-shell">

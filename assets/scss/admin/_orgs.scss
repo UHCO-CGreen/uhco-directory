@@ -1,0 +1,131 @@
+.orgs-page {
+  color: #213547;
+}
+
+.orgs-page h1,
+.orgs-form-shell h1,
+.orgs-delete-shell h1 {
+  color: #18344d;
+}
+
+.orgs-accordion,
+.orgs-add-card,
+.orgs-form-shell,
+.orgs-delete-shell,
+.orgs-delete-card {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.orgs-form-shell,
+.orgs-delete-shell {
+  max-width: 48rem;
+  padding: 1.5rem;
+}
+
+.orgs-root-item {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+
+.orgs-root-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(180deg, #fdfefe 0%, #f3f7fb 100%);
+}
+
+.orgs-root-toggle {
+  color: #18344d !important;
+  font-weight: 700;
+}
+
+.orgs-root-toggle:hover,
+.orgs-root-toggle:focus {
+  color: #0f4c81 !important;
+}
+
+.orgs-root-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.orgs-type-badge {
+  color: #fff;
+  background: linear-gradient(180deg, #6c7b8b 0%, #51606f 100%) !important;
+}
+
+.orgs-count-badge {
+  color: #33495d !important;
+  background: #f4f7fa !important;
+  border-color: #c9d5df !important;
+}
+
+.orgs-table {
+  margin-bottom: 0;
+}
+
+.orgs-table > thead > tr > th {
+  border-bottom: 0;
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.orgs-table tbody tr:nth-of-type(even) {
+  --bs-table-accent-bg: rgba(239, 244, 249, 0.65);
+}
+
+.orgs-table tbody td {
+  vertical-align: middle;
+}
+
+.orgs-name-cell {
+  font-weight: 600;
+  color: #18344d;
+}
+
+.orgs-action-button {
+  min-width: 4.75rem;
+  font-weight: 600;
+}
+
+.orgs-add-card .card-header {
+  border-bottom: 0;
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  color: #fff;
+}
+
+.orgs-add-card .card-body {
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+
+.orgs-delete-alert {
+  border: 1px solid rgba(176, 58, 75, 0.18);
+  background: linear-gradient(180deg, #fff5f6 0%, #ffecef 100%);
+  color: #7d2333;
+}
+
+.orgs-delete-card {
+  padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 767.98px) {
+  .orgs-root-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .orgs-root-actions {
+    width: 100%;
+  }
+}

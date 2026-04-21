@@ -14,6 +14,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-user-review-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -36,7 +37,7 @@
 </cfif>
 
 <cfif canManageUserReviewSettings>
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 settings-shell">
     <div class="card-header"><h5 class="mb-0">Configuration</h5></div>
     <div class="card-body">
         <form method="post" action="/admin/settings/user-review/save.cfm">
@@ -76,16 +77,16 @@
 </cfif>
 
 <cfif canApproveUserReview>
-<div class="card shadow-sm">
+<div class="card shadow-sm settings-shell">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Submissions</h5>
-        <span class="badge bg-secondary">#arrayLen(submissions)#</span>
+        <span class="badge settings-badge-count">#arrayLen(submissions)#</span>
     </div>
     <div class="card-body p-0">
         <cfif arrayLen(submissions)>
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
+                <table class="table table-hover mb-0 align-middle settings-table">
+                    <thead>
                         <tr>
                             <th>User</th>
                             <th>Submitted</th>
@@ -104,7 +105,7 @@
                                 <td class="small">#dateTimeFormat(submission.SUBMITTEDAT, "mmm d, yyyy h:nn tt")#</td>
                                 <td><span class="badge text-bg-#submission.STATUS EQ 'pending' ? 'warning' : 'secondary'#">#encodeForHTML(replace(submission.STATUS, "_", " ", "all"))#</span></td>
                                 <td class="small">#encodeForHTML(replace(submission.SECTIONLIST ?: "", ",", ", ", "all"))#</td>
-                                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/admin/settings/user-review/review.cfm?submissionID=#submission.SUBMISSIONID#">Review</a></td>
+                                <td class="text-end"><a class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" href="/admin/settings/user-review/review.cfm?submissionID=#submission.SUBMISSIONID#" title="Review Submission" data-bs-toggle="tooltip" data-bs-title="Review Submission" aria-label="Review Submission"><i class="bi bi-pencil-square"></i></a></td>
                             </tr>
                         </cfloop>
                     </tbody>
@@ -116,6 +117,8 @@
     </div>
 </div>
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

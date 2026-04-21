@@ -372,38 +372,38 @@
 <cfset orgFilterPanelHTML = "">
 <cfif showOrgFilter>
     <cfset orgFilterToggleButtonHTML = "
-            <button type='button' class='btn btn-sm #orgFilterToggleButtonClass#' data-bs-toggle='collapse' data-bs-target='##orgFilterPanel' aria-expanded='#(orgFilterHasSelection ? "true" : "false")#' aria-controls='orgFilterPanel'>
+            <button type='button' class='btn btn-sm users-list-org-filter-toggle #orgFilterToggleButtonClass#' data-bs-toggle='collapse' data-bs-target='##orgFilterPanel' aria-expanded='#(orgFilterHasSelection ? "true" : "false")#' aria-controls='orgFilterPanel'>
                 <i class='bi bi-diagram-3 me-1'></i>Org Filters#(selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "")#
             </button>
     ">
     <cfset orgFilterPanelHTML = "
-            <div class='w-100'>
+            <div class='w-100 users-list-org-filter-wrap'>
                 <div id='orgFilterPanel' class='collapse#(orgFilterHasSelection ? " show" : "")# mt-2'>
-                    <div class='card border-light-subtle shadow-sm'>
-                        <div class='card-body p-3'>
+                    <div class='card border-light-subtle shadow-sm users-list-org-filter-panel'>
+                        <div class='card-body p-3 users-list-org-filter-panel-body'>
                             <div class='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3'>
                                 <div>
-                                    <div class='fw-semibold'>Organization Filters</div>
-                                    <div class='text-muted small'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
+                                    <div class='fw-semibold users-list-org-filter-title'>Organization Filters</div>
+                                    <div class='text-muted small users-list-org-filter-note'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
                                 </div>
                             </div>
                             <div class='form-check mb-3'>
                                 <input class='form-check-input' type='checkbox' name='filterOrg' value='NOORGS' id='filterOrgNoOrg'#(includeNoOrgFilter ? " checked" : "")#>
                                 <label class='form-check-label' for='filterOrgNoOrg'>No Org</label>
                             </div>
-                            <div class='row row-cols-1 row-cols-xl-2 g-3'>
+                            <div class='row row-cols-1 row-cols-xl-2 g-3 users-list-org-filter-grid'>
     ">
     <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
         <cfset rootOrg = rootOrgs[iRoot]>
         <cfset childOrgs = structKeyExists(orgChildrenByParent, toString(rootOrg.ORGID)) ? orgChildrenByParent[toString(rootOrg.ORGID)] : []>
         <cfset orgFilterPanelHTML &= "
                                 <div class='col'>
-                                    <div class='card h-100 border-light-subtle'>
-                                        <div class='card-header bg-white'>
-                                            <div class='fw-semibold'>#EncodeForHTML(rootOrg.ORGNAME)#</div>
-                                            #(len(trim(rootOrg.ORGDESCRIPTION ?: "")) ? "<div class='small text-muted mt-1'>" & EncodeForHTML(rootOrg.ORGDESCRIPTION) & "</div>" : "")#
+                                    <div class='card h-100 border-light-subtle users-list-org-group-card'>
+                                        <div class='card-header bg-white users-list-org-group-header'>
+                                            <div class='fw-semibold users-list-org-group-title'>#EncodeForHTML(rootOrg.ORGNAME)#</div>
+                                            #(len(trim(rootOrg.ORGDESCRIPTION ?: "")) ? "<div class='small text-muted mt-1 users-list-org-group-description'>" & EncodeForHTML(rootOrg.ORGDESCRIPTION) & "</div>" : "")#
                                         </div>
-                                        <div class='card-body p-3'>
+                                        <div class='card-body p-3 users-list-org-group-body'>
         ">
         <cfif arrayLen(childOrgs) EQ 0>
             <cfset orgFilterPanelHTML &= "<div class='text-muted small'>No child organizations available.</div>">
@@ -453,26 +453,26 @@
 
 <!--- ======================== BUILD PAGE CONTENT ======================== --->
 <cfset content = "
-<div class='d-flex justify-content-between mb-4'>
-    <h1><i class='bi bi-people-fill me-2'></i>#pageTitle# <span class='badge bg-secondary fs-6'>#totalRecords#</span></h1>
+<div class='d-flex justify-content-between mb-4 users-list-page-header'>
+    <h1><i class='bi bi-people-fill me-2'></i>#pageTitle# <span class='badge bg-secondary fs-6 users-list-count-badge'>#totalRecords#</span></h1>
     <div class='d-flex gap-2'>
         <a href='/admin/users/new.cfm' class='btn btn-primary'>New User</a>
     </div>
 </div>
 
-<div class='card mb-4'>
-    <div class='card-body'>
-        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
+<div class='card mb-4 users-list-filter-card'>
+    <div class='card-body users-list-filter-card-body'>
+        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0 users-list-filter-form'>
             <input type='hidden' name='list'    value='#listType#'>
             <input type='hidden' name='sortCol' value='#sortColumn#'>
             <input type='hidden' name='sortDir' value='#sortDirection#'>
             <input type='hidden' name='page'    value='1'>
-            <div class='input-group' style='min-width:220px; flex:1;'>
-                <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
+            <div class='input-group users-list-toolbar-search'>
+                <button type='button' class='btn btn-sm btn-outline-secondary users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
                 <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
             </div>
-            <label for='flagFilter' class='mb-0'>Flag:</label>
-            <select name='filterFlag' id='flagFilter' class='form-select' style='width:auto;'>
+            <label for='flagFilter' class='mb-0 users-list-filter-label'>Flag:</label>
+            <select name='filterFlag' id='flagFilter' class='form-select users-list-select-auto'>
                 <option value=''>All</option>
                 <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
 ">
@@ -491,8 +491,8 @@
 <!--- Grad year filter (conditional) --->
 <cfif showGradFilter>
     <cfset content &= "
-            <label for='gradYearFilter' class='mb-0'>Grad Year:</label>
-            <select name='filterGradYear' id='gradYearFilter' class='form-select' style='width:auto;'>
+            <label for='gradYearFilter' class='mb-0 users-list-filter-label'>Grad Year:</label>
+            <select name='filterGradYear' id='gradYearFilter' class='form-select users-list-select-auto'>
                 <option value=''>All Years</option>
     ">
     <cfloop from="1" to="#arrayLen(allGradYears)#" index="i">
@@ -506,15 +506,15 @@
 
 <!--- Per page + buttons --->
 <cfset content &= "
-            <label for='perPageSelect' class='mb-0'>Per page:</label>
-            <select name='perPage' id='perPageSelect' class='form-select' style='width:auto;'>
+            <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per page:</label>
+            <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
                 <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
                 <option value='25'  #(perPage == 25  ? 'selected' : '')#>25</option>
                 <option value='50'  #(perPage == 50  ? 'selected' : '')#>50</option>
                 <option value='100' #(perPage == 100 ? 'selected' : '')#>100</option>
             </select>
-            <button type='submit' class='btn btn-sm btn-secondary'>Apply Filter</button>
-            " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning'>Clear Filters</a>" : "") & "
+            <button type='submit' class='btn btn-sm btn-secondary users-list-apply-button'>Apply Filter</button>
+            " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning users-list-clear-button'>Clear Filters</a>" : "") & "
             #orgFilterPanelHTML#
         </form>
     </div>
@@ -528,23 +528,24 @@
 
 <!--- Table header --->
 <cfset content &= "
-<table class='table table-striped table-hover align-middle'>
-    <thead class='table-dark'>
+<div class='table-responsive users-list-table-shell'>
+<table class='table table-striped table-hover align-middle users-list-table'>
+    <thead class='users-list-table-head'>
         <tr>
-            <th style='width: 50px; min-width: 50px;' class='text-center'>##</th>
+            <th class='text-center users-list-col-id'>##</th>
 ">
 <cfif showPhoto>
-    <cfset content &= "            <th style='width: 32px; min-width: 32px;' class='text-center'></th>
+    <cfset content &= "            <th class='text-center users-list-col-photo'></th>
 ">
 </cfif>
 <cfset content &= "
-            <th><a href='#helpers.getSortLink("FIRSTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
-            <th><a href='#helpers.getSortLink("LASTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Last Name #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
-            <th><a href='#helpers.getSortLink("EMAIL", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("FIRSTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' class='users-list-sort-link'>First Name #(sortColumn == "FIRSTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("LASTNAME", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' class='users-list-sort-link'>Last Name #(sortColumn == "LASTNAME" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th><a href='#helpers.getSortLink("EMAIL", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' class='users-list-sort-link'>Email #(sortColumn == "EMAIL" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
 ">
 <cfif showGradYear>
     <cfset content &= "
-            <th class='text-center'><a href='#helpers.getSortLink("CURRENTGRADYEAR", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' style='color: ##fff; text-decoration: none;'>Grad Year #(sortColumn == "CURRENTGRADYEAR" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
+            <th class='text-center'><a href='#helpers.getSortLink("CURRENTGRADYEAR", sortColumn, sortDirection, selectedFlagFilter, selectedGradYear, searchTerm, sortColumn, sortDirection, perPage, selectedLetter, selectedOrgFilter, listType)#' class='users-list-sort-link'>Grad Year #(sortColumn == "CURRENTGRADYEAR" ? (sortDirection == "ASC" ? "&uarr;" : "&darr;") : "")#</a></th>
 ">
 </cfif>
 <cfif showTitle>
@@ -553,9 +554,9 @@
 ">
 </cfif>
 <cfset content &= "
-            <th style='width: 210px; min-width: 210px;'>Organizational Units</th>
-            <th style='width: 150px; min-width: 150px;'>Flags</th>
-            <th style='width: 160px; min-width: 160px;'>Actions</th>
+            <th class='users-list-col-orgs'>Organizational Units</th>
+            <th class='users-list-col-flags'>Flags</th>
+            <th class='users-list-col-actions'>Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -570,14 +571,14 @@
     <cfset flagsHTML = "">
 
     <cfloop from="1" to="#arrayLen(userOrgsData)#" index="o">
-        <cfset orgsHTML &= "<span class='badge rounded-pill bg-primary text-wrap text-start' style='font-size: 0.7rem; line-height: 1.15;'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
+        <cfset orgsHTML &= "<span class='badge rounded-pill bg-primary text-wrap text-start users-list-badge-org'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
     </cfloop>
 
     <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
         <cfif highlightFlags AND (userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH")>
-            <cfset flagsHTML &= "<span class='badge rounded-pill bg-danger text-wrap text-start' style='font-size: 0.68rem; line-height: 1.15;'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill bg-danger text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
         <cfelse>
-            <cfset flagsHTML &= "<span class='badge rounded-pill bg-secondary text-wrap text-start' style='font-size: 0.68rem; line-height: 1.15;'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill bg-secondary text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
         </cfif>
     </cfloop>
 
@@ -619,12 +620,12 @@
     <!--- Manage Images link (faculty / current-students with media admin role) --->
     <cfset mediaLink = "">
     <cfif showManageImages AND request.hasPermission("media.edit")>
-        <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary' title='Manage Images' data-bs-toggle='tooltip' data-bs-title='Manage Images'><i class='bi bi-card-image'></i></a>">
+        <cfset mediaLink = "<a href='/admin/user-media/sources.cfm?userid=#u.USERID#' class='btn btn-sm btn-outline-primary users-list-action-button users-list-action-button-media' title='Manage Images' data-bs-toggle='tooltip' data-bs-title='Manage Images'><i class='bi bi-card-image'></i></a>">
     </cfif>
 
     <cfset deleteLink = "">
     <cfif request.hasPermission("users.delete")>
-        <cfset deleteLink = "<a class='btn btn-sm btn-danger' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
+        <cfset deleteLink = "<a class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
     </cfif>
 
     <!--- Deceased icon (alumni only) --->
@@ -632,7 +633,7 @@
     <cfif showDeceased>
         <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
             <cfif lCase(trim(userFlags[f].FLAGNAME)) EQ "deceased">
-                <cfset deceasedIcon = "<i class='bi bi-record-fill me-1' title='Deceased' data-bs-toggle='tooltip' data-bs-title='Deceased'></i>">
+                <cfset deceasedIcon = "<i class='bi bi-record-fill me-1 users-list-deceased-icon' title='Deceased' data-bs-toggle='tooltip' data-bs-title='Deceased'></i>">
                 <cfbreak>
             </cfif>
         </cfloop>
@@ -650,13 +651,13 @@
     ">
 
     <cfif showPhoto>
-        <cfset content &= "<td class='text-center'>" & (len(thumbURL) ? "<img src='" & thumbURL & "' alt='thumb' style='width:32px;height:32px;object-fit:cover;border-radius:4px;'>" : "") & "</td>">
+        <cfset content &= "<td class='text-center'>" & (len(thumbURL) ? "<img src='" & thumbURL & "' alt='thumb' class='users-list-thumb'>" : "") & "</td>">
     </cfif>
 
     <cfset content &= "
             <td>#deceasedIcon##u.FIRSTNAME#</td>
             <td>#u.LASTNAME#</td>
-            <td>#displayEmail##(displayEmailExternal ? " <span class='badge bg-warning text-dark' title='Non-UH email'>External</span>" : "")#</td>
+            <td class='users-list-email-cell'>#displayEmail##(displayEmailExternal ? " <span class='badge text-dark users-list-external-badge' title='Non-UH email'>External</span>" : "")#</td>
     ">
 
     <cfif showGradYear>
@@ -671,11 +672,11 @@
     </cfif>
 
     <cfset content &= "
-            <td style='width: 210px; min-width: 210px;'><div class='d-flex flex-wrap gap-1 align-items-start'>#orgsHTML#</div></td>
-            <td style='width: 150px; min-width: 150px;'><div class='d-flex flex-wrap gap-1 align-items-start'>#flagsHTML#</div></td>
-            <td style='width: 165px; min-width: 165px;' class='text-end'><div class='d-flex flex-wrap gap-1 align-items-start'>
-                <a class='btn btn-sm btn-info' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>
-                <a class='btn btn-sm btn-secondary' href='/admin/users/view.cfm?userID=#u.USERID#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
+            <td class='users-list-col-orgs'><div class='d-flex flex-wrap gap-1 align-items-start users-list-pill-stack'>#orgsHTML#</div></td>
+            <td class='users-list-col-flags'><div class='d-flex flex-wrap gap-1 align-items-start users-list-pill-stack'>#flagsHTML#</div></td>
+            <td class='users-list-col-actions text-end'><div class='d-flex flex-wrap gap-1 align-items-start users-list-actions'>
+                <a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>
+                <a class='btn btn-sm btn-secondary users-list-action-button users-list-action-button-view' href='/admin/users/view.cfm?userID=#u.USERID#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
                 #deleteLink#
                 #mediaLink#</div>
             </td>
@@ -684,12 +685,13 @@
 </cfloop>
 
 <cfif arrayLen(pageRows) EQ 0>
-    <cfset content &= "<tr><td colspan='#colCount#' class='text-center text-muted'>#noDataMsg#</td></tr>">
+    <cfset content &= "<tr><td colspan='#colCount#' class='text-center text-muted users-list-empty-state'>#noDataMsg#</td></tr>">
 </cfif>
 
 <cfset content &= "
     </tbody>
 </table>
+</div>
 ">
 
 <!--- Bottom pagination --->

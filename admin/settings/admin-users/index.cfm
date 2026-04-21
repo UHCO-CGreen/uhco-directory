@@ -47,6 +47,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-admin-users-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -72,7 +73,7 @@
 </cfif>
 
 <cfif request.isActualSuperAdmin()>
-<div class="card border-0 shadow-sm mt-3 mb-4 border-start border-4 border-warning">
+<div class="card border-0 shadow-sm mt-3 mb-4 border-start border-4 border-warning settings-shell">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
             <div>
@@ -104,7 +105,7 @@
 
         <div class="row g-4 mt-1">
             <div class="col-lg-4">
-                <div class="border rounded p-3 h-100">
+                <div class="settings-category-card h-100">
                     <h6 class="mb-3">Impersonate Role</h6>
                     <form method="post" action="/admin/settings/admin-users/save.cfm">
                         <input type="hidden" name="action" value="startImpersonationRole">
@@ -125,7 +126,7 @@
                 </div>
             </div>
             <div class="col-lg-8">
-                <div class="border rounded p-3 h-100">
+                <div class="settings-category-card h-100">
                     <h6 class="mb-3">Impersonate Custom Permissions</h6>
                     <form method="post" action="/admin/settings/admin-users/save.cfm">
                         <input type="hidden" name="action" value="startImpersonationPermissions">
@@ -133,7 +134,7 @@
                         <div class="row row-cols-1 row-cols-md-2 g-3">
                             <cfloop list="admin,users,media,settings" index="permissionCategory">
                                 <div class="col">
-                                    <div class="border rounded p-2 h-100">
+                                    <div class="settings-category-card h-100 p-2">
                                         <div class="fw-semibold text-capitalize mb-2">#encodeForHTML(permissionCategory)#</div>
                                         <cfset foundCategoryPermission = false>
                                         <cfloop array="#allPermissions#" index="permissionItem">
@@ -167,9 +168,9 @@
 </cfif>
 
 <!--- ── Add User form ── --->
-<div class="card border-0 shadow-sm mt-3 mb-4">
+<div class="card border-0 shadow-sm mt-3 mb-4 settings-shell">
     <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-person-plus me-2"></i>Add Admin User</h5>
+        <h5 class="mb-3 settings-section-title"><i class="bi bi-person-plus me-2"></i>Add Admin User</h5>
         <form method="post" action="/admin/settings/admin-users/save.cfm" class="row g-3 align-items-end">
             <input type="hidden" name="action" value="addUser">
             <div class="col-auto">
@@ -185,12 +186,12 @@
 </div>
 
 <!--- ── Users table ── --->
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm settings-shell">
     <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-people me-2"></i>Current Admin Users</h5>
+        <h5 class="mb-3 settings-section-title"><i class="bi bi-people me-2"></i>Current Admin Users</h5>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0 settings-table">
+                <thead>
                     <tr>
                         <th>ID</th>
                         <th>CougarNet</th>
@@ -210,7 +211,7 @@
                         <td><strong>#encodeForHTML(u.COUGARNET)#</strong></td>
                         <td>
                             <cfif u.IS_ACTIVE>
-                                <span class="badge bg-success">Active</span>
+                                <span class="badge settings-badge-active">Active</span>
                             <cfelse>
                                 <span class="badge bg-secondary">Inactive</span>
                             </cfif>
@@ -225,10 +226,11 @@
                             </cfif>
                         </td>
                         <td>
-                            <span class="badge bg-secondary me-1">Direct #arrayLen(currentDirectPermissions)#</span>
-                            <span class="badge bg-info text-dark">Effective #arrayLen(currentEffectivePermissions)#</span>
+                            <span class="badge settings-badge-count me-1">Direct #arrayLen(currentDirectPermissions)#</span>
+                            <span class="badge settings-badge-custom">Effective #arrayLen(currentEffectivePermissions)#</span>
                         </td>
                         <td class="text-end">
+                            <div class="settings-action-group">
                             <!--- Toggle active --->
                             <form method="post" action="/admin/settings/admin-users/save.cfm" class="d-inline">
                                 <input type="hidden" name="action" value="toggleActive">
@@ -258,11 +260,12 @@
                                     data-bs-target="##permissionsModal#u.USER_ID#">
                                 <i class="bi bi-sliders"></i>
                             </button>
+                            </div>
                         </td>
                     </tr>
 
                     <!--- Roles modal --->
-                    <div class="modal fade" id="rolesModal#u.USER_ID#" tabindex="-1">
+                    <div class="modal fade settings-modal" id="rolesModal#u.USER_ID#" tabindex="-1">
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <div class="modal-header">
@@ -300,7 +303,7 @@
                         </div>
                     </div>
 
-                    <div class="modal fade" id="permissionsModal#u.USER_ID#" tabindex="-1">
+                    <div class="modal fade settings-modal" id="permissionsModal#u.USER_ID#" tabindex="-1">
                         <div class="modal-dialog modal-lg modal-dialog-scrollable">
                             <div class="modal-content">
                                 <form method="post" action="/admin/settings/admin-users/save.cfm">
@@ -337,7 +340,7 @@
                                             <div class="row g-3">
                                                 <cfloop array="#permissionCategoryOrder#" index="permissionCategory">
                                                     <div class="col-md-6">
-                                                        <div class="border rounded p-3 h-100">
+                                                        <div class="settings-category-card h-100">
                                                             <div class="fw-semibold text-capitalize mb-2">#encodeForHTML(permissionCategory)#</div>
                                                             <cfloop array="#permissionsByCategory[permissionCategory]#" index="permissionItem">
                                                                 <div class="form-check mb-2">
@@ -380,6 +383,8 @@
             <i class="bi bi-sliders me-1"></i>Manage Permissions
         </a>
     </cfif>
+</div>
+
 </div>
 
 </cfoutput>

@@ -12,25 +12,27 @@
 <cfset system = systemResult.data>
 
 <cfset content = "
+<div class='external-page'>
+<div class='external-delete-shell'>
 <h1>Delete External System</h1>
 
-<div class='alert alert-danger' role='alert'>
+<div class='alert alert-danger external-delete-alert mt-4' role='alert'>
     <h4 class='alert-heading'>Are you sure?</h4>
     <p>You are about to permanently delete this external system. All external IDs associated with this system will also be removed.</p>
 </div>
 
-<div class='card mb-4'>
-    <div class='card-body'>
+<div class='external-delete-card mb-4'>
         <p><strong>ID:</strong> #system.SYSTEMID#</p>
         <p><strong>System Name:</strong> #EncodeForHTML(system.SYSTEMNAME)#</p>
-    </div>
 </div>
 
-<form method='post' action='confirmDelete.cfm' style='display:inline;'>
+<form method='post' action='confirmDelete.cfm' class='admin-inline-form'>
     <input type='hidden' name='SystemID' value='#system.SYSTEMID#'>
     <button type='submit' class='btn btn-danger'>Delete System</button>
 </form>
 <a href='/admin/external/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
+</div>
+</div>
 " />
 
 <cfinclude template="/admin/layout.cfm">

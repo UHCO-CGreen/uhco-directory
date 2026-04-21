@@ -82,7 +82,7 @@
 <cfset content = "">
 <cfoutput>
 <cfset content &= '
-<div class="container-fluid">
+<div class="settings-page settings-filename-patterns-page">
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -93,7 +93,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Filename Patterns</h2>
+            <h1 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Filename Patterns</h1>
             <p class="text-muted mb-0">Manage patterns used to auto-match source image files to users.</p>
         </div>
     </div>
@@ -117,8 +117,8 @@
 <cfset content &= '
     <div class="row g-4">
         <div class="col-lg-5">
-            <div class="card shadow-sm">
-                <div class="card-header bg-dark text-white">
+            <div class="card shadow-sm settings-shell settings-summary-card">
+                <div class="card-header">
                     <h5 class="mb-0">#editMode ? "Edit" : "New"# Pattern</h5>
                 </div>
                 <div class="card-body">
@@ -169,13 +169,13 @@
             </div>
 
             <!--- Token Reference Card --->
-            <div class="card shadow-sm mt-3">
-                <div class="card-header bg-light">
+            <div class="card shadow-sm mt-3 settings-shell settings-reference-card">
+                <div class="card-header">
                     <h6 class="mb-0"><i class="bi bi-braces me-1"></i>Available Tokens</h6>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
+                    <table class="table table-sm mb-0 settings-table">
+                        <thead>
                             <tr><th>Token</th><th>Resolves To</th><th>Example</th></tr>
                         </thead>
                         <tbody>
@@ -194,13 +194,13 @@
             </div>
 
             <!--- Preview Card --->
-            <div class="card shadow-sm mt-3">
-                <div class="card-header bg-light">
+            <div class="card shadow-sm mt-3 settings-shell settings-reference-card">
+                <div class="card-header">
                     <h6 class="mb-0"><i class="bi bi-eye me-1"></i>Preview: John Michael Doe</h6>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
+                    <table class="table table-sm mb-0 settings-table">
+                        <thead>
                             <tr><th>Pattern</th><th>Resolved</th></tr>
                         </thead>
                         <tbody id="previewBody">
@@ -212,14 +212,15 @@
 
         <!--- ── Patterns Table ─────────────────────────────────────────── --->
         <div class="col-lg-7">
-            <div class="card shadow-sm">
-                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">All Patterns (#arrayLen(patterns)#)</h5>
+            <div class="card shadow-sm settings-shell">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">All Patterns</h5>
+                    <span class="badge settings-badge-count">#arrayLen(patterns)#</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover table-sm align-middle mb-0 settings-table">
+                            <thead>
                                 <tr>
                                     <th>Pattern</th>
                                     <th>Description</th>
@@ -245,19 +246,19 @@
                                     <td class="text-center">#val(p.SORTORDER ?: 0)#</td>
                                     <td class="text-center">
                                         <cfif isBoolean(p.ISACTIVE ?: false) AND p.ISACTIVE>
-                                            <span class="badge bg-success">Yes</span>
+                                            <span class="badge settings-badge-active">Yes</span>
                                         <cfelse>
-                                            <span class="badge bg-secondary">No</span>
+                                            <span class="badge settings-badge-neutral">No</span>
                                         </cfif>
                                     </td>
                                     <td class="text-end">
                                         <a href="/admin/settings/media-config/filename-patterns.cfm?edit=#val(p.FILENAMEPATTERNID)#"
-                                           class="btn btn-outline-primary btn-sm" title="Edit">
-                                            <i class="bi bi-pencil"></i>
+                                           class="users-list-action-button users-list-action-button-edit" title="Edit" aria-label="Edit Pattern">
+                                            <i class="bi bi-pencil-square"></i>
                                         </a>
-                                        <button type="button" class="btn btn-outline-danger btn-sm"
+                                        <button type="button" class="users-list-action-button users-list-action-button-delete"
                                                 onclick="confirmDelete(#val(p.FILENAMEPATTERNID)#, ''#encodeForJavaScript(p.PATTERN ?: "")#'')"
-                                                title="Delete">
+                                                title="Delete" aria-label="Delete Pattern">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </td>
@@ -279,7 +280,7 @@
 </div>
 
 <!--- ── Delete Confirmation Modal ────────────────────────────────────────── --->
-<div class="modal fade" id="deleteModal" tabindex="-1">
+<div class="modal fade settings-danger-modal" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">

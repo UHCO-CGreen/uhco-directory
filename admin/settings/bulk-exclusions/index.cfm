@@ -27,6 +27,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-bulk-exclusions-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -75,22 +76,22 @@
     <cfloop array="#types#" index="t">
         <cfset lastRun = dbOk ? svc.getLatestRunByType(t.TYPE_KEY) : {}>
         <div class="col-md-6 col-lg-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 settings-hub-card settings-hub-card--primary">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
                         <h5 class="card-title mb-2">
-                            <i class="bi #t.ICON# me-2"></i>#encodeForHTML(t.LABEL)#
+                            <i class="bi #t.ICON# me-2 settings-hub-icon"></i>#encodeForHTML(t.LABEL)#
                         </h5>
                         <a href="/admin/settings/bulk-exclusions/edit.cfm?type=#encodeForURL(t.TYPE_KEY)#"
-                           class="btn btn-sm btn-outline-secondary" title="Edit flags &amp; codes">
-                            <i class="bi bi-pencil"></i>
+                           class="users-list-action-button users-list-action-button-edit" title="Edit flags &amp; codes" aria-label="Edit #encodeForHTMLAttribute(t.LABEL)#">
+                            <i class="bi bi-pencil-square"></i>
                         </a>
                     </div>
                     <p class="mb-1"><strong>Flags:</strong> <span class="text-muted">#encodeForHTML(t.FLAGS)#</span></p>
                     <p class="mb-2"><strong>Codes:</strong></p>
                     <div class="mb-3">
                         <cfloop list="#t.CODES#" index="code">
-                            <span class="badge bg-secondary me-1 mb-1">#trim(code)#</span>
+                            <span class="badge settings-badge-neutral me-1 mb-1">#trim(code)#</span>
                         </cfloop>
                     </div>
                     <cfif structCount(lastRun)>
@@ -118,12 +119,12 @@
 
 <!--- ── Run History ── --->
 <cfif dbOk AND arrayLen(recentRuns)>
-<div class="card border-0 shadow-sm mt-4">
+<div class="card border-0 shadow-sm mt-4 settings-shell">
     <div class="card-body">
         <h5 class="mb-3"><i class="bi bi-clock-history me-2"></i>Recent Runs</h5>
         <div class="table-responsive">
-            <table class="table table-hover table-sm align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover table-sm align-middle mb-0 settings-table">
+                <thead>
                     <tr>
                         <th>ID</th>
                         <th>Type</th>
@@ -137,7 +138,7 @@
                 <cfloop array="#recentRuns#" index="r">
                     <tr>
                         <td>#r.RUNID#</td>
-                        <td><span class="badge bg-info text-dark">#encodeForHTML(r.EXCLUSIONTYPE)#</span></td>
+                        <td><span class="badge settings-badge-primary-soft">#encodeForHTML(r.EXCLUSIONTYPE)#</span></td>
                         <td>#r.ROWSAFFECTED#</td>
                         <td>#encodeForHTML(r.TRIGGEREDBY)#</td>
                         <td>#dateTimeFormat(r.RUNAT, "MMM d, yyyy h:nn tt")#</td>
@@ -158,6 +159,8 @@
     </div>
 </div>
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

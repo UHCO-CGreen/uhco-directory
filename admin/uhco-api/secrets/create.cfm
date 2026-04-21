@@ -1,7 +1,7 @@
 <cfset content = "
 <h1>New API Secret</h1>
 
-<form method='post' action='/admin/secrets/saveSecret.cfm' class='mt-4' style='max-width:680px;'>
+<form method='post' action='/admin/secrets/saveSecret.cfm' class='mt-4 admin-form-max-680'>
 
     <div class='mb-3'>
         <label class='form-label fw-semibold'>Secret Name <span class='text-danger'>*</span></label>

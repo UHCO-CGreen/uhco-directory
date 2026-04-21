@@ -24,8 +24,10 @@
             <tr>
                 <td>#a.ACCESSNAME#</td>
                 <td>
-                    <a href='/admin/access/edit.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-info'>Edit</a>
-                    <a href='/admin/access/delete.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-danger'>Delete</a>
+                    <div class='d-flex flex-wrap gap-1 align-items-start users-list-actions'>
+                        <a href='/admin/access/edit.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Access Area' data-bs-toggle='tooltip' data-bs-title='Edit Access Area' aria-label='Edit Access Area'><i class='bi bi-pencil-square'></i></a>
+                        <a href='/admin/access/delete.cfm?areaID=#a.ACCESSAREAID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Access Area' data-bs-toggle='tooltip' data-bs-title='Delete Access Area' aria-label='Delete Access Area'><i class='bi bi-trash'></i></a>
+                    </div>
                 </td>
             </tr>
         ">

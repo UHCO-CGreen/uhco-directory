@@ -1,0 +1,133 @@
+@use "../shared/brand";
+
+body {
+  background: brand.$app-bg;
+}
+
+.sidebar {
+  position: sticky;
+  top: 1.5rem;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+}
+
+.endpoint-card {
+  border-left: 4px solid var(--bs-primary);
+}
+
+.method-badge {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.param-table th {
+  white-space: nowrap;
+}
+
+pre.example,
+pre.code,
+#live-response {
+  background: brand.$code-bg;
+  color: brand.$code-fg;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+}
+
+pre.example {
+  font-size: 0.85rem;
+  padding: 1rem;
+}
+
+pre.code {
+  font-size: 0.83rem;
+  padding: 1.1rem 1.25rem;
+  position: relative;
+}
+
+#live-response {
+  min-height: 120px;
+  font-size: 0.82rem;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.nav-link.active {
+  font-weight: 600;
+}
+
+h2 {
+  scroll-margin-top: 1.5rem;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  opacity: 0.55;
+  font-size: 0.75rem;
+}
+
+.copy-btn:hover {
+  opacity: 1;
+}
+
+.lang-badge {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: 0.25em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-js {
+  background: #f7df1e;
+  color: #222;
+}
+
+.badge-node {
+  background: #339933;
+  color: #fff;
+}
+
+.badge-python {
+  background: #3776ab;
+  color: #fff;
+}
+
+.badge-cf {
+  background: #0070d2;
+  color: #fff;
+}
+
+.badge-curl {
+  background: #555;
+  color: #fff;
+}
+
+.kw {
+  color: #569cd6;
+}
+
+.st {
+  color: #ce9178;
+}
+
+.cm {
+  color: #6a9955;
+}
+
+.fn {
+  color: #dcdcaa;
+}
+
+.va {
+  color: #9cdcfe;
+}
+
+.api-examples-shell {
+  max-width: 860px;
+}

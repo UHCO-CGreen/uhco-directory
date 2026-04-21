@@ -6,6 +6,7 @@
 <cfset tokens = tokenService.getAllTokens()>
 
 <cfset content = "
+<div class='settings-page settings-api-tokens-page'>
 <nav aria-label='breadcrumb'>
     <ol class='breadcrumb'>
         <li class='breadcrumb-item'><a href='/admin/settings/'>Settings</a></li>
@@ -26,9 +27,10 @@
     <cfset content &= "<p class='text-muted'>No tokens created yet.</p>">
 <cfelse>
     <cfset content &= "
+<div class='settings-shell'>
 <div class='table-responsive'>
-<table class='table table-striped table-hover align-middle'>
-    <thead class='table-dark'>
+<table class='table table-striped table-hover align-middle settings-table mb-0'>
+    <thead>
         <tr>
             <th>Name</th>
             <th>Application</th>
@@ -53,7 +55,7 @@
         </cfif>
 
         <cfset statusBadge = isActive AND !isExpired
-            ? "<span class='badge bg-success'>Active</span>"
+            ? "<span class='badge settings-badge-active'>Active</span>"
             : "<span class='badge bg-secondary'>#(isActive ? 'Expired' : 'Revoked')#</span>">
 
         <cfset expiresDisplay = len(trim(t.EXPIRESAT & "")) ? dateFormat(t.EXPIRESAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
@@ -71,20 +73,22 @@
             <td class='small'>#lastUsedDisplay#</td>
             <td class='small'>#dateFormat(t.CREATEDAT, 'mmm d, yyyy')#</td>
             <td class='text-end'>
+                <div class='settings-action-group'>
         ">
 
         <cfif isActive AND !isExpired>
             <cfset content &= "<form method='post' action='/admin/settings/uhco-api/tokens/revokeToken.cfm' class='d-inline' onsubmit=""return confirm('Revoke this token? The application will immediately lose access.')"">
                 <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                <button class='btn btn-sm btn-outline-warning'>Revoke</button>
+                <button class='btn btn-sm btn-outline-warning' title='Revoke Token' data-bs-toggle='tooltip' data-bs-title='Revoke Token' aria-label='Revoke Token'><i class='bi bi-pause-circle'></i></button>
             </form>">
         </cfif>
 
         <cfset content &= "
                 <form method='post' action='/admin/settings/uhco-api/tokens/deleteToken.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this token record?')"">
                     <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                    <button class='btn btn-sm btn-outline-danger'>Delete</button>
+                    <button class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Token' data-bs-toggle='tooltip' data-bs-title='Delete Token' aria-label='Delete Token'><i class='bi bi-trash'></i></button>
                 </form>
+                </div>
             </td>
         </tr>
         ">
@@ -94,7 +98,10 @@
     </tbody>
 </table>
 </div>
+</div>
     ">
 </cfif>
+
+<cfset content &= "</div>">
 
 <cfinclude template="/admin/layout.cfm">

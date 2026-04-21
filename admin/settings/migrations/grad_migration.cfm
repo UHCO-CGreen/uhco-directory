@@ -94,6 +94,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-grad-migration-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -143,7 +144,7 @@
 <!--- ── Status Dashboard ── --->
 <div class="row mt-4 g-3">
     <div class="col-md-3">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Graduating Class</h6>
                 <h2 class="card-title text-primary">#gradWindow.graduatingYear#</h2>
@@ -151,7 +152,7 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Memorial Day #year(now())#</h6>
                 <h4 class="card-title">#dateFormat(gradWindow.memorialDay, 'mmmm d, yyyy')#</h4>
@@ -159,7 +160,7 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Auto-Execute</h6>
                 <h4 class="card-title">
@@ -173,7 +174,7 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center h-100">
+        <div class="card text-center h-100 settings-shell">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Latest Run</h6>
                 <cfif structIsEmpty(latestRun)>
@@ -196,7 +197,7 @@
 </div>
 
 <!--- ── Preview Panel ── --->
-<div class="card mt-4">
+<div class="card mt-4 settings-shell settings-summary-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-eye me-2"></i>Preview Migration</h5>
         <a href="/admin/settings/migrations/grad_migration.cfm?preview=true&gradYear=#gradWindow.graduatingYear#"
@@ -212,7 +213,7 @@
             </div>
             <cfif previewData.totalStudents GT 0>
                 <div class="table-responsive">
-                    <table class="table table-sm table-striped">
+                    <table class="table table-sm table-striped settings-table">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -258,7 +259,7 @@
 </div>
 
 <!--- ── Settings Panel ── --->
-<div class="card mt-4">
+<div class="card mt-4 settings-shell settings-summary-card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Settings</h5>
     </div>
@@ -292,7 +293,7 @@
 </div>
 
 <!--- ── Schedule Panel ── --->
-<div class="card mt-4">
+<div class="card mt-4 settings-shell settings-summary-card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-clock me-2"></i>Scheduled Task</h5>
     </div>
@@ -326,7 +327,7 @@
 </div>
 
 <!--- ── Run History ── --->
-<div class="card mt-4">
+<div class="card mt-4 settings-shell settings-summary-card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Run History</h5>
     </div>
@@ -335,7 +336,7 @@
             <p class="text-muted">No migration runs yet.</p>
         <cfelse>
             <div class="table-responsive">
-                <table class="table table-sm table-striped">
+                <table class="table table-sm table-striped settings-table">
                     <thead>
                         <tr>
                             <th>Run</th>
@@ -396,6 +397,8 @@
     </div>
 </div>
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

@@ -44,6 +44,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-bulk-exclusions-edit-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -63,7 +64,7 @@
     </div>
 </cfif>
 
-<div class="card border-0 shadow-sm mt-3">
+<div class="card border-0 shadow-sm mt-3 settings-shell settings-summary-card">
     <div class="card-body">
         <form method="post">
             <input type="hidden" name="save" value="1">
@@ -133,7 +134,7 @@
                 <h6 class="text-muted mb-2"><i class="bi bi-eye me-1"></i>Current Codes Preview</h6>
                 <div id="codesPreview" class="d-flex flex-wrap gap-1 mb-3">
                     <cfloop list="#typeData.CODES#" index="code">
-                        <span class="badge bg-secondary">#trim(code)#</span>
+                        <span class="badge settings-badge-neutral">#trim(code)#</span>
                     </cfloop>
                 </div>
             </div>
@@ -157,6 +158,8 @@
     </div>
 </div>
 
+</div>
+
 </cfoutput>
 </cfsavecontent>
 
@@ -174,7 +177,7 @@
         var container = document.getElementById('codesPreview');
         var codes = this.value.split(',').map(function(c){ return c.trim(); }).filter(Boolean);
         container.innerHTML = codes.map(function(c){
-            return '<span class="badge bg-secondary">' + c.replace(/</g,'&lt;') + '</span>';
+            return '<span class="badge settings-badge-neutral">' + c.replace(/</g,'&lt;') + '</span>';
         }).join(' ');
     });
 </script>

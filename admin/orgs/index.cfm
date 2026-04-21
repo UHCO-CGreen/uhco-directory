@@ -54,12 +54,12 @@
 </cffunction>
 
 <!--- ── Render ── --->
-<cfset content = "<h1>Organizational Units</h1>">
+<cfset content = "<div class='orgs-page'><h1>Organizational Units</h1>">
 
 <cfif arrayLen(allOrgs) EQ 0>
     <cfset content &= "<p class='text-muted mt-3'>No organizational units found.</p>">
 <cfelse>
-    <cfset content &= "<div class='accordion mt-4' id='orgAccordion'>">
+    <cfset content &= "<div class='accordion mt-4 orgs-accordion p-3' id='orgAccordion'>">
 
     <cfloop from="1" to="#arrayLen(rootOrgs)#" index="i">
         <cfset ro          = rootOrgs[i]>
@@ -71,13 +71,13 @@
         <!--- Pre-compute fragments to avoid nested quotes in the string --->
         <cfset ariaExpanded = (i EQ 1 AND hasChildren) ? "true" : "false">
         <cfset showClass    = (i EQ 1 AND hasChildren) ? " show" : "">
-        <cfset typeHtml  = len(trim(ro.ORGTYPE ?: "")) ? " <span class='badge bg-secondary fw-normal'>" & EncodeForHTML(trim(ro.ORGTYPE)) & "</span>" : "">
-        <cfset countBadge = hasChildren ? " <span class='badge bg-white text-muted border fw-normal ms-1'>" & arrayLen(descendants) & "</span>" : "">
+        <cfset typeHtml  = len(trim(ro.ORGTYPE ?: "")) ? " <span class='badge fw-normal orgs-type-badge'>" & EncodeForHTML(trim(ro.ORGTYPE)) & "</span>" : "">
+        <cfset countBadge = hasChildren ? " <span class='badge border fw-normal ms-1 orgs-count-badge'>" & arrayLen(descendants) & "</span>" : "">
 
         <cfset content &= "
-        <div class='accordion-item mb-2 border rounded shadow-sm'>
-            <div class='d-flex align-items-center pe-3 rounded-top' style='background:##f8f9fa;' id='#headingID#'>
-                <button class='btn btn-link text-dark text-start text-decoration-none flex-grow-1 px-3 py-2 fw-semibold'
+        <div class='accordion-item mb-3 orgs-root-item'>
+            <div class='orgs-root-header' id='#headingID#'>
+                <button class='btn btn-link text-start text-decoration-none flex-grow-1 px-0 py-0 orgs-root-toggle'
                         type='button'
                         data-bs-toggle='collapse'
                         data-bs-target='###collapseID#'
@@ -85,9 +85,9 @@
                         aria-controls='#collapseID#'>
                     #EncodeForHTML(ro.ORGNAME)##typeHtml##countBadge#
                 </button>
-                <div class='d-flex gap-1 flex-shrink-0'>
-                    <a href='/admin/orgs/edit.cfm?orgID=#ro.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
-                    <a href='/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
+                <div class='orgs-root-actions d-flex flex-wrap gap-1 align-items-start flex-shrink-0'>
+                    <a href='/admin/orgs/edit.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                    <a href='/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
                 </div>
             </div>
             <div id='#collapseID#' class='accordion-collapse collapse#showClass#'>
@@ -95,8 +95,8 @@
 
         <cfif hasChildren>
             <cfset content &= "
-                <table class='table table-sm table-hover mb-0'>
-                    <thead class='table-light'>
+                <table class='table table-sm table-hover mb-0 orgs-table'>
+                    <thead>
                         <tr>
                             <th class='ps-3'>Name</th>
                             <th>Type</th>
@@ -114,11 +114,13 @@
 
                 <cfset content &= "
                         <tr>
-                            <td class='ps-3'>#prefix##EncodeForHTML(desc.org.ORGNAME)#</td>
+                            <td class='ps-3 orgs-name-cell'>#prefix##EncodeForHTML(desc.org.ORGNAME)#</td>
                             <td>#dType#</td>
                             <td class='text-end pe-3'>
-                                <a href='/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#'   class='btn btn-sm btn-outline-primary'>Edit</a>
-                                <a href='/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-outline-danger'>Delete</a>
+                                <div class='d-flex flex-wrap gap-1 align-items-start justify-content-end'>
+                                    <a href='/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                                    <a href='/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
+                                </div>
                             </td>
                         </tr>
                 ">
@@ -142,7 +144,7 @@
 </cfif>
 
 <cfset content &= "
-<div class='card mt-5'>
+<div class='card mt-5 orgs-add-card'>
     <div class='card-header fw-semibold'>Add New Organizational Unit</div>
     <div class='card-body'>
         <form class='row g-3' method='post' action='saveOrg.cfm'>
@@ -190,6 +192,7 @@
             </div>
         </form>
     </div>
+</div>
 </div>
 " />
 

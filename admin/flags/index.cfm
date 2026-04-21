@@ -4,7 +4,8 @@
 <cfset allFlags = flagsResult.data />
 
 <cfset content = "
-<div class='d-flex justify-content-between align-items-center mb-4'>
+<div class='flags-page'>
+<div class='d-flex justify-content-between align-items-center mb-4 flags-header'>
     <h1>User Flags</h1>
     <a href='/admin/flags/new.cfm' class='btn btn-primary'>New Flag</a>
 </div>
@@ -19,8 +20,9 @@
 </cfif>
 
 <cfset content &= "
-<table class='table table-bordered table-striped mt-4'>
-    <thead class='table-dark'>
+<div class='flags-table-shell mt-4 overflow-hidden'>
+<table class='table table-bordered table-striped flags-table'>
+    <thead>
         <tr><th>Flag Name</th><th>Actions</th></tr>
     </thead>
     <tbody>
@@ -31,21 +33,25 @@
         <cfset f = allFlags[i]>
         <cfset content &= "
             <tr>
-                <td>#f.FLAGNAME#</td>
+                <td class='flags-name'>#EncodeForHTML(f.FLAGNAME)#</td>
                 <td>
-                    <a href='/admin/flags/edit.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-info'>Edit</a>
-                    <a href='/admin/flags/delete.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-danger'>Delete</a>
+                    <div class='d-flex flex-wrap gap-1 align-items-start users-list-actions flags-actions'>
+                        <a href='/admin/flags/edit.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Flag' data-bs-toggle='tooltip' data-bs-title='Edit Flag' aria-label='Edit Flag'><i class='bi bi-pencil-square'></i></a>
+                        <a href='/admin/flags/delete.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Flag' data-bs-toggle='tooltip' data-bs-title='Delete Flag' aria-label='Delete Flag'><i class='bi bi-trash'></i></a>
+                    </div>
                 </td>
             </tr>
         ">
     </cfloop>
 <cfelse>
-    <cfset content &= "<tr><td colspan='2' class='text-muted'>No flags found</td></tr>">
+    <cfset content &= "<tr><td colspan='2' class='text-muted flags-empty-state'>No flags found</td></tr>">
 </cfif>
 
 <cfset content &= "
     </tbody>
 </table>
+</div>
+</div>
 " />
 
 <cfinclude template="/admin/layout.cfm">

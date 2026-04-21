@@ -6,6 +6,7 @@
 <cfset secrets = secretService.getAllSecrets()>
 
 <cfset content = "
+<div class='settings-page settings-api-secrets-page'>
 <nav aria-label='breadcrumb'>
     <ol class='breadcrumb'>
         <li class='breadcrumb-item'><a href='/admin/settings/'>Settings</a></li>
@@ -31,9 +32,10 @@
     <cfset content &= "<p class='text-muted'>No secrets yet. <a href='/admin/settings/uhco-api/secrets/create.cfm'>Create one</a>.</p>">
 <cfelse>
     <cfset content &= "
+    <div class='settings-shell'>
     <div class='table-responsive'>
-    <table class='table table-bordered table-hover align-middle'>
-        <thead class='table-dark'>
+    <table class='table table-bordered table-hover align-middle settings-table mb-0'>
+        <thead>
             <tr>
                 <th>Name</th>
                 <th>App</th>
@@ -49,7 +51,7 @@
     ">
 
     <cfloop array="#secrets#" item="s">
-        <cfset statusBadge    = s.ISACTIVE ? "<span class='badge bg-success'>Active</span>" : "<span class='badge bg-secondary'>Revoked</span>">
+        <cfset statusBadge    = s.ISACTIVE ? "<span class='badge settings-badge-active'>Active</span>" : "<span class='badge bg-secondary'>Revoked</span>">
         <cfset expiresDisplay = (len(trim(s.EXPIRESAT & "")) AND s.EXPIRESAT NEQ "") ? dateFormat(s.EXPIRESAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
         <cfset lastUsedDisplay = (len(trim(s.LASTUSEDAT & "")) AND s.LASTUSEDAT NEQ "") ? dateFormat(s.LASTUSEDAT, "mmm d, yyyy") : "<span class='text-muted'>Never</span>">
         <cfset ipDisplay = len(trim(s.ALLOWEDIPS & "")) ? EncodeForHTML(s.ALLOWEDIPS) : "<span class='text-muted'>Any</span>">
@@ -64,22 +66,26 @@
             <td>#statusBadge#</td>
             <td>#lastUsedDisplay#</td>
             <td class='text-end'>
+                <div class='settings-action-group'>
                 <cfif s.ISACTIVE>
                 <form method='post' action='/admin/settings/uhco-api/secrets/revokeSecret.cfm' class='d-inline' onsubmit=""return confirm('Revoke this secret?')"">
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-warning'>Revoke</button>
+                    <button class='btn btn-sm btn-outline-warning' title='Revoke Secret' data-bs-toggle='tooltip' data-bs-title='Revoke Secret' aria-label='Revoke Secret'><i class='bi bi-pause-circle'></i></button>
                 </form>
                 </cfif>
                 <form method='post' action='/admin/settings/uhco-api/secrets/deleteSecret.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this secret?')"">
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-danger'>Delete</button>
+                    <button class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Secret' data-bs-toggle='tooltip' data-bs-title='Delete Secret' aria-label='Delete Secret'><i class='bi bi-trash'></i></button>
                 </form>
+                </div>
             </td>
         </tr>
         ">
     </cfloop>
 
-    <cfset content &= "</tbody></table></div>">
+    <cfset content &= "</tbody></table></div></div>">
 </cfif>
+
+<cfset content &= "</div>">
 
 <cfinclude template="/admin/layout.cfm">

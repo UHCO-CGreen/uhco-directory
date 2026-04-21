@@ -5,7 +5,7 @@
 <cfset content = "
 <h1>New API Token</h1>
 
-<form method='post' action='/admin/settings/uhco-api/tokens/saveToken.cfm' class='mt-4' style='max-width:680px;'>
+<form method='post' action='/admin/settings/uhco-api/tokens/saveToken.cfm' class='mt-4 admin-form-max-680'>
 
     <div class='mb-3'>
         <label class='form-label fw-semibold'>Token Name <span class='text-danger'>*</span></label>
@@ -46,7 +46,7 @@
         </div>
         <div class='form-text mt-1'>Generates a matching API Secret so this token can also access protected data (Current-Student, Alumni, Academic Programs orgs).</div>
 
-        <div id='secretPanel' style='display:none;' class='mt-3'>
+        <div id='secretPanel' class='mt-3 admin-hidden'>
             <hr class='mt-2'>
             <h6 class='fw-semibold mb-3 mt-3'><i class='bi bi-shield-lock me-2'></i>Secret Settings</h6>
 

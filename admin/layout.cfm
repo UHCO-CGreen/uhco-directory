@@ -2,214 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>UHCO ident Admin</title>
+    <title>UHCO Identity Admin</title>
 
-    <!-- Bootstrap 5.3 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="/assets/css/admin.css">
     
     <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/bootstrap-icons.css">
 
-    <style>
-        body { background:#f8f9fa; }
-        
-        .sidebar {
-            width: 260px;
-            flex-shrink: 0;
-            background: #212529;
-            color: #fff;
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 1030;
-            transition: width 0.3s ease;
-            overflow-x: hidden;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .sidebar.collapsed {
-            width: 80px;
-        }
-
-        /* Offset main content to account for fixed sidebar */
-        .main-content {
-            margin-left: 260px;
-            transition: margin-left 0.3s ease;
-        }
-        .main-content.sidebar-collapsed {
-            margin-left: 80px;
-        }
-        
-        .sidebar a {
-            color: #adb5bd;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 15px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar a:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-
-        .sidebar a:focus,
-        .sidebar a:focus-visible,
-        .sidebar a:focus-within,
-        .sidebar .nav-link:focus,
-        .sidebar .nav-link:focus-visible {
-            outline: none;
-            box-shadow: none;
-            border-color: transparent;
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-        
-        .sidebar a.settings {
-            color: #adb5bd;
-            text-decoration: none;
-            padding: 10px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-        /* Top-level active nav item — highlight the entire LI so children appear grouped */
-        .sidebar > ul > .nav-item.active {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-        }
-
-        /* Active link text styling (top-level and sub-level) */
-        .sidebar .nav-item a.active {
-            background-color: transparent;
-            color: #f0d878;
-            font-weight: 700;
-        }
-        
-        .sidebar.collapsed a {
-            justify-content: center;
-            padding: 12px;
-        }
-        
-        .sidebar-label {
-            white-space: nowrap;
-            flex: 1;
-        }
-        
-        .sidebar.collapsed .sidebar-label {
-            display: none;
-        }
-        
-        .sidebar-chevron {
-            font-size: 12px;
-            transition: transform 0.2s;
-            margin-left: auto;
-        }
-        
-        .sidebar.collapsed .sidebar-chevron {
-            display: none;
-        }
-
-        /* Collapsed: hide user info, center settings, hide logout text */
-        .sidebar.collapsed .user {
-            display: none;
-        }
-        .sidebar.collapsed .settings {
-            width: 100%;
-            text-align: center;
-        }
-        .sidebar.collapsed .logout a {
-            padding: 0.375rem;
-            width: auto;
-        }
-        .sidebar.collapsed .logout span {
-            display: none;
-        }
-        .sidebar.collapsed .logout .bi {
-            margin-right: 0 !important;
-        }
-        
-        .sidebar-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            padding-right: 5px;
-        }
-        
-        .sidebar-title {
-            white-space: nowrap;
-            transition: opacity 0.3s ease;
-        }
-        
-        .sidebar.collapsed .sidebar-title {
-            display: none;
-        }
-        
-        .sidebar-toggle {
-            background: none;
-            border: none;
-            color: #adb5bd;
-            cursor: pointer;
-            font-size: 20px;
-            padding: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-toggle:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
-        
-        .sidebar-icon {
-            min-width: 24px;
-            width: 24px;
-            text-align: center;
-        }
-        
-        .sidebar-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .viewbar{
-            width: 460px;
-            flex-shrink: 0;
-            background: #efefef;
-            color: #54585a;
-            min-height: 100vh;
-            transition: width 0.3s ease;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .cfdebug {
-            max-width: 100%;
-            overflow: auto;
-            margin-left: 280px;
-        }
-
-        .environment-toast {
-            position: fixed;
-            right: 1rem;
-            bottom: 1rem;
-            z-index: 1085;
-        }
-    </style>
+    <cfif structKeyExists(variables, "pageStyles")>
+        <cfoutput>#pageStyles#</cfoutput>
+    </cfif>
 </head>
 
 <body>
@@ -482,7 +284,8 @@
             document.getElementById('mainContent').classList.add('sidebar-collapsed');
         }
     </script>
-    <main class="flex-fill p-4" style="min-width:0; overflow-x:hidden;">
+    <cfset isSettingsSection = structKeyExists(cgi, "script_name") AND findNoCase("/admin/settings/", cgi.script_name) GT 0>
+    <main class="flex-fill p-4<cfif isSettingsSection> admin-main-settings</cfif>" style="min-width:0; overflow-x:hidden;">
         <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
             <cfset impersonationState = application.authService.getImpersonationState()>
             <cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>

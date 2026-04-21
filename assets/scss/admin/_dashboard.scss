@@ -1,0 +1,64 @@
+.dashboard-shell {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.dashboard-title {
+  margin-bottom: 0;
+}
+
+.dashboard-subtitle {
+  max-width: 56rem;
+  color: var(--bs-secondary-color);
+}
+
+.dashboard-card {
+  border: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.dashboard-card .card-body {
+  min-height: 100%;
+}
+
+.dashboard-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.dashboard-card-title .bi {
+  color: var(--bs-primary);
+}
+
+.dashboard-card-text {
+  margin-bottom: 0;
+  color: var(--bs-secondary-color);
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-status-card {
+  border-width: 1px;
+}
+
+.dashboard-status-card .card-body {
+  align-items: flex-start;
+}
+
+.dashboard-status-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.dashboard-status-copy small {
+  display: block;
+  line-height: 1.45;
+}

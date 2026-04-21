@@ -29,6 +29,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-uh-sync-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -62,9 +63,9 @@
     <!--- Changed Fields --->
     <div class="col-md-6">
         <a href="/admin/settings/uh-sync/changed-fields.cfm" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm">
+            <div class="card h-100 border-0 shadow-sm settings-hub-card settings-hub-card--primary">
                 <div class="card-body text-center py-4">
-                    <i class="bi bi-arrow-left-right display-4 mb-3"></i>
+                    <i class="bi bi-arrow-left-right display-4 mb-3 settings-hub-icon"></i>
                     <h5 class="card-title text-dark">Changed Fields</h5>
                     <p class="card-text text-muted small">Field-level diffs between local DB and UH API</p>
                 </div>
@@ -75,15 +76,17 @@
     <!--- Membership Changes --->
     <div class="col-md-6">
         <a href="/admin/settings/uh-sync/membership-changes.cfm" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm">
+            <div class="card h-100 border-0 shadow-sm settings-hub-card settings-hub-card--success">
                 <div class="card-body text-center py-4">
-                    <i class="bi bi-people display-4 mb-3"></i>
+                    <i class="bi bi-people display-4 mb-3 settings-hub-icon settings-hub-icon--success"></i>
                     <h5 class="card-title text-dark">Membership Changes</h5>
                     <p class="card-text text-muted small">Left UH / New in UH tracking</p>
                 </div>
             </div>
         </a>
     </div>
+
+</div>
 
 </div>
 

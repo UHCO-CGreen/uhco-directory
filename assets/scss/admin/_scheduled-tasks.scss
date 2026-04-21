@@ -1,0 +1,17 @@
+.scheduled-tasks-masonry {
+  column-count: 2;
+  column-gap: 1.5rem;
+}
+
+.scheduled-tasks-masonry-item {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 1.5rem;
+  break-inside: avoid;
+}
+
+@media (max-width: 991.98px) {
+  .scheduled-tasks-masonry {
+    column-count: 1;
+  }
+}

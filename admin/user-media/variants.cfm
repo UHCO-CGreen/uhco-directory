@@ -338,8 +338,7 @@
                     id='variantPreviewImage'
                     src=''
                     alt='Variant preview'
-                    class='img-fluid rounded border d-none'
-                    style='max-height: 70vh;'
+                    class='img-fluid rounded border d-none media-modal-preview-image'
                 >
                 <div id='variantPreviewEmpty' class='text-muted py-5 d-none'>Preview not available.</div>
             </div>

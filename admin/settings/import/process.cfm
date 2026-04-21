@@ -87,6 +87,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-import-process-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -124,7 +125,7 @@
     <!--- Summary cards --->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm">
+            <div class="card text-center border-0 shadow-sm settings-shell">
                 <div class="card-body">
                     <div class="fs-2 fw-bold">#runSummary.TOTAL_ROWS#</div>
                     <div class="text-muted small">Total Rows</div>
@@ -132,7 +133,7 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm bg-success-subtle">
+            <div class="card text-center border-0 shadow-sm settings-shell">
                 <div class="card-body">
                     <div class="fs-2 fw-bold text-success">#runSummary.SUCCESS_COUNT#</div>
                     <div class="text-muted small">Successful</div>
@@ -140,7 +141,7 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm bg-warning-subtle">
+            <div class="card text-center border-0 shadow-sm settings-shell">
                 <div class="card-body">
                     <div class="fs-2 fw-bold text-warning">#runSummary.SKIP_COUNT#</div>
                     <div class="text-muted small">Skipped</div>
@@ -148,7 +149,7 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="card text-center border-0 shadow-sm bg-danger-subtle">
+            <div class="card text-center border-0 shadow-sm settings-shell">
                 <div class="card-body">
                     <div class="fs-2 fw-bold text-danger">#runSummary.ERROR_COUNT#</div>
                     <div class="text-muted small">Errors</div>
@@ -158,7 +159,7 @@
     </div>
 
     <!--- Run metadata --->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-reference-card">
         <div class="card-body small">
             <div class="row">
                 <div class="col-md-3"><strong>Template:</strong> #tplLabel#</div>
@@ -195,9 +196,9 @@
             </div>
         </div>
 
-        <div class="table-responsive" style="max-height:500px; overflow-y:auto;">
-            <table class="table table-sm table-bordered small" id="detailsTable">
-                <thead class="table-light sticky-top">
+        <div class="table-responsive admin-scroll-panel settings-shell">
+            <table class="table table-sm table-bordered small settings-table mb-0" id="detailsTable">
+                <thead class="sticky-top">
                     <tr>
                         <th>Row</th>
                         <th>Status</th>
@@ -236,6 +237,8 @@
     </div>
 
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

@@ -143,7 +143,7 @@
             Schedule the report to run automatically at 3:00 AM each day via the ColdFusion Scheduler.
             Alternatively, add the URL below to the CF Administrator manually.
         </p>
-        <div class='input-group mb-3' style='max-width:700px;'>
+        <div class='input-group mb-3 report-scheduler-input'>
             <input type='text' class='form-control form-control-sm font-monospace'
                    value='#EncodeForHTMLAttribute(schedulerUrl)#' readonly id='schedUrlInput'>
             <button class='btn btn-sm btn-outline-secondary'

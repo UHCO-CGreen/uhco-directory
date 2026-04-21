@@ -19,6 +19,8 @@
 </cfif>
 
 <cfset content = "
+<div class='flags-page'>
+<div class='flags-form-shell'>
 <h1>Edit Flag</h1>
 
 <form method='post' action='saveFlag.cfm' class='mt-4'>
@@ -35,6 +37,8 @@
         <a href='/admin/flags/index.cfm' class='btn btn-secondary'>Cancel</a>
     </div>
 </form>
+</div>
+</div>
 " />
 
 <cfinclude template="/admin/layout.cfm">

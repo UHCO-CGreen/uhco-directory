@@ -75,7 +75,7 @@
     </cfif>
 
     <cfset childOrgs = orgChildrenByParent[arguments.parentKey]>
-    <cfset html &= "<ul class='list-unstyled mb-1'>">
+    <cfset html &= "<ul class='list-unstyled mb-1 users-new-org-tree'>">
 
     <cfloop from="1" to="#arrayLen(childOrgs)#" index="j">
         <cfset child = childOrgs[j]>
@@ -83,7 +83,7 @@
         <cfset childKey = toString(child.ORGID)>
         <cfset parentAttr = arguments.parentKey EQ "ROOT" ? "" : arguments.parentKey>
         <cfset html &= "
-            <li style='margin-left:#(arguments.depth * 1.25)#rem;' class='mb-1'>
+            <li class='mb-1'>
                 <div class='form-check'>
                     <input class='form-check-input org-checkbox' type='checkbox' name='Organizations' value='#child.ORGID#' id='org#child.ORGID#' data-orgid='#child.ORGID#' data-parentorgid='#parentAttr#' " & (checked ? "checked" : "") & ">
                     <label class='form-check-label' for='org#child.ORGID#'>
@@ -268,7 +268,7 @@
 
     <div class='mb-3'>
         <label class='form-label'>Flags</label>
-        <div class='border p-3 rounded' style='max-height: 200px; overflow-y: auto;'>
+        <div class='border p-3 rounded admin-scroll-panel-xs'>
 " />
 
 <cfif arrayLen(allFlags) gt 0>
@@ -293,7 +293,7 @@
 
     <div class='mb-3'>
         <label class='form-label'>Organizations</label>
-        <div class='border p-3 rounded' style='max-height: 200px; overflow-y: auto;'>
+        <div class='border p-3 rounded admin-scroll-panel-xs'>
 " />
 
 <cfif arrayLen(allOrganizations) gt 0>

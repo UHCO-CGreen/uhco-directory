@@ -5,17 +5,13 @@
   <title>Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Bootstrap 5.3 CSS -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  >
+  <link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 
 <body class="bg-light">
 
   <div class="container min-vh-100 d-flex align-items-center justify-content-center">
-    <div class="card shadow-sm" style="width: 100%; max-width: 400px;">
+    <div class="card shadow-sm admin-login-card">
       <div class="card-body p-4">
 
         <h4 class="text-center mb-4">Sign In</h4>
@@ -32,7 +28,7 @@
           
           <!-- Username -->
           <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
+            <label for="username" class="form-label">COUGARNET ID</label>
             <input
               type="text"
               class="form-control"

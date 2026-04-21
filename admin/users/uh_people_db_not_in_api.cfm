@@ -397,13 +397,13 @@
                         <td>#EncodeForHTML(stagingDbOnly.Reason ?: "")#</td>
                         <td>#dateformat(stagingDbOnly.CreatedAt, 'yyyy-mm-dd')# #timeformat(stagingDbOnly.CreatedAt, 'HH:mm')#</td>
                         <td>
-                            <form method='post' style='display:inline;'>
+                            <form method='post' class='admin-inline-form'>
                                 <input type='hidden' name='viewStaging' value='1'>
                                 <input type='hidden' name='ignoreFromStaging' value='1'>
                                 <input type='hidden' name='stagingID' value='#stagingDbOnly.StagingID#'>
                                 <button type='submit' class='btn btn-sm btn-outline-secondary'>Ignore</button>
                             </form>
-                            <form method='post' style='display:inline;'>
+                            <form method='post' class='admin-inline-form'>
                                 <input type='hidden' name='viewStaging' value='1'>
                                 <input type='hidden' name='deleteFromStaging' value='1'>
                                 <input type='hidden' name='stagingID' value='#stagingDbOnly.StagingID#'>

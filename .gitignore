@@ -7,6 +7,7 @@ xml/
 scripts/
 x_attending_wallboard/
 z_data_dumps/
+dev/
 
 # File types
 *.csv

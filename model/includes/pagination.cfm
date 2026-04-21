@@ -8,9 +8,9 @@
 </cfloop>
 <cfparam name="url.letter" default="">
 <cfset selectedLetter = ucase(trim(url.letter))>
-<cfset content &= "<nav class='navbar navbar-expand-lg bg-body-tertiary'><div class='container-fluid flex-column'>">
-<cfset content &= "<div class='w-100 mt-2 mb-1'><span class='text-muted small'>Showing #sliceStart#&ndash;#sliceEnd# of #totalRecords# records</span></div>">
-<cfset content &= "<div class='d-flex flex-wrap align-items-center w-100'>">
+<cfset content &= "<nav class='users-list-pagination-shell navbar navbar-expand-lg bg-body-tertiary'><div class='container-fluid flex-column'>">
+<cfset content &= "<div class='users-list-pagination-summary w-100 mt-2 mb-1'><span class='text-muted small'>Showing #sliceStart#&ndash;#sliceEnd# of #totalRecords# records</span></div>">
+<cfset content &= "<div class='d-flex flex-wrap align-items-center w-100 gap-2'>">
 <cfset content &= "<div class='me-auto'>">
 
 <cfif totalPages GT 1>
@@ -23,7 +23,7 @@
         <cfset winStart = max(1, winEnd - pageWindow + 1)>
     </cfif>
 
-    <cfset content &= "<nav><ul class='pagination pagination-sm flex-wrap mb-0'>">
+    <cfset content &= "<nav class='users-list-pagination-nav' aria-label='Page navigation'><ul class='pagination pagination-sm flex-wrap mb-0 users-list-pagination-pages'>">
     <!--- Prev --->
     <cfset content &= "<li class='page-item" & (currentPage == 1 ? " disabled" : "") & "'><a class='page-link' href='" & helpers.getPageLink(currentPage - 1,selectedFlagFilter,selectedGradYear,searchTerm,sortColumn,sortDirection,perPage,selectedLetter,selectedOrgFilter,listType) & "'>&laquo;</a></li>">
     <!--- First page + ellipsis --->
@@ -50,12 +50,12 @@
 </cfif>
 
 <cfset content &= "</div>">
-<cfset content &= "<div id='aTOz' class='ms-auto'><div class='d-flex flex-wrap gap-1 my-2'>">
+<cfset content &= "<div id='aTOz' class='users-list-pagination-az ms-auto'><div class='d-flex flex-wrap gap-1 my-2 users-list-pagination-letters'>">
 
-<cfset content &= "<a class='btn btn-outline-secondary btn-sm" & (selectedLetter EQ "" ? " active" : "") & "' href='" & helpers.getPageLink(1,selectedFlagFilter,selectedGradYear,searchTerm,sortColumn,sortDirection,perPage,"",selectedOrgFilter,listType) & "' aria-current='" & (selectedLetter EQ "" ? "true" : "false") & "'>All</a>">
+<cfset content &= "<a class='btn btn-sm users-list-pagination-letter" & (selectedLetter EQ "" ? " active" : "") & "' href='" & helpers.getPageLink(1,selectedFlagFilter,selectedGradYear,searchTerm,sortColumn,sortDirection,perPage,"",selectedOrgFilter,listType) & "' aria-current='" & (selectedLetter EQ "" ? "true" : "false") & "'>All</a>">
 <cfloop array="#alphabet#" index="letter">
     <cfset content &= "
-        <a class='btn btn-outline-secondary btn-sm #(selectedLetter EQ letter ? " active" : "")#'
+        <a class='btn btn-sm users-list-pagination-letter #(selectedLetter EQ letter ? " active" : "")#'
         href='#helpers.getPageLink(1,selectedFlagFilter,selectedGradYear,searchTerm,sortColumn,sortDirection,perPage,letter,selectedOrgFilter,listType)#'
         aria-current='#(selectedLetter EQ letter ? "true" : "false")#'>
             #letter#

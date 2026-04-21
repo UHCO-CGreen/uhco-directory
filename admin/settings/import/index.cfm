@@ -27,6 +27,7 @@ for (tpl in templates) {
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-import-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -46,15 +47,15 @@ for (tpl in templates) {
     <cfloop array="#uploadTemplates#" index="tpl">
         <div class="col-md-6 col-lg-3">
             <a href="upload.cfm?template=#tpl.key#" class="text-decoration-none">
-                <div class="card h-100 shadow-sm border-start border-primary border-3">
+                <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--primary">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-2">
-                            <i class="bi #tpl.icon# fs-3 text-primary me-2"></i>
+                            <i class="bi #tpl.icon# fs-3 settings-hub-icon me-2"></i>
                             <h5 class="card-title text-dark mb-0">#tpl.label#</h5>
                         </div>
                         <p class="card-text text-muted small mb-2">#tpl.description#</p>
                         <div class="mt-2">
-                            <span class="badge bg-success-subtle text-success">Required: #arrayToList(tpl.requiredCols, ", ")#</span>
+                            <span class="badge settings-badge-success-soft">Required: #arrayToList(tpl.requiredCols, ", ")#</span>
                         </div>
                         <div class="mt-2">
                             <a href="templates/#tpl.key#_template.csv" download class="small text-primary" onclick="event.stopPropagation();">
@@ -73,16 +74,16 @@ for (tpl in templates) {
     <cfloop array="#generatedTemplates#" index="tpl">
         <div class="col-md-6 col-lg-4">
             <a href="generate.cfm?template=#tpl.key#" class="text-decoration-none">
-                <div class="card h-100 shadow-sm border-start border-success border-3">
+                <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--success">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-2">
-                            <i class="bi #tpl.icon# fs-3 text-success me-2"></i>
+                            <i class="bi #tpl.icon# fs-3 settings-hub-icon settings-hub-icon--success me-2"></i>
                             <h5 class="card-title text-dark mb-0">#tpl.label#</h5>
                         </div>
                         <p class="card-text text-muted small mb-2">#tpl.description#</p>
                         <div class="mt-2">
-                            <span class="badge bg-success-subtle text-success">Generated CSV</span>
-                            <span class="badge bg-light text-dark">One section per job</span>
+                            <span class="badge settings-badge-success-soft">Generated CSV</span>
+                            <span class="badge settings-badge-neutral">One section per job</span>
                         </div>
                         <div class="mt-2 small text-success">Filter users, download CSV, then upload the completed file.</div>
                     </div>
@@ -95,9 +96,9 @@ for (tpl in templates) {
 <!--- ── Recent Import History ── --->
 <h5 class="mb-3">Recent Imports</h5>
 <cfif arrayLen(recentRuns)>
-    <div class="table-responsive">
-        <table class="table table-sm table-striped align-middle">
-            <thead class="table-light">
+    <div class="table-responsive settings-shell">
+        <table class="table table-sm table-striped align-middle settings-table mb-0">
+            <thead>
                 <tr>
                     <th>Run</th>
                     <th>Template</th>
@@ -118,11 +119,11 @@ for (tpl in templates) {
                         <td>###run.RUN_ID#</td>
                         <td>
                             <cfswitch expression="#run.TEMPLATE_KEY#">
-                                <cfcase value="users"><span class="badge bg-primary">Users</span></cfcase>
-                                <cfcase value="flags"><span class="badge bg-info text-dark">Flags</span></cfcase>
-                                <cfcase value="orgs"><span class="badge bg-secondary">Orgs</span></cfcase>
-                                <cfcase value="student_academic"><span class="badge bg-dark">Academic</span></cfcase>
-                                <cfdefaultcase><span class="badge bg-light text-dark">#run.TEMPLATE_KEY#</span></cfdefaultcase>
+                                <cfcase value="users"><span class="badge settings-badge-primary-soft">Users</span></cfcase>
+                                <cfcase value="flags"><span class="badge settings-badge-warning-soft">Flags</span></cfcase>
+                                <cfcase value="orgs"><span class="badge settings-badge-neutral">Orgs</span></cfcase>
+                                <cfcase value="student_academic"><span class="badge settings-badge-count">Academic</span></cfcase>
+                                <cfdefaultcase><span class="badge settings-badge-neutral">#run.TEMPLATE_KEY#</span></cfdefaultcase>
                             </cfswitch>
                         </td>
                         <td class="small">#run.FILE_NAME#</td>
@@ -156,6 +157,8 @@ for (tpl in templates) {
         <i class="bi bi-inbox me-2"></i>No import history yet. Choose a template above to get started.
     </div>
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>

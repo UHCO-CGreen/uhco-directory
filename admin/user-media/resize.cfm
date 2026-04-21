@@ -186,8 +186,7 @@
         <div class='card-body text-center'>
             <img src='#encodeForHTMLAttribute(previewUrl)#'
                  alt='Generated variant preview'
-                 class='img-fluid rounded border'
-                 style='max-height: 500px;'>
+                  class='img-fluid rounded border media-preview-image-lg'>
             <p class='text-muted small mt-2 mb-0'>
                 File: #encodeForHTML(variant.LOCALPATH)#
                 &mdash; #dimDisplay#

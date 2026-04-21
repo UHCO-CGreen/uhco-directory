@@ -27,6 +27,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-uhco-api-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -49,18 +50,18 @@
     <!--- Tokens Card --->
     <div class="col-lg-4 col-md-6">
         <a href="tokens/index.cfm" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-start border-primary border-3">
+            <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--primary">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <i class="bi bi-key fs-2 text-primary me-3"></i>
+                        <i class="bi bi-key fs-2 me-3 settings-hub-icon"></i>
                         <div>
                             <h5 class="card-title text-dark mb-0">API Tokens</h5>
                             <p class="card-text text-muted small mb-0">Grant external applications access to the directory API</p>
                         </div>
                     </div>
                     <div class="d-flex gap-3">
-                        <span class="badge bg-primary-subtle text-primary fs-6">#arrayLen(tokens)# total</span>
-                        <span class="badge bg-success-subtle text-success fs-6">#activeTokens# active</span>
+                        <span class="badge settings-badge-primary-soft fs-6">#arrayLen(tokens)# total</span>
+                        <span class="badge settings-badge-success-soft fs-6">#activeTokens# active</span>
                     </div>
                 </div>
             </div>
@@ -70,18 +71,18 @@
     <!--- Secrets Card --->
     <div class="col-lg-4 col-md-6">
         <a href="secrets/index.cfm" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-start border-warning border-3">
+            <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--warning">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <i class="bi bi-shield-lock fs-2 text-warning me-3"></i>
+                        <i class="bi bi-shield-lock fs-2 me-3 settings-hub-icon settings-hub-icon--warning"></i>
                         <div>
                             <h5 class="card-title text-dark mb-0">API Secrets</h5>
                             <p class="card-text text-muted small mb-0">Gate access to protected data (student records, etc.)</p>
                         </div>
                     </div>
                     <div class="d-flex gap-3">
-                        <span class="badge bg-warning-subtle text-warning fs-6">#arrayLen(secrets)# total</span>
-                        <span class="badge bg-success-subtle text-success fs-6">#activeSecrets# active</span>
+                        <span class="badge settings-badge-warning-soft fs-6">#arrayLen(secrets)# total</span>
+                        <span class="badge settings-badge-success-soft fs-6">#activeSecrets# active</span>
                     </div>
                 </div>
             </div>
@@ -91,18 +92,18 @@
     <!--- Quickpull Settings Card --->
     <div class="col-lg-4 col-md-12">
         <a href="quickpulls/index.cfm" class="text-decoration-none">
-            <div class="card h-100 shadow-sm border-start border-success border-3">
+            <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--success">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <i class="bi bi-diagram-3 fs-2 text-success me-3"></i>
+                        <i class="bi bi-diagram-3 fs-2 me-3 settings-hub-icon settings-hub-icon--success"></i>
                         <div>
                             <h5 class="card-title text-dark mb-0">Quickpulls</h5>
                             <p class="card-text text-muted small mb-0">Choose endpoint-specific return items, image variants, contact types, orgs, and flags</p>
                         </div>
                     </div>
                     <div class="d-flex gap-3">
-                        <span class="badge bg-success-subtle text-success fs-6">4 endpoints</span>
-                        <span class="badge bg-secondary-subtle text-secondary fs-6">Item-level config</span>
+                        <span class="badge settings-badge-success-soft fs-6">4 endpoints</span>
+                        <span class="badge settings-badge-neutral fs-6">Item-level config</span>
                     </div>
                 </div>
             </div>
@@ -112,8 +113,8 @@
 </div>
 
 <!--- Documentation link --->
-<div class="card shadow-sm mt-4">
-    <div class="card-body d-flex align-items-center">
+<div class="card shadow-sm mt-4 settings-shell">
+    <div class="card-body settings-doc-card">
         <i class="bi bi-book fs-4 text-secondary me-3"></i>
         <div>
             <h6 class="mb-0">API Documentation</h6>
@@ -123,6 +124,8 @@
             <i class="bi bi-box-arrow-up-right me-1"></i>Open Docs
         </a>
     </div>
+</div>
+
 </div>
 
 </cfoutput>

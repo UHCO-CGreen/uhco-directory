@@ -1,0 +1,33 @@
+@use "../shared/brand";
+
+body {
+  background: brand.$userreview-bg;
+}
+
+.ur-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.ur-header {
+  background: linear-gradient(135deg, brand.$userreview-header-start, brand.$userreview-header-end);
+  color: #fff;
+  border-radius: 1rem;
+}
+
+.ur-card {
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1.25rem rgba(16, 24, 40, 0.08);
+}
+
+.row-card {
+  border: 1px solid #dde3ea;
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: #fff;
+}
+
+.mono {
+  font-family: Consolas, "Courier New", monospace;
+}

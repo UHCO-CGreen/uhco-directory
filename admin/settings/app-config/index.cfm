@@ -27,6 +27,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-app-config-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -48,7 +49,7 @@
     </div>
 </cfif>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 settings-shell settings-summary-card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-image me-2"></i>Published Image URL Settings</h5>
     </div>
@@ -75,21 +76,22 @@
         </form>
 
         <div class="mt-3 small text-muted">
-            Effective published image base URL: <code>#encodeForHTML(publishedImageBaseUrl)#</code>
+            Effective published image base URL:
+            <span class="font-monospace">#encodeForHTML(publishedImageBaseUrl)#</span>
         </div>
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm settings-shell">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-table me-2"></i>Current AppConfig Values</h5>
-        <span class="badge bg-secondary">#arrayLen(allConfig)#</span>
+        <span class="badge settings-badge-count">#arrayLen(allConfig)#</span>
     </div>
     <div class="card-body p-0">
         <cfif arrayLen(allConfig)>
             <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0 align-middle">
-                    <thead class="table-light">
+                <table class="table table-sm table-hover mb-0 align-middle settings-table">
+                    <thead>
                         <tr>
                             <th>Config Key</th>
                             <th>Config Value</th>
@@ -112,6 +114,8 @@
             <div class="p-3 text-muted">No app settings found.</div>
         </cfif>
     </div>
+</div>
+
 </div>
 
 </cfoutput>

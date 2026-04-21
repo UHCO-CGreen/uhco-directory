@@ -18,6 +18,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-admin-permissions-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -42,9 +43,9 @@
     </div>
 </cfif>
 
-<div class="card border-0 shadow-sm mt-3 mb-4">
+<div class="card border-0 shadow-sm mt-3 mb-4 settings-shell">
     <div class="card-body">
-        <h5 class="mb-3">
+        <h5 class="mb-3 settings-section-title">
             <cfif structCount(editPermission)>
                 <i class="bi bi-pencil me-2"></i>Edit Permission
             <cfelse>
@@ -98,12 +99,12 @@
     </div>
 </div>
 
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm settings-shell">
     <div class="card-body">
-        <h5 class="mb-3"><i class="bi bi-list-ul me-2"></i>All Permissions</h5>
+        <h5 class="mb-3 settings-section-title"><i class="bi bi-list-ul me-2"></i>All Permissions</h5>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0 settings-table">
+                <thead>
                     <tr>
                         <th>Key</th>
                         <th>Display Name</th>
@@ -123,10 +124,10 @@
                                 <div class="text-muted small">#encodeForHTML(permissionRow.DESCRIPTION)#</div>
                             </cfif>
                         </td>
-                        <td><span class="badge bg-light text-dark border">#encodeForHTML(permissionRow.CATEGORY)#</span></td>
+                        <td><span class="badge border settings-badge-neutral">#encodeForHTML(permissionRow.CATEGORY)#</span></td>
                         <td>
                             <cfif val(permissionRow.IS_ACTIVE) EQ 1>
-                                <span class="badge bg-success">Active</span>
+                                <span class="badge settings-badge-active">Active</span>
                             <cfelse>
                                 <span class="badge bg-secondary">Inactive</span>
                             </cfif>
@@ -135,18 +136,19 @@
                             <cfif val(permissionRow.IS_SYSTEM) EQ 1>
                                 <span class="badge bg-warning text-dark">System</span>
                             <cfelse>
-                                <span class="badge bg-info text-dark">Custom</span>
+                                <span class="badge settings-badge-custom">Custom</span>
                             </cfif>
                         </td>
                         <td class="text-end">
-                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-outline-primary" title="Edit">
-                                <i class="bi bi-pencil"></i>
+                            <div class="settings-action-group">
+                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Edit Permission" data-bs-toggle="tooltip" data-bs-title="Edit Permission" aria-label="Edit Permission">
+                                <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif val(permissionRow.IS_SYSTEM) EQ 0>
                                 <form method="post" action="/admin/settings/admin-permissions/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deletePermission">
                                     <input type="hidden" name="permissionID" value="#permissionRow.PERMISSION_ID#">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete" onclick="return confirm('Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?')">
+                                    <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Delete Permission" data-bs-toggle="tooltip" data-bs-title="Delete Permission" aria-label="Delete Permission" onclick="return confirm('Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?')">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -155,6 +157,7 @@
                                     <i class="bi bi-lock"></i>
                                 </button>
                             </cfif>
+                            </div>
                         </td>
                     </tr>
                 </cfloop>
@@ -171,6 +174,8 @@
     <a href="/admin/settings/admin-roles/" class="btn btn-outline-secondary">
         <i class="bi bi-key me-1"></i>Manage Roles
     </a>
+</div>
+
 </div>
 
 </cfoutput>

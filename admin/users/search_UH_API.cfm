@@ -223,7 +223,7 @@
 <div class='card mb-3 border-primary'>
     <div class='card-header bg-primary text-white'><strong>Request URL</strong></div>
     <div class='card-body'>
-        <code class='d-block' style='word-break:break-all;font-size:0.85rem;'>#len(requestUrl) ? EncodeForHTML(requestUrl) : '<em>URL not available (check debug panel for errors)</em>'#</code>
+        <code class='d-block admin-code-break-small'>#len(requestUrl) ? EncodeForHTML(requestUrl) : '<em>URL not available (check debug panel for errors)</em>'#</code>
     </div>
 </div>
 ">
@@ -242,7 +242,7 @@
         <button class='btn btn-sm btn-outline-secondary' type='button' data-bs-toggle='collapse' data-bs-target='##debugCollapse'>Toggle</button>
     </div>
     <div class='collapse' id='debugCollapse'>
-        <div class='card-body bg-light' style='font-size:0.8rem;'>
+        <div class='card-body bg-light admin-debug-body-sm'>
             #apiDebugOutput#
         </div>
     </div>

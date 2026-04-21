@@ -51,6 +51,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-import-generate-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -77,7 +78,7 @@
 
 <div class="row g-4">
     <div class="col-lg-8">
-        <div class="card shadow-sm">
+        <div class="card shadow-sm settings-shell settings-summary-card">
             <div class="card-body">
                 <h5 class="card-title mb-3">Template Filters</h5>
                 <form method="post">
@@ -129,7 +130,7 @@
     </div>
 
     <div class="col-lg-4">
-        <div class="card shadow-sm mb-4">
+        <div class="card shadow-sm mb-4 settings-shell settings-reference-card">
             <div class="card-body">
                 <h5 class="card-title mb-3">How It Works</h5>
                 <ol class="small mb-0 ps-3">
@@ -141,7 +142,7 @@
             </div>
         </div>
 
-        <div class="card shadow-sm">
+        <div class="card shadow-sm settings-shell settings-reference-card">
             <div class="card-body">
                 <h5 class="card-title mb-3">Columns</h5>
                 <div class="small mb-2"><strong>Required:</strong> #encodeForHTML(arrayToList(tpl.requiredCols, ", "))#</div>
@@ -149,6 +150,8 @@
             </div>
         </div>
     </div>
+</div>
+
 </div>
 
 </cfoutput>

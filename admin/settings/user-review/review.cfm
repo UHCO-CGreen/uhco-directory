@@ -31,6 +31,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-user-review-detail-page">
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -59,7 +60,7 @@
 </cfif>
 
 <cfif len(trim(detail.submission.REVIEWNOTE ?: ""))>
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 settings-shell settings-reference-card">
         <div class="card-header"><h5 class="mb-0">Review Notes</h5></div>
         <div class="card-body">
             <pre class="small bg-light border rounded p-3 mb-0">#encodeForHTML(detail.submission.REVIEWNOTE)#</pre>
@@ -67,7 +68,7 @@
     </div>
 </cfif>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4 settings-shell settings-summary-card">
     <div class="card-body">
         <form method="post" action="/admin/settings/user-review/resolve.cfm" class="mb-0">
             <input type="hidden" name="submissionID" value="#detail.submission.SUBMISSIONID#">
@@ -84,13 +85,13 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm settings-shell">
     <div class="card-header"><h5 class="mb-0">Field Changes</h5></div>
     <div class="card-body p-0">
         <cfif arrayLen(detail.fields)>
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
+                <table class="table table-hover mb-0 align-middle settings-table">
+                    <thead>
                         <tr>
                             <th>Section</th>
                             <th>Field</th>
@@ -129,7 +130,7 @@
                                         <form method="post" action="/admin/settings/user-review/resolve.cfm" class="mb-0 d-flex flex-column align-items-end gap-2">
                                             <input type="hidden" name="submissionID" value="#detail.submission.SUBMISSIONID#">
                                             <input type="hidden" name="submissionFieldID" value="#fieldRow.SUBMISSIONFIELDID#">
-                                            <textarea name="reviewNote" class="form-control form-control-sm" rows="2" placeholder="Reason required for discard." style="min-width: 260px;"></textarea>
+                                            <textarea name="reviewNote" class="form-control form-control-sm admin-review-note" rows="2" placeholder="Reason required for discard."></textarea>
                                             <div class="d-flex justify-content-end gap-2">
                                                 <button type="submit" name="action" value="approveField" class="btn btn-sm btn-success">Approve</button>
                                                 <button type="submit" name="action" value="discardField" class="btn btn-sm btn-outline-danger" onclick="return requireReviewNote(this.form)">Discard</button>
@@ -146,6 +147,8 @@
             <div class="p-3 text-muted">No field changes were stored for this submission.</div>
         </cfif>
     </div>
+</div>
+
 </div>
 
 </cfoutput>

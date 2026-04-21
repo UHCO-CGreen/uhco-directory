@@ -1,0 +1,95 @@
+.external-page {
+  color: #213547;
+}
+
+.external-page h1,
+.external-page h3,
+.external-form-shell h1,
+.external-delete-shell h1 {
+  color: #18344d;
+}
+
+.external-table-shell,
+.external-add-card,
+.external-form-shell,
+.external-delete-shell,
+.external-delete-card {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.external-form-shell,
+.external-delete-shell {
+  max-width: 42rem;
+  padding: 1.5rem;
+}
+
+.external-table {
+  margin-bottom: 0;
+}
+
+.external-table > thead > tr > th {
+  border-bottom: 0;
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.external-table tbody tr:nth-of-type(even) {
+  --bs-table-accent-bg: rgba(239, 244, 249, 0.65);
+}
+
+.external-table tbody td {
+  vertical-align: middle;
+}
+
+.external-system-name {
+  font-weight: 600;
+  color: #18344d;
+}
+
+.external-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.external-action-button {
+  min-width: 4.75rem;
+  font-weight: 600;
+}
+
+.external-add-card .card-header {
+  border-bottom: 0;
+  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  color: #fff;
+}
+
+.external-add-card .card-body {
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+
+.external-delete-alert {
+  border: 1px solid rgba(176, 58, 75, 0.18);
+  background: linear-gradient(180deg, #fff5f6 0%, #ffecef 100%);
+  color: #7d2333;
+}
+
+.external-delete-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.external-empty-state {
+  padding: 1rem 1.25rem;
+}
+
+@media (max-width: 767.98px) {
+  .external-actions {
+    justify-content: flex-start;
+  }
+}

@@ -76,10 +76,11 @@ This repository already includes richer HTML documentation:
 
 - app documentation: [Docs/index.html](Docs/index.html)
 - API documentation: [api/docs.html](api/docs.html)
+- styling guide: [STYLING.md](STYLING.md)
 
 ## Local / Server Setup
 
-This project does not have a package-manager-based bootstrap flow. A working environment generally requires:
+This project now includes a local `npm` + Sass asset build for compiled CSS and localized Bootstrap Icons. A working environment generally requires:
 
 1. Adobe ColdFusion installed and configured for this site.
 2. IIS configured to serve the application root.
@@ -91,6 +92,13 @@ This project does not have a package-manager-based bootstrap flow. A working env
    - `UH_API_TOKEN`
    - `UH_API_SECRET`
 6. Network access to LDAP / Active Directory if admin authentication is required.
+
+For local styling work:
+
+7. Node.js installed for the front-end asset build.
+8. Run `npm install` once at the repository root.
+9. Run `npm run build` to copy vendor assets and compile CSS bundles.
+10. Use `npm run watch:styles` during active Sass development.
 
 If application state needs to be rebuilt after config changes, the app supports `?reinit=true` in requests via [Application.cfc](Application.cfc).
 

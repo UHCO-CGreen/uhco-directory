@@ -76,6 +76,7 @@
 <cfsavecontent variable="content">
 <cfoutput>
 
+<div class="settings-page settings-import-upload-page">
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/admin/settings/">Settings</a></li>
@@ -99,7 +100,7 @@
 
 <!--- ── Upload Form ── --->
 <cfif NOT showPreview>
-    <div class="card shadow-sm mb-4" style="max-width:600px;">
+    <div class="card shadow-sm mb-4 admin-card-max-600 settings-shell settings-summary-card">
         <div class="card-body">
             <h5 class="card-title mb-3">Upload CSV File</h5>
 
@@ -165,11 +166,11 @@
         </cfif>
 
         <cfif arrayLen(validation.errors)>
-            <div class="card border-danger mb-3">
+            <div class="card border-danger mb-3 settings-shell">
                 <div class="card-header bg-danger text-white small">
                     Row Errors (#arrayLen(validation.errors)#)
                 </div>
-                <div class="card-body p-0" style="max-height:300px; overflow-y:auto;">
+                <div class="card-body p-0 admin-scroll-panel-sm">
                     <ul class="list-group list-group-flush small">
                         <cfloop array="#validation.errors#" index="err">
                             <li class="list-group-item list-group-item-danger py-1">#err#</li>
@@ -188,9 +189,9 @@
 
     <!--- Data preview (first 50 rows) --->
     <h5 class="mb-2">Data Preview <span class="text-muted small">(first 50 rows of #parsedData.rawRowCount#)</span></h5>
-    <div class="table-responsive mb-4" style="max-height:450px; overflow-y:auto;">
-        <table class="table table-sm table-bordered table-striped small">
-            <thead class="table-light sticky-top">
+    <div class="table-responsive mb-4 admin-scroll-panel-md settings-shell">
+        <table class="table table-sm table-bordered table-striped small settings-table mb-0">
+            <thead class="sticky-top">
                 <tr>
                     <th class="text-muted">##</th>
                     <cfloop array="#parsedData.headers#" index="hdr">
@@ -243,6 +244,8 @@
     </div>
 
 </cfif>
+
+</div>
 
 </cfoutput>
 </cfsavecontent>
