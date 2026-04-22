@@ -35,7 +35,7 @@ component output="false" singleton {
         var variantTypes = variables.VariantDAO.getVariantTypesAll();
 
         for ( var variantType in variantTypes ) {
-            if ( _isTruthy(variantType.ALLOWMANUALCROP ?: 0) OR _isTruthy(variantType.ALLOWRESIZE ?: 0) ) {
+            if ( lCase(trim(variantType.MODE ?: "resize_only")) NEQ "passthrough" ) {
                 continue;
             }
 

@@ -434,7 +434,7 @@
                                 <cfif arrayLen(userFlags) GT 0>
                                     <div class="mb-3 d-flex flex-wrap gap-1">
                                         <cfloop array="#userFlags#" index="userFlag">
-                                            <span class="badge bg-secondary">#encodeForHTML(userFlag.FLAGNAME)#</span>
+                                            <span class="badge bg-secondary text-dark">#encodeForHTML(userFlag.FLAGNAME)#</span>
                                         </cfloop>
                                     </div>
                                 <cfelse>
@@ -478,7 +478,7 @@
                                 <cfif arrayLen(userFlags) GT 0>
                                     <div class="mb-3 d-flex flex-wrap gap-1">
                                         <cfloop array="#userFlags#" index="userFlag">
-                                            <span class="badge bg-secondary">#encodeForHTML(userFlag.FLAGNAME)#</span>
+                                            <span class="badge bg-secondary text-dark">#encodeForHTML(userFlag.FLAGNAME)#</span>
                                         </cfloop>
                                     </div>
                                 <cfelse>

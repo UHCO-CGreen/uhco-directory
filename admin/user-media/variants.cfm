@@ -323,8 +323,9 @@
             ">
         <cfelse>
             <!--- Already assigned — show Generate/Crop/Transfer link --->
-            <cfset vtAllowCrop   = isBoolean(v.ALLOWMANUALCROP ?: false) AND v.ALLOWMANUALCROP>
-            <cfset vtAllowResize = isBoolean(v.ALLOWRESIZE ?: true) AND v.ALLOWRESIZE>
+            <cfset vtMode = lCase(trim(v.MODE ?: 'resize_only'))>
+            <cfset vtAllowCrop   = (vtMode EQ 'crop_resize')>
+            <cfset vtAllowResize = (vtMode NEQ 'passthrough')>
 
             <cfif vtAllowCrop>
                 <cfset content &= "

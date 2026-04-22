@@ -561,31 +561,17 @@ component output="false" singleton {
             }
 
             // ── Pass-through mode ─────────────────────────────────────────
-            // When AllowResize = false the source is already at final dimensions.
-            // Copy it to the output location (with format conversion via cfimage
-            // if the output format differs from the source) and return immediately.
-            var allowResize = isBoolean(arguments.variantType.ALLOWRESIZE ?: true)
-                ? arguments.variantType.ALLOWRESIZE
-                : (val(arguments.variantType.ALLOWRESIZE ?: 1) EQ 1);
+            // When Mode = passthrough the source is already at final dimensions.
+            // Pass-through mode is format-independent: it preserves the source format
+            // (PNG, JPG, or WebP) by performing a direct file copy, regardless of the
+            // OutputFormat setting. This avoids ColdFusion's imageRead() which cannot
+            // process WebP files.
+            var mode = lCase(trim(arguments.variantType.MODE ?: "resize_only"));
 
-            if ( !allowResize ) {
-                var ptOutputFormat = lCase( trim( arguments.variantType.OUTPUTFORMAT ?: "" ) );
-                if ( ptOutputFormat EQ "jpeg" ) { ptOutputFormat = "jpg"; }
-                var ptSourceExt = lCase( listLast(sourceFilename, ".") );
-                if ( ptSourceExt EQ "jpeg" ) { ptSourceExt = "jpg"; }
-
-                if ( ptSourceExt EQ ptOutputFormat ) {
-                    // Same format — straight file copy (fastest).
-                    fileCopy(sourceAbsolutePath, arguments.outputPath);
-                } else {
-                    // Format conversion required: read → write in target format.
-                    var ptImage = imageRead(sourceAbsolutePath);
-                    if ( ptOutputFormat EQ "jpg" ) {
-                        cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true, quality=0.75);
-                    } else {
-                        cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true);
-                    }
-                }
+            if ( mode EQ "passthrough" ) {
+                // Direct file copy (format-preserving).
+                // This works with PNG, JPG, and WebP without invoking imageRead().
+                fileCopy(sourceAbsolutePath, arguments.outputPath);
                 return;
             }
 

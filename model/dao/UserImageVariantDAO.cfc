@@ -56,7 +56,7 @@ component extends="dao.BaseDAO" output="false" singleton {
             "
             SELECT ImageVariantTypeID, Code, Description, Audience,
                    OutputFormat, WidthPx, HeightPx,
-                   AllowManualCrop, AllowResize, IsActive
+                   Mode, IsActive
             FROM   ImageVariantTypes
             WHERE  IsActive = 1
             ORDER  BY Code
@@ -75,7 +75,7 @@ component extends="dao.BaseDAO" output="false" singleton {
             "
             SELECT ImageVariantTypeID, Code, Description, Audience,
                    OutputFormat, WidthPx, HeightPx,
-                   AllowManualCrop, AllowResize, IsActive
+                   Mode, IsActive
             FROM   ImageVariantTypes
             ORDER  BY Code
             ",
@@ -108,18 +108,17 @@ component extends="dao.BaseDAO" output="false" singleton {
         string  outputFormat   = "jpg",
         numeric widthPx        = 0,
         numeric heightPx       = 0,
-        boolean allowManualCrop = false,
-        boolean allowResize     = true,
+        string  mode            = "resize_only",
         boolean isActive        = true
     ) {
         var qry = executeQueryWithRetry(
             "
             INSERT INTO ImageVariantTypes
                 (Code, Description, Audience, OutputFormat, WidthPx, HeightPx,
-                 AllowManualCrop, AllowResize, IsActive)
+                 Mode, IsActive)
             VALUES
                 (:code, :description, :audience, :outputFormat, :widthPx, :heightPx,
-                 :allowManualCrop, :allowResize, :isActive);
+                 :mode, :isActive);
             SELECT SCOPE_IDENTITY() AS newID;
             ",
             {
@@ -129,8 +128,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                 outputFormat    = { value=arguments.outputFormat,     cfsqltype="cf_sql_nvarchar" },
                 widthPx         = { value=arguments.widthPx GT 0 ? arguments.widthPx : javaCast("null",""), cfsqltype="cf_sql_integer", null=(arguments.widthPx LTE 0) },
                 heightPx        = { value=arguments.heightPx GT 0 ? arguments.heightPx : javaCast("null",""), cfsqltype="cf_sql_integer", null=(arguments.heightPx LTE 0) },
-                allowManualCrop = { value=arguments.allowManualCrop, cfsqltype="cf_sql_bit" },
-                allowResize     = { value=arguments.allowResize,     cfsqltype="cf_sql_bit" },
+                mode            = { value=arguments.mode,            cfsqltype="cf_sql_nvarchar" },
                 isActive        = { value=arguments.isActive,        cfsqltype="cf_sql_bit" }
             },
             { datasource=variables.datasource, timeout=30 }
@@ -149,8 +147,7 @@ component extends="dao.BaseDAO" output="false" singleton {
         string  outputFormat   = "jpg",
         numeric widthPx        = 0,
         numeric heightPx       = 0,
-        boolean allowManualCrop = false,
-        boolean allowResize     = true,
+        string  mode            = "resize_only",
         boolean isActive        = true
     ) {
         executeQueryWithRetry(
@@ -162,8 +159,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                    OutputFormat    = :outputFormat,
                    WidthPx         = :widthPx,
                    HeightPx        = :heightPx,
-                   AllowManualCrop = :allowManualCrop,
-                   AllowResize     = :allowResize,
+                   Mode            = :mode,
                    IsActive        = :isActive
             WHERE  ImageVariantTypeID = :id
             ",
@@ -175,8 +171,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                 outputFormat    = { value=arguments.outputFormat,       cfsqltype="cf_sql_nvarchar" },
                 widthPx         = { value=arguments.widthPx GT 0 ? arguments.widthPx : javaCast("null",""), cfsqltype="cf_sql_integer", null=(arguments.widthPx LTE 0) },
                 heightPx        = { value=arguments.heightPx GT 0 ? arguments.heightPx : javaCast("null",""), cfsqltype="cf_sql_integer", null=(arguments.heightPx LTE 0) },
-                allowManualCrop = { value=arguments.allowManualCrop, cfsqltype="cf_sql_bit" },
-                allowResize     = { value=arguments.allowResize,     cfsqltype="cf_sql_bit" },
+                mode            = { value=arguments.mode,            cfsqltype="cf_sql_nvarchar" },
                 isActive        = { value=arguments.isActive,        cfsqltype="cf_sql_bit" }
             },
             { datasource=variables.datasource, timeout=30 }
@@ -261,6 +256,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                    ivt.Code,
                    ivt.Description,
                    ivt.Audience,
+                   ivt.Mode,
                    ivt.OutputFormat,
                    ivt.WidthPx,
                    ivt.HeightPx,

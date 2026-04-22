@@ -22,7 +22,7 @@ component output="false" singleton {
     // ── POC: local source directory ──────────────────────────────────────────
     // DROPBOX SWAP POINT: replace this path with a Dropbox folder reference.
     variables.localSourceDir    = "/_temp_source/";
-    variables.allowedExtensions = ["jpg", "jpeg", "png"];
+    variables.allowedExtensions = ["jpg", "jpeg", "png", "webp"];
 
     // Default SourceKey values. Can be overridden by AppConfig key media.source_keys.
     variables.defaultSourceKeys = ["profile", "alumni", "dean", "marketing"];

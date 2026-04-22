@@ -26,6 +26,13 @@
     <cfif action EQ "save">
         <cfset editID = val(form.imageVariantTypeID ?: 0)>
         <cfset code   = trim(form.code ?: "")>
+        <cfset submittedMode = "resize_only">
+        <cfif structKeyExists(form, "vtMode")>
+            <cfset submittedMode = lCase(trim(form.vtMode))>
+        </cfif>
+        <cfif NOT listFindNoCase("crop_resize,resize_only,passthrough", submittedMode)>
+            <cfset submittedMode = "resize_only">
+        </cfif>
 
         <cfif NOT len(code)>
             <cfset actionMessage      = "Code is required.">
@@ -38,11 +45,10 @@
                         code            = code,
                         description     = trim(form.description ?: ""),
                         audience        = trim(form.audience ?: ""),
+                        mode            = submittedMode,
                         outputFormat    = trim(form.outputFormat ?: "jpg"),
                         widthPx         = val(form.widthPx ?: 0),
                         heightPx        = val(form.heightPx ?: 0),
-                        allowManualCrop = structKeyExists(form, "allowManualCrop"),
-                        allowResize     = structKeyExists(form, "allowResize"),
                         isActive        = structKeyExists(form, "isActive")
                     )>
                     <cfset actionMessage = "Variant type '#encodeForHTML(code)#' updated.">
@@ -51,11 +57,10 @@
                         code            = code,
                         description     = trim(form.description ?: ""),
                         audience        = trim(form.audience ?: ""),
+                        mode            = submittedMode,
                         outputFormat    = trim(form.outputFormat ?: "jpg"),
                         widthPx         = val(form.widthPx ?: 0),
                         heightPx        = val(form.heightPx ?: 0),
-                        allowManualCrop = structKeyExists(form, "allowManualCrop"),
-                        allowResize     = structKeyExists(form, "allowResize"),
                         isActive        = structKeyExists(form, "isActive")
                     )>
                     <cfset actionMessage = "Variant type '#encodeForHTML(code)#' created (ID: #newID#).">
@@ -175,6 +180,18 @@
 <!--- ═══════════════════════════════════════════════════════════════════════
      Add / Edit Form
      ═══════════════════════════════════════════════════════════════════════ --->
+<cfset editMode_Current = "">
+<cfif editMode>
+    <cfif structKeyExists(editType, "MODE") AND len(trim(editType["MODE"]))>
+        <cfset editMode_Current = lCase(trim(editType["MODE"]))>
+    <cfelse>
+        <cfset editMode_Current = "resize_only">
+    </cfif>
+    <cfif NOT listFindNoCase("crop_resize,resize_only,passthrough", editMode_Current)>
+        <cfset editMode_Current = "resize_only">
+    </cfif>
+</cfif>
+
 <cfset content &= "
 <div class='card mb-4 settings-shell'>
     <div class='card-header fw-semibold'>
@@ -213,44 +230,49 @@
                            placeholder='e.g. web, kiosk, print'>
                 </div>
                 <div class='col-md-3'>
+                    <label for='vtMode' class='form-label'>Mode <span class='text-danger'>*</span></label>
+                    <select class='form-select' id='vtMode' name='vtMode' required>
+                        <option value='' #(NOT editMode OR editMode_Current EQ "") ? 'selected' : ''#>— select mode —</option>
+                        <option value='crop_resize' #(editMode_Current EQ "crop_resize") ? 'selected' : ''#>Crop & Resize</option>
+                        <option value='resize_only' #(editMode_Current EQ "resize_only") ? 'selected' : ''#>Resize Only</option>
+                        <option value='passthrough' #(editMode_Current EQ "passthrough") ? 'selected' : ''#>Pass-through (Format-Independent)</option>
+                    </select>
+                    <div class='form-text'>Processing mode determines which fields are required.</div>
+                </div>
+            </div>
+
+            <div id='dimensionsControls' class='row g-3 mt-1' style='display: none;'>
+                <div class='col-md-4'>
                     <label for='vtOutputFormat' class='form-label'>Output Format</label>
                     <select class='form-select' id='vtOutputFormat' name='outputFormat'>
                         <option value='jpg' #(editMode AND (editType.OUTPUTFORMAT ?: '') EQ 'jpg') ? 'selected' : ''#>JPG</option>
                         <option value='png' #(editMode AND (editType.OUTPUTFORMAT ?: '') EQ 'png') ? 'selected' : ''#>PNG</option>
                         <option value='webp' #(editMode AND (editType.OUTPUTFORMAT ?: '') EQ 'webp') ? 'selected' : ''#>WebP</option>
                     </select>
+                    <div class='form-text text-muted small'>Output format for resized/cropped variants.</div>
                 </div>
-                <div class='col-md-3'>
+                <div class='col-md-4'>
                     <label for='vtWidthPx' class='form-label'>Width (px)</label>
                     <input type='number' class='form-control' id='vtWidthPx' name='widthPx'
                            value='#editMode ? val(editType.WIDTHPX ?: 0) : ""#'
                            min='0' placeholder='0 = auto'>
+                    <div class='form-text text-muted small'>0 or leave blank for auto-fit.</div>
                 </div>
-                <div class='col-md-3'>
+                <div class='col-md-4'>
                     <label for='vtHeightPx' class='form-label'>Height (px)</label>
                     <input type='number' class='form-control' id='vtHeightPx' name='heightPx'
                            value='#editMode ? val(editType.HEIGHTPX ?: 0) : ""#'
                            min='0' placeholder='0 = auto'>
+                    <div class='form-text text-muted small'>0 or leave blank for auto-fit.</div>
                 </div>
             </div>
 
+            <div id='passthroughInfo' class='alert alert-info mt-3' style='display: none;'>
+                <i class='bi bi-info-circle me-1'></i>
+                <strong>Pass-through Mode:</strong> Format and dimensions are not used. Source images (PNG, JPG, or WebP) are copied as-is without any processing.
+            </div>
+
             <div class='row g-3 mt-1'>
-                <div class='col-md-3'>
-                    <div class='form-check form-switch mt-4'>
-                        <input class='form-check-input' type='checkbox' id='vtAllowManualCrop' name='allowManualCrop'
-                               #(editMode AND isBoolean(editType.ALLOWMANUALCROP ?: false) AND editType.ALLOWMANUALCROP) ? 'checked' : (!editMode ? '' : '')#>
-                        <label class='form-check-label' for='vtAllowManualCrop'>Allow Manual Crop</label>
-                    </div>
-                    <div class='form-text'>Enables the crop tool for this variant.</div>
-                </div>
-                <div class='col-md-3'>
-                    <div class='form-check form-switch mt-4'>
-                        <input class='form-check-input' type='checkbox' id='vtAllowResize' name='allowResize'
-                               #(editMode AND isBoolean(editType.ALLOWRESIZE ?: true) AND editType.ALLOWRESIZE) ? 'checked' : (!editMode ? 'checked' : '')#>
-                        <label class='form-check-label' for='vtAllowResize'>Allow Resize</label>
-                    </div>
-                    <div class='form-text'>Enables proportional resize. Off = pass-through.</div>
-                </div>
                 <div class='col-md-3'>
                     <div class='form-check form-switch mt-4'>
                         <input class='form-check-input' type='checkbox' id='vtIsActive' name='isActive'
@@ -300,10 +322,9 @@
                     <th>Code</th>
                     <th>Description</th>
                     <th>Audience</th>
-                    <th>Format</th>
                     <th class='text-center'>Dimensions</th>
-                    <th class='text-center'>Crop</th>
-                    <th class='text-center'>Resize</th>
+                    <th>Mode</th>
+                    <th>Format</th>
                     <th class='text-center'>Active</th>
                     <th>Actions</th>
                 </tr>
@@ -317,21 +338,26 @@
         <cfset vtW     = val(vt.WIDTHPX ?: 0)>
         <cfset vtH     = val(vt.HEIGHTPX ?: 0)>
         <cfset vtDims  = (vtW GT 0 ? vtW : "auto") & " &times; " & (vtH GT 0 ? vtH : "auto")>
-        <cfset vtCrop  = isBoolean(vt.ALLOWMANUALCROP ?: false) AND vt.ALLOWMANUALCROP>
-        <cfset vtResize = isBoolean(vt.ALLOWRESIZE ?: true) AND vt.ALLOWRESIZE>
+        <cfset vtModeKey = "resize_only">
+        <cfif structKeyExists(vt, "MODE")>
+            <cfset vtModeKey = lCase(trim(vt["MODE"]))>
+        </cfif>
+        <cfif NOT listFindNoCase("crop_resize,resize_only,passthrough", vtModeKey)>
+            <cfset vtModeKey = "resize_only">
+        </cfif>
         <cfset vtActive = isBoolean(vt.ISACTIVE ?: true) AND vt.ISACTIVE>
         <cfset rowClass = vtActive ? "" : "table-secondary">
+        <cfset vtMode = vtModeKey EQ "crop_resize" ? "Crop & Resize" : (vtModeKey EQ "resize_only" ? "Resize Only" : "Pass-through")>
 
         <cfset content &= "
             <tr class='#rowClass#'>
                 <td class='font-monospace'>#encodeForHTML(vt.CODE ?: "")#</td>
                 <td>#encodeForHTML(vt.DESCRIPTION ?: "")#</td>
                 <td>#encodeForHTML(vt.AUDIENCE ?: "")#</td>
-                <td class='text-uppercase small'>#encodeForHTML(vt.OUTPUTFORMAT ?: "")#</td>
                 <td class='text-center small'>#vtDims#</td>
-                <td class='text-center'>#vtCrop ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
-                <td class='text-center'>#vtResize ? '<i class=""bi bi-check-circle-fill text-success""></i>' : '<i class=""bi bi-dash text-muted""></i>'#</td>
-                <td class='text-center'>#vtActive ? '<span class=""badge settings-badge-active"">Active</span>' : '<span class=""badge bg-secondary text-dark"">Inactive</span>'#</td>
+                <td><span class='badge bg-info text-dark'>#vtMode#</span></td>
+                <td class='text-uppercase small'>#(vtMode EQ "Pass-through" ? "Any" : encodeForHTML(vt.OUTPUTFORMAT ?: ""))#</td>
+                <td class='text-center'>#vtActive ? '<span class="badge settings-badge-active">Active</span>' : '<span class="badge bg-secondary text-dark">Inactive</span>'#</td>
                 <td>
                     <div class='settings-action-group'>
                         <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
@@ -379,28 +405,32 @@
 <div class='card mb-4 settings-shell settings-reference-card'>
     <div class='card-header fw-semibold'><i class='bi bi-info-circle me-1'></i> Processing Modes</div>
     <div class='card-body'>
-        <table class='table table-sm mb-0'>
+        <table class='table table-sm mb-3'>
             <thead>
-                <tr><th>Crop</th><th>Resize</th><th>Behavior</th></tr>
+                <tr><th>Mode</th><th>Behavior</th><th>Source Formats</th></tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><i class='bi bi-check-circle-fill text-success'></i></td>
-                    <td><i class='bi bi-check-circle-fill text-success'></i></td>
-                    <td><strong>Crop &amp; Resize</strong> &mdash; Admin selects crop area, image is cropped then resized to target dimensions.</td>
+                    <td><span class='badge bg-info text-dark'>Crop & Resize</span></td>
+                    <td>Admin selects crop area, image is cropped then resized to target dimensions. Output format specified.</td>
+                    <td>JPG, PNG</td>
                 </tr>
                 <tr>
-                    <td><i class='bi bi-dash text-muted'></i></td>
-                    <td><i class='bi bi-check-circle-fill text-success'></i></td>
-                    <td><strong>Resize Only</strong> &mdash; Source image is proportionally resized to target width/height. No cropping.</td>
+                    <td><span class='badge bg-info text-dark'>Resize Only</span></td>
+                    <td>Source image is proportionally resized to target width/height with no cropping. Output format specified.</td>
+                    <td>JPG, PNG</td>
                 </tr>
                 <tr>
-                    <td><i class='bi bi-dash text-muted'></i></td>
-                    <td><i class='bi bi-dash text-muted'></i></td>
-                    <td><strong>Pass-through</strong> &mdash; Source image is copied as-is to publishing. No resize, no crop.</td>
+                    <td><span class='badge bg-info text-dark'>Pass-through</span></td>
+                    <td><strong>Format-independent:</strong> Source image is copied as-is to publishing without resizing or cropping. Output format is preserved from source (PNG stays PNG, JPG stays JPG, WebP stays WebP). No format conversion, no ColdFusion image processing.</td>
+                    <td>JPG, PNG, WebP</td>
                 </tr>
             </tbody>
         </table>
+        <div class='alert alert-info small mb-0'>
+            <i class='bi bi-lightbulb me-1'></i>
+            <strong>WebP Support:</strong> Pass-through variants support WebP source images. Other modes (Crop & Resize, Resize Only) work with JPG and PNG only.
+        </div>
     </div>
 </div>
 ">
@@ -419,7 +449,7 @@
                 <button type='button' class='btn-close btn-close-white' data-bs-dismiss='modal' aria-label='Close'></button>
             </div>
             <div class='modal-body'>
-                <p>Are you sure you want to delete this variant type?</p>
+                <p class='text-muted small mb-1'><strong>Pass-through Mode:</strong> Format-independent &mdash; accepts PNG, JPG, or WebP and outputs in the same format without resizing or cropping.</p>
                 <div class='alert alert-warning'>
                     <strong id='deleteVtCode'></strong>
                     <span class='text-muted ms-2' id='deleteVtDesc'></span>
@@ -449,20 +479,69 @@
     </div>
 </div>
 
-<script>
-(function () {
-    'use strict';
-    var deleteModal = document.getElementById('deleteModal');
-    if (deleteModal) {
-        deleteModal.addEventListener('show.bs.modal', function (event) {
-            var btn = event.relatedTarget;
-            document.getElementById('deleteVtID').value        = btn.getAttribute('data-vt-id')   || '';
-            document.getElementById('deleteVtCode').textContent = btn.getAttribute('data-vt-code') || '';
-            document.getElementById('deleteVtDesc').textContent = btn.getAttribute('data-vt-desc') || '';
-        });
-    }
-}());
-</script>
+            <script>
+            (function () {
+                'use strict';
+                var modeSelect = document.getElementById('vtMode');
+                var dimensionsControls = document.getElementById('dimensionsControls');
+                var passthroughInfo = document.getElementById('passthroughInfo');
+                var widthInput = document.getElementById('vtWidthPx');
+                var heightInput = document.getElementById('vtHeightPx');
+                var formatSelect = document.getElementById('vtOutputFormat');
+
+                function updateFormState() {
+                    var mode = modeSelect.value;
+
+                    if (mode === 'crop_resize') {
+                        // Crop & Resize
+                        dimensionsControls.style.display = 'flex';
+                        passthroughInfo.style.display = 'none';
+                        widthInput.disabled = false;
+                        heightInput.disabled = false;
+                        formatSelect.disabled = false;
+                    } else if (mode === 'resize_only') {
+                        // Resize Only
+                        dimensionsControls.style.display = 'flex';
+                        passthroughInfo.style.display = 'none';
+                        widthInput.disabled = false;
+                        heightInput.disabled = false;
+                        formatSelect.disabled = false;
+                    } else if (mode === 'passthrough') {
+                        // Pass-through
+                        dimensionsControls.style.display = 'none';
+                        passthroughInfo.style.display = 'block';
+                        widthInput.disabled = true;
+                        heightInput.disabled = true;
+                        formatSelect.disabled = true;
+                    } else {
+                        // No selection
+                        dimensionsControls.style.display = 'none';
+                        passthroughInfo.style.display = 'none';
+                    }
+                }
+
+                if (modeSelect) {
+                    modeSelect.addEventListener('change', updateFormState);
+                    // Initialize on page load
+                    updateFormState();
+                }
+            }());
+            </script>
+
+            <script>
+            (function () {
+                'use strict';
+                var deleteModal = document.getElementById('deleteModal');
+                if (deleteModal) {
+                    deleteModal.addEventListener('show.bs.modal', function (event) {
+                        var btn = event.relatedTarget;
+                        document.getElementById('deleteVtID').value        = btn.getAttribute('data-vt-id')   || '';
+                        document.getElementById('deleteVtCode').textContent = btn.getAttribute('data-vt-code') || '';
+                        document.getElementById('deleteVtDesc').textContent = btn.getAttribute('data-vt-desc') || '';
+                    });
+                }
+            }());
+            </script>
 ">
 
 <cfset content &= "</div>">

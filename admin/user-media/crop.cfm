@@ -62,7 +62,7 @@
         <cfset sourceUrl = request.webRoot & "/admin/user-media/_serve_dropbox_image.cfm?path=" & encodeForURL(rawDropboxPath)>
     </cfif>
 </cfif>
-<cfset allowCrop     = isBoolean(variant.ALLOWMANUALCROP ?: false) AND variant.ALLOWMANUALCROP>
+<cfset allowCrop     = lCase(trim(variant.MODE ?: "resize_only")) EQ "crop_resize">
 
 <!--- If this variant type does not allow manual crop, redirect back ───────── --->
 <cfif NOT allowCrop>

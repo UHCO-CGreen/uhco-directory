@@ -26,6 +26,7 @@
     <cfif action EQ "save">
         <cfset editID = val(form.imageVariantTypeID ?: 0)>
         <cfset code   = trim(form.code ?: "")>
+        <cfset submittedMode = structKeyExists(form, "allowResize") ? (structKeyExists(form, "allowManualCrop") ? "crop_resize" : "resize_only") : "passthrough">
 
         <cfif NOT len(code)>
             <cfset actionMessage      = "Code is required.">
@@ -38,11 +39,10 @@
                         code            = code,
                         description     = trim(form.description ?: ""),
                         audience        = trim(form.audience ?: ""),
+                        mode            = submittedMode,
                         outputFormat    = trim(form.outputFormat ?: "jpg"),
                         widthPx         = val(form.widthPx ?: 0),
                         heightPx        = val(form.heightPx ?: 0),
-                        allowManualCrop = structKeyExists(form, "allowManualCrop"),
-                        allowResize     = structKeyExists(form, "allowResize"),
                         isActive        = structKeyExists(form, "isActive")
                     )>
                     <cfset actionMessage = "Variant type '#encodeForHTML(code)#' updated.">
@@ -51,11 +51,10 @@
                         code            = code,
                         description     = trim(form.description ?: ""),
                         audience        = trim(form.audience ?: ""),
+                        mode            = submittedMode,
                         outputFormat    = trim(form.outputFormat ?: "jpg"),
                         widthPx         = val(form.widthPx ?: 0),
                         heightPx        = val(form.heightPx ?: 0),
-                        allowManualCrop = structKeyExists(form, "allowManualCrop"),
-                        allowResize     = structKeyExists(form, "allowResize"),
                         isActive        = structKeyExists(form, "isActive")
                     )>
                     <cfset actionMessage = "Variant type '#encodeForHTML(code)#' created (ID: #newID#).">
@@ -235,16 +234,16 @@
             <div class='row g-3 mt-1'>
                 <div class='col-md-3'>
                     <div class='form-check form-switch mt-4'>
-                        <input class='form-check-input' type='checkbox' id='vtAllowManualCrop' name='allowManualCrop'
-                               #(editMode AND isBoolean(editType.ALLOWMANUALCROP ?: false) AND editType.ALLOWMANUALCROP) ? 'checked' : (!editMode ? '' : '')#>
+                           <input class='form-check-input' type='checkbox' id='vtAllowManualCrop' name='allowManualCrop'
+                               #(editMode AND lCase(trim(editType.MODE ?: 'resize_only')) EQ 'crop_resize') ? 'checked' : (!editMode ? '' : '')#>
                         <label class='form-check-label' for='vtAllowManualCrop'>Allow Manual Crop</label>
                     </div>
                     <div class='form-text'>Enables the crop tool for this variant.</div>
                 </div>
                 <div class='col-md-3'>
                     <div class='form-check form-switch mt-4'>
-                        <input class='form-check-input' type='checkbox' id='vtAllowResize' name='allowResize'
-                               #(editMode AND isBoolean(editType.ALLOWRESIZE ?: true) AND editType.ALLOWRESIZE) ? 'checked' : (!editMode ? 'checked' : '')#>
+                           <input class='form-check-input' type='checkbox' id='vtAllowResize' name='allowResize'
+                               #(editMode AND lCase(trim(editType.MODE ?: 'resize_only')) NEQ 'passthrough') ? 'checked' : (!editMode ? 'checked' : '')#>
                         <label class='form-check-label' for='vtAllowResize'>Allow Resize</label>
                     </div>
                     <div class='form-text'>Enables proportional resize. Off = pass-through.</div>
@@ -315,8 +314,9 @@
         <cfset vtW     = val(vt.WIDTHPX ?: 0)>
         <cfset vtH     = val(vt.HEIGHTPX ?: 0)>
         <cfset vtDims  = (vtW GT 0 ? vtW : "auto") & " &times; " & (vtH GT 0 ? vtH : "auto")>
-        <cfset vtCrop  = isBoolean(vt.ALLOWMANUALCROP ?: false) AND vt.ALLOWMANUALCROP>
-        <cfset vtResize = isBoolean(vt.ALLOWRESIZE ?: true) AND vt.ALLOWRESIZE>
+        <cfset vtModeKey = lCase(trim(vt.MODE ?: 'resize_only'))>
+        <cfset vtCrop  = (vtModeKey EQ 'crop_resize')>
+        <cfset vtResize = (vtModeKey NEQ 'passthrough')>
         <cfset vtActive = isBoolean(vt.ISACTIVE ?: true) AND vt.ISACTIVE>
         <cfset rowClass = vtActive ? "" : "table-secondary">
 

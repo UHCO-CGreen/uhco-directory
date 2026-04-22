@@ -51,7 +51,7 @@
 <cfset variantCode   = encodeForHTML(variant.CODE ?: "")>
 <cfset targetWidth   = isNumeric(variant.WIDTHPX ?: "") ? int(val(variant.WIDTHPX)) : 0>
 <cfset targetHeight  = isNumeric(variant.HEIGHTPX ?: "") ? int(val(variant.HEIGHTPX)) : 0>
-<cfset allowResize   = isBoolean(variant.ALLOWRESIZE ?: true) AND variant.ALLOWRESIZE>
+<cfset allowResize   = lCase(trim(variant.MODE ?: "resize_only")) NEQ "passthrough">
 <cfset isPassThrough = NOT allowResize>
 
 <!--- Build a human-readable dimensions string --->
