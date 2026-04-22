@@ -289,6 +289,36 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
+     * Return counts of generated variants that are not yet published, grouped by user.
+     * A variant is considered generated when LocalPath is non-empty.
+     * It is considered unpublished when there is no matching UserImages row for
+     * the same source + variant code.
+     */
+    public array function getGeneratedUnpublishedVariantCountsByUser() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT uis.UserID,
+                   COUNT(*) AS GeneratedUnpublishedCount
+            FROM   UserImageVariants uiv
+            JOIN   UserImageSources uis
+                   ON uis.UserImageSourceID = uiv.UserImageSourceID
+            JOIN   ImageVariantTypes ivt
+                   ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+            LEFT JOIN UserImages ui
+                   ON ui.UserImageSourceID = uiv.UserImageSourceID
+                  AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+            WHERE  uis.IsActive = 1
+              AND  LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+              AND  ui.ImageID IS NULL
+            GROUP BY uis.UserID
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
      * Return a single variant record for a source + ImageVariantTypeID.
      * Returns an empty struct when not found.
      */
@@ -365,6 +395,27 @@ component extends="dao.BaseDAO" output="false" singleton {
         executeQueryWithRetry(
             "DELETE FROM UserImageVariants WHERE UserImageSourceID = :sourceID",
             { sourceID = { value = arguments.sourceID, cfsqltype = "cf_sql_integer" } },
+            { datasource = variables.datasource, timeout = 30 }
+        );
+    }
+
+    /**
+     * Delete one variant assignment by source + type.
+     */
+    public void function deleteVariantBySourceAndType(
+        required numeric userImageSourceID,
+        required numeric imageVariantTypeID
+    ) {
+        executeQueryWithRetry(
+            "
+            DELETE FROM UserImageVariants
+            WHERE UserImageSourceID = :sourceID
+              AND ImageVariantTypeID = :typeID
+            ",
+            {
+                sourceID = { value = arguments.userImageSourceID, cfsqltype = "cf_sql_integer" },
+                typeID   = { value = arguments.imageVariantTypeID, cfsqltype = "cf_sql_integer" }
+            },
             { datasource = variables.datasource, timeout = 30 }
         );
     }

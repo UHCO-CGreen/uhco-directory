@@ -57,6 +57,16 @@
         <cfset actionMessage      = result.message>
         <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
 
+    <!--- ── Remove an assigned variant (only when not published) ───── --->
+    <cfelseif action EQ "unassign" AND isNumeric(form.imageVariantTypeID ?: "") AND val(form.imageVariantTypeID) GT 0>
+        <cfset result = variantService.unassignSource(
+            userID             = userID,
+            imageVariantTypeID = val(form.imageVariantTypeID),
+            userImageSourceID  = sourceID
+        )>
+        <cfset actionMessage      = result.message>
+        <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
+
     <!--- ── Generate a single variant ───────────────────────────────── --->
     <cfelseif action EQ "generate" AND isNumeric(form.imageVariantTypeID ?: "") AND val(form.imageVariantTypeID) GT 0>
         <cfset result = variantService.generateVariant(
@@ -87,6 +97,22 @@
                     </cfif>
                 </cfloop>
             </cfif>
+        </cfif>
+
+    <!--- ── Unpublish a single published variant ───────────────────── --->
+    <cfelseif action EQ "unpublish" AND isNumeric(form.imageVariantTypeID ?: "") AND val(form.imageVariantTypeID) GT 0>
+        <cfif NOT request.hasPermission("media.unpublish")>
+            <cfset actionMessage = "You do not have permission to unpublish media.">
+            <cfset actionMessageClass = "alert-danger">
+        <cfelse>
+            <cfset publishingService = createObject("component", "cfc.PublishingService").init()>
+            <cfset result = publishingService.unpublishVariant(
+                userID             = userID,
+                imageVariantTypeID = val(form.imageVariantTypeID),
+                userImageSourceID  = sourceID
+            )>
+            <cfset actionMessage      = result.message>
+            <cfset actionMessageClass = result.success ? "alert-success" : "alert-danger">
         </cfif>
 
     </cfif>
@@ -270,7 +296,7 @@
             <cfset content &= "
                     <button
                         type='button'
-                        class='btn btn-sm btn-outline-secondary me-1 js-variant-preview'
+                        class='btn btn-sm btn-outline-dark me-1 js-variant-preview'
                         data-bs-toggle='modal'
                         data-bs-target='##variantPreviewModal'
                         data-preview-url='#encodeForHTMLAttribute(v.PREVIEWURL ?: "")#'
@@ -314,6 +340,42 @@
                         <i class='bi bi-gear'></i> #vtAllowResize ? 'Resize' : 'Transfer'#
                     </a>
                 ">
+            </cfif>
+
+            <cfif NOT (isBoolean(v.HASPUBLISHEDIMAGE ?: false) AND v.HASPUBLISHEDIMAGE)>
+                <cfset content &= "
+                    <form method='post' class='d-inline ms-1'>
+                        <input type='hidden' name='action' value='unassign'>
+                        <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
+                        <button type='submit' class='btn btn-sm btn-outline-danger'
+                                onclick='return confirm(\'Remove assignment for #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#?\');'>
+                            <i class='bi bi-x-circle me-1'></i> Remove
+                        </button>
+                    </form>
+                ">
+            <cfelse>
+                <cfset content &= "
+                    <span class='badge text-bg-success ms-1' title='Published variants cannot be removed'>Published</span>
+                ">
+            </cfif>
+
+            <cfif (isBoolean(v.HASPUBLISHEDIMAGE ?: false) AND v.HASPUBLISHEDIMAGE)>
+                <cfif request.hasPermission("media.unpublish")>
+                    <cfset content &= "
+                        <form method='post' class='d-inline ms-1'>
+                            <input type='hidden' name='action' value='unpublish'>
+                            <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
+                            <button type='submit' class='btn btn-sm btn-outline-danger'
+                                    onclick='return confirm(\'Unpublish #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#? This removes the published file and DB record.\');'>
+                                <i class='bi bi-trash me-1'></i> Unpublish
+                            </button>
+                        </form>
+                    ">
+                <cfelse>
+                    <cfset content &= "
+                        <span class='badge text-bg-success ms-1'>Published</span>
+                    ">
+                </cfif>
             </cfif>
         </cfif>
 

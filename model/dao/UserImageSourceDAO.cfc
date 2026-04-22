@@ -24,6 +24,24 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
+     * Return active source counts grouped by user.
+     */
+    public array function getActiveSourceCountsByUser() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT UserID,
+                   COUNT(*) AS ActiveSourceCount
+            FROM UserImageSources
+            WHERE IsActive = 1
+            GROUP BY UserID
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
      * Return a single source record by its primary key.
      * Returns an empty struct when not found.
      */

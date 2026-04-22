@@ -49,4 +49,27 @@ component output="false" singleton {
         return webThumbMap;
     }
 
+    public struct function getPublishedImages() {
+        var images = variables.ImagesDAO.getPublishedImages();
+
+        for ( var i = 1; i LTE arrayLen(images); i++ ) {
+            if ( structKeyExists(images[i], "IMAGEURL") ) {
+                images[i].IMAGEURL = variables.MediaConfigService.normalizePublishedUrl( images[i].IMAGEURL ?: "" );
+            }
+        }
+
+        return { success=true, data=images };
+    }
+
+    public struct function getPublishedImageCountMapByUser() {
+        var rows = variables.ImagesDAO.getPublishedImageCountsByUser();
+        var result = {};
+
+        for (var row in rows) {
+            result[ toString(row.USERID) ] = val(row.PUBLISHEDCOUNT ?: 0);
+        }
+
+        return { success=true, data=result };
+    }
+
 }

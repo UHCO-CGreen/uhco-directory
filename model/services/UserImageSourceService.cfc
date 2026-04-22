@@ -102,6 +102,20 @@ component output="false" singleton {
     }
 
     /**
+     * Returns a struct keyed by UserID with active source counts.
+     */
+    public struct function getActiveSourceCountMapByUser() {
+        var rows = variables.SourceDAO.getActiveSourceCountsByUser();
+        var result = {};
+
+        for (var row in rows) {
+            result[ toString(row.USERID) ] = val(row.ACTIVESOURCECOUNT ?: 0);
+        }
+
+        return result;
+    }
+
+    /**
      * Returns the list of valid SourceKey values for UI dropdowns.
      */
     public array function getSourceKeys() {

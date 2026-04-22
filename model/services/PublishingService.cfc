@@ -172,6 +172,51 @@ component output="false" singleton {
     }
 
     /**
+     * Unpublish one variant for a specific user + source.
+     * Removes the UserImages row and attempts to delete the published file.
+     */
+    public struct function unpublishVariant(
+        required numeric userID,
+        required numeric imageVariantTypeID,
+        required numeric userImageSourceID
+    ) {
+        var variantType = variables.VariantDAO.getVariantTypeByID(arguments.imageVariantTypeID);
+        if ( structIsEmpty(variantType) ) {
+            return { success=false, message="Unknown variant type." };
+        }
+
+        var variantCode = trim(variantType.CODE ?: "");
+        var publishedRow = variables.ImagesDAO.getPublishedImageByUserVariantAndSource(
+            userID            = arguments.userID,
+            imageVariant      = variantCode,
+            userImageSourceID = arguments.userImageSourceID
+        );
+
+        if ( structIsEmpty(publishedRow) ) {
+            return { success=false, message="No published image exists for this variant/source." };
+        }
+
+        // Delete DB row first so app state reflects unpublish even if file cleanup fails.
+        variables.ImagesDAO.deleteByUserVariantAndSource(
+            userID            = arguments.userID,
+            imageVariant      = variantCode,
+            userImageSourceID = arguments.userImageSourceID
+        );
+
+        var fileDeleteResult = _deletePublishedFileByUrl(trim(publishedRow.IMAGEURL ?: ""));
+        var baseMessage = "Published image removed for " & variantCode & ".";
+
+        if ( !fileDeleteResult.success ) {
+            return {
+                success = true,
+                message = baseMessage & " (File cleanup note: " & fileDeleteResult.message & ")"
+            };
+        }
+
+        return { success=true, message=baseMessage };
+    }
+
+    /**
      * Publish a single variant.
      *
      * Steps:
@@ -335,6 +380,33 @@ component output="false" singleton {
                 type    = "PublishingService.CopyFailed",
                 message = "File copy to published directory failed."
             );
+        }
+    }
+
+    /**
+     * Delete a published file by URL, if it maps to the published directory.
+     */
+    private struct function _deletePublishedFileByUrl( required string imageUrl ) {
+        if ( !len(trim(arguments.imageUrl)) ) {
+            return { success=false, message="No published URL found." };
+        }
+
+        var normalizedUrl = replace(arguments.imageUrl, "\\", "/", "all");
+        var fileName = listLast(normalizedUrl, "/");
+        if ( !len(fileName) ) {
+            return { success=false, message="Unable to resolve published filename." };
+        }
+
+        var publishedAbsolute = variables.publishedDirAbsolute & fileName;
+        if ( !fileExists(publishedAbsolute) ) {
+            return { success=false, message="Published file was already missing." };
+        }
+
+        try {
+            fileDelete(publishedAbsolute);
+            return { success=true, message="File deleted." };
+        } catch (any e) {
+            return { success=false, message="Failed to delete published file: " & e.message };
         }
     }
 

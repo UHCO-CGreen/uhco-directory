@@ -308,6 +308,7 @@
 
         cropper = new Cropper(img, {
             aspectRatio: #targetWidth# / #targetHeight#,
+            checkOrientation: false,
             viewMode: 1,
             dragMode: 'move',
             autoCropArea: 0.8,
@@ -348,7 +349,7 @@
             return;
         }
 
-        var data = cropper.getData(true);
+        var data = cropper.getData();
 
         if (!data.width || data.width <= 0 || !data.height || data.height <= 0) {
             event.preventDefault();
@@ -356,10 +357,10 @@
             return;
         }
 
-        document.getElementById('cropX').value      = data.x;
-        document.getElementById('cropY').value      = data.y;
-        document.getElementById('cropWidth').value  = data.width;
-        document.getElementById('cropHeight').value = data.height;
+        document.getElementById('cropX').value      = Number(data.x || 0).toFixed(4);
+        document.getElementById('cropY').value      = Number(data.y || 0).toFixed(4);
+        document.getElementById('cropWidth').value  = Number(data.width || 0).toFixed(4);
+        document.getElementById('cropHeight').value = Number(data.height || 0).toFixed(4);
 
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class=\x22spinner-border spinner-border-sm me-1\x22></span> Generating...';

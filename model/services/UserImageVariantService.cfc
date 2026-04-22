@@ -194,6 +194,21 @@ component output="false" singleton {
         return matrix;
     }
 
+    /**
+     * Returns a struct keyed by UserID with counts of generated variants that
+     * do not yet have a published image.
+     */
+    public struct function getGeneratedUnpublishedCountMapByUser() {
+        var rows = variables.VariantDAO.getGeneratedUnpublishedVariantCountsByUser();
+        var result = {};
+
+        for (var row in rows) {
+            result[ toString(row.USERID) ] = val(row.GENERATEDUNPUBLISHEDCOUNT ?: 0);
+        }
+
+        return result;
+    }
+
     private struct function _resolveDisplayState(
         required struct variantRow,
         struct publishedRecord = {}
@@ -321,6 +336,63 @@ component output="false" singleton {
         );
 
         return { success=true, message="Variant type assigned. Click Generate to produce the image." };
+    }
+
+    /**
+     * Remove an assigned variant mapping from a specific source.
+     * Blocked when a published image exists for this source + variant code.
+     */
+    public struct function unassignSource(
+        required numeric userID,
+        required numeric imageVariantTypeID,
+        required numeric userImageSourceID
+    ) {
+        var variantType = variables.VariantDAO.getVariantTypeByID( arguments.imageVariantTypeID );
+        if ( structIsEmpty(variantType) ) {
+            return { success=false, message="Unknown variant type." };
+        }
+
+        var source = variables.SourceDAO.getSourceByID( arguments.userImageSourceID );
+        if ( structIsEmpty(source) ) {
+            return { success=false, message="Source record not found." };
+        }
+        if ( val(source.USERID) NEQ arguments.userID ) {
+            return { success=false, message="Source does not belong to this user." };
+        }
+
+        var variant = variables.VariantDAO.getVariantBySourceAndType(
+            userImageSourceID  = arguments.userImageSourceID,
+            imageVariantTypeID = arguments.imageVariantTypeID
+        );
+        if ( structIsEmpty(variant) ) {
+            return { success=false, message="Variant is not currently assigned to this source." };
+        }
+
+        var publishedImagesResult = variables.ImagesService.getImages( arguments.userID );
+        var publishedImages = publishedImagesResult.success ? publishedImagesResult.data : [];
+        var targetCode = lCase(trim(variantType.CODE ?: ""));
+        var isPublished = false;
+
+        for ( var publishedImage in publishedImages ) {
+            if (
+                val(publishedImage.USERIMAGESOURCEID ?: 0) EQ arguments.userImageSourceID
+                AND compareNoCase(trim(publishedImage.IMAGEVARIANT ?: ""), targetCode) EQ 0
+            ) {
+                isPublished = true;
+                break;
+            }
+        }
+
+        if ( isPublished ) {
+            return { success=false, message="Cannot remove this assignment because it has a published image." };
+        }
+
+        variables.VariantDAO.deleteVariantBySourceAndType(
+            userImageSourceID  = arguments.userImageSourceID,
+            imageVariantTypeID = arguments.imageVariantTypeID
+        );
+
+        return { success=true, message="Variant assignment removed." };
     }
 
     /**

@@ -146,6 +146,59 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    /**
+     * Return one published image row for user + variant + source.
+     * Returns an empty struct when not found.
+     */
+    public struct function getPublishedImageByUserVariantAndSource(
+        required numeric userID,
+        required string imageVariant,
+        required numeric userImageSourceID
+    ) {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT TOP 1 ImageID, UserID, ImageVariant, ImageURL, UserImageSourceID
+            FROM UserImages
+            WHERE UserID = :userID
+              AND UPPER(ImageVariant) = UPPER(:imageVariant)
+              AND UserImageSourceID = :sourceID
+            ORDER BY ImageID DESC
+            ",
+            {
+                userID       = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                imageVariant = { value=arguments.imageVariant, cfsqltype="cf_sql_varchar" },
+                sourceID     = { value=arguments.userImageSourceID, cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return (qry.recordCount GT 0) ? qry.getRow(1) : {};
+    }
+
+    /**
+     * Delete one published image row by user + variant + source.
+     */
+    public void function deleteByUserVariantAndSource(
+        required numeric userID,
+        required string imageVariant,
+        required numeric userImageSourceID
+    ) {
+        executeQueryWithRetry(
+            "
+            DELETE FROM UserImages
+            WHERE UserID = :userID
+              AND UPPER(ImageVariant) = UPPER(:imageVariant)
+              AND UserImageSourceID = :sourceID
+            ",
+            {
+                userID       = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                imageVariant = { value=arguments.imageVariant, cfsqltype="cf_sql_varchar" },
+                sourceID     = { value=arguments.userImageSourceID, cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
     public void function removeImage( required numeric imageID ) {
         executeQueryWithRetry(
             "DELETE FROM UserImages WHERE ImageID = :id",
@@ -163,6 +216,48 @@ component extends="dao.BaseDAO" output="false" singleton {
             "SELECT ImageID, UserID, ImageVariant, ImageURL FROM UserImages WHERE ImageVariant = :code",
             { code = { value=arguments.imageVariant, cfsqltype="cf_sql_varchar" } },
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
+     * Return all published image records (across all users).
+     * Used by User Media "View Published" mode.
+     */
+    public array function getPublishedImages() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT ImageID,
+                   UserID,
+                   ImageVariant,
+                   ImageURL,
+                   ImageDescription,
+                   ImageDimensions,
+                   SortOrder,
+                   UserImageSourceID,
+                   PublishedAt
+            FROM UserImages
+            ORDER BY PublishedAt DESC, UserID ASC, ImageVariant ASC, SortOrder ASC
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+        return queryToArray(qry);
+    }
+
+    /**
+     * Return published image counts grouped by user.
+     */
+    public array function getPublishedImageCountsByUser() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT UserID,
+                   COUNT(*) AS PublishedCount
+            FROM UserImages
+            GROUP BY UserID
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
         );
         return queryToArray(qry);
     }
