@@ -51,7 +51,17 @@
 <cfset variantCode   = encodeForHTML(variant.CODE ?: "")>
 <cfset targetWidth   = isNumeric(variant.WIDTHPX ?: "") ? int(val(variant.WIDTHPX)) : 0>
 <cfset targetHeight  = isNumeric(variant.HEIGHTPX ?: "") ? int(val(variant.HEIGHTPX)) : 0>
-<cfset sourceUrl     = variant.SOURCEDROPBOXPATH ?: "">
+<cfset rawDropboxPath = variant.SOURCEDROPBOXPATH ?: "">
+<cfset sourceUrl = "">
+<cfif len(rawDropboxPath)>
+    <cfif left(rawDropboxPath, 14) EQ "/_temp_source/">
+        <!--- Local file: use the web path directly. --->
+        <cfset sourceUrl = rawDropboxPath>
+    <cfelse>
+        <!--- Dropbox file: proxy through our serve endpoint. --->
+        <cfset sourceUrl = request.webRoot & "/admin/user-media/_serve_dropbox_image.cfm?path=" & encodeForURL(rawDropboxPath)>
+    </cfif>
+</cfif>
 <cfset allowCrop     = isBoolean(variant.ALLOWMANUALCROP ?: false) AND variant.ALLOWMANUALCROP>
 
 <!--- If this variant type does not allow manual crop, redirect back ───────── --->

@@ -202,7 +202,28 @@
         <cfset v = variantMatrix[i]>
 
         <!--- ── Status badge ────────────────────────────────────────── --->
-        <cfset statusBadge = "<span class='badge #encodeForHTML(v.DISPLAYSTATUSCLASS ?: "bg-secondary")#'><i class='bi bi-circle-fill me-1'></i>#encodeForHTML(v.DISPLAYSTATUSLABEL ?: "Unknown")#</span>">
+        <cfset statusClass = trim(v.DISPLAYSTATUSCLASS ?: "")>
+        <cfset statusClassLower = lCase(statusClass)>
+        <cfif !len(statusClass)>
+            <cfset statusClass = "text-bg-secondary">
+            <cfset statusClassLower = "text-bg-secondary">
+        </cfif>
+        <!--- Guard against classes with no background utility. --->
+        <cfif !find("bg-", statusClassLower) AND !find("text-bg-", statusClassLower)>
+            <cfset statusClass = "text-bg-secondary">
+            <cfset statusClassLower = "text-bg-secondary">
+        </cfif>
+        <!--- Ensure readable text on light badge backgrounds. --->
+        <cfif (find("bg-light", statusClassLower) OR find("bg-warning", statusClassLower) OR find("bg-info", statusClassLower) OR find("bg-secondary", statusClassLower))
+            AND !find("text-dark", statusClassLower)
+            AND !find("text-body", statusClassLower)>
+            <cfset statusClass &= " text-dark">
+        </cfif>
+        <!--- Our theme uses white as --bs-secondary, so add a border for contrast. --->
+        <cfif find("bg-secondary", statusClassLower) AND !find("border", statusClassLower)>
+            <cfset statusClass &= " border border-secondary-subtle">
+        </cfif>
+        <cfset statusBadge = "<span class='badge #encodeForHTML(statusClass)#'><i class='bi bi-circle-fill me-1'></i>#encodeForHTML(v.DISPLAYSTATUSLABEL ?: "Unknown")#</span>">
 
         <!--- ── Last generated display ──────────────────────────────── --->
         <cfset generatedDisplay = "">

@@ -58,20 +58,20 @@
 </div>
 <p class='text-muted'>Manage images and media variants for individual users.</p>
 
-<div class='card mb-4'>
-    <div class='card-body'>
-        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0'>
-            <div class='input-group admin-search-input-xl'>
-                <button type='button' class='btn btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
+<div class='card mb-4 users-list-filter-card'>
+    <div class='card-body users-list-filter-card-body'>
+        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0 users-list-filter-form'>
+            <div class='input-group users-list-toolbar-search'>
+                <button type='button' class='btn btn-sm btn-outline-secondary users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
                 <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(searchTerm)#'>
             </div>
-            <button type='submit' class='btn btn-secondary'>
+            <button type='submit' class='btn btn-sm btn-secondary users-list-apply-button'>
                 <i class='bi bi-search'></i> Search
             </button>
 ">
 
 <cfif searched>
-    <cfset content &= "<a href='/admin/user-media/' class='btn btn-outline-secondary'>Clear</a>">
+    <cfset content &= "<a href='/admin/user-media/' class='btn btn-sm btn-warning users-list-clear-button'>Clear</a>">
 </cfif>
 
 <cfset content &= "

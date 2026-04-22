@@ -61,6 +61,7 @@ component output="false" singleton {
         variables.SourceDAO  = createObject("component", "dao.UserImageSourceDAO").init();
         variables.ImageProcessor = createObject("component", "cfc.ImageProcessor");
         variables.ImagesService = createObject("component", "cfc.images_service").init();
+        variables.DropboxProvider = createObject("component", "cfc.DropboxProvider").init();
 
         // Compute absolute paths from this CFC's location.
         // expandPath("/...") cannot be used — it resolves against the IIS site
@@ -473,95 +474,118 @@ component output="false" singleton {
         struct           frameData = {},
         struct           cropData  = {}
     ) {
-        // Resolve the absolute disk path of the source file.
-        // DROPBOX SWAP POINT: replace this with a Dropbox download call.
-        var sourceFilename     = listLast(arguments.source.DROPBOXPATH, "/\\");
-        var sourceAbsolutePath = _resolveSourceAbsolutePath( arguments.source.DROPBOXPATH ?: "" );
+        // Resolve source path. Local records use /_temp_source/... while
+        // Dropbox records are downloaded to a temp file before processing.
+        var sourceFilename = listLast(arguments.source.DROPBOXPATH, "/\\");
+        var sourcePathInfo = _resolveSourcePathInfo( arguments.source.DROPBOXPATH ?: "" );
+        var sourceAbsolutePath = sourcePathInfo.path;
 
-        if ( !len(sourceAbsolutePath) OR !fileExists(sourceAbsolutePath) ) {
-            throw(
-                type    = "UserImageVariantService.SourceNotFound",
-                message = "Source file not found on disk: #sourceFilename#. Ensure the file exists in the source directory."
-            );
-        }
+        try {
+            if ( !len(sourceAbsolutePath) OR !fileExists(sourceAbsolutePath) ) {
+                throw(
+                    type    = "UserImageVariantService.SourceNotFound",
+                    message = "Source file not found on disk: #sourceFilename#. Ensure the file exists in the source directory."
+                );
+            }
 
-        // ── Pass-through mode ─────────────────────────────────────────────
-        // When AllowResize = false the source is already at final dimensions.
-        // Copy it to the output location (with format conversion via cfimage
-        // if the output format differs from the source) and return immediately.
-        var allowResize = isBoolean(arguments.variantType.ALLOWRESIZE ?: true)
-            ? arguments.variantType.ALLOWRESIZE
-            : (val(arguments.variantType.ALLOWRESIZE ?: 1) EQ 1);
+            // ── Pass-through mode ─────────────────────────────────────────
+            // When AllowResize = false the source is already at final dimensions.
+            // Copy it to the output location (with format conversion via cfimage
+            // if the output format differs from the source) and return immediately.
+            var allowResize = isBoolean(arguments.variantType.ALLOWRESIZE ?: true)
+                ? arguments.variantType.ALLOWRESIZE
+                : (val(arguments.variantType.ALLOWRESIZE ?: 1) EQ 1);
 
-        if ( !allowResize ) {
-            var ptOutputFormat = lCase( trim( arguments.variantType.OUTPUTFORMAT ?: "" ) );
-            if ( ptOutputFormat EQ "jpeg" ) { ptOutputFormat = "jpg"; }
-            var ptSourceExt = lCase( listLast(sourceFilename, ".") );
-            if ( ptSourceExt EQ "jpeg" ) { ptSourceExt = "jpg"; }
+            if ( !allowResize ) {
+                var ptOutputFormat = lCase( trim( arguments.variantType.OUTPUTFORMAT ?: "" ) );
+                if ( ptOutputFormat EQ "jpeg" ) { ptOutputFormat = "jpg"; }
+                var ptSourceExt = lCase( listLast(sourceFilename, ".") );
+                if ( ptSourceExt EQ "jpeg" ) { ptSourceExt = "jpg"; }
 
-            if ( ptSourceExt EQ ptOutputFormat ) {
-                // Same format — straight file copy (fastest).
-                fileCopy(sourceAbsolutePath, arguments.outputPath);
-            } else {
-                // Format conversion required: read → write in target format.
-                var ptImage = imageRead(sourceAbsolutePath);
-                if ( ptOutputFormat EQ "jpg" ) {
-                    cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true, quality=0.75);
+                if ( ptSourceExt EQ ptOutputFormat ) {
+                    // Same format — straight file copy (fastest).
+                    fileCopy(sourceAbsolutePath, arguments.outputPath);
                 } else {
-                    cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true);
+                    // Format conversion required: read → write in target format.
+                    var ptImage = imageRead(sourceAbsolutePath);
+                    if ( ptOutputFormat EQ "jpg" ) {
+                        cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true, quality=0.75);
+                    } else {
+                        cfimage(action="write", source=ptImage, destination=arguments.outputPath, overwrite=true);
+                    }
                 }
+                return;
             }
-            return;
-        }
 
-        // ── Standard resize / crop pipeline ───────────────────────────────
-        var width  = isNumeric(arguments.variantType.WIDTHPX ?: "") ? val(arguments.variantType.WIDTHPX) : 0;
-        var height = isNumeric(arguments.variantType.HEIGHTPX ?: "") ? val(arguments.variantType.HEIGHTPX) : 0;
-        var outputFormat = lCase( trim( arguments.variantType.OUTPUTFORMAT ?: "" ) );
-        var allowTransparency = isBoolean(arguments.variantType.ALLOWTRANSPARENCY ?: "")
-            ? arguments.variantType.ALLOWTRANSPARENCY
-            : (val(arguments.variantType.ALLOWTRANSPARENCY ?: 0) EQ 1);
+            // ── Standard resize / crop pipeline ───────────────────────────
+            var width  = isNumeric(arguments.variantType.WIDTHPX ?: "") ? val(arguments.variantType.WIDTHPX) : 0;
+            var height = isNumeric(arguments.variantType.HEIGHTPX ?: "") ? val(arguments.variantType.HEIGHTPX) : 0;
+            var outputFormat = lCase( trim( arguments.variantType.OUTPUTFORMAT ?: "" ) );
+            var allowTransparency = isBoolean(arguments.variantType.ALLOWTRANSPARENCY ?: "")
+                ? arguments.variantType.ALLOWTRANSPARENCY
+                : (val(arguments.variantType.ALLOWTRANSPARENCY ?: 0) EQ 1);
 
-        // Variant types may define a fixed box (width+height), width-only, or
-        // height-only output.  At least one dimension must be present.
-        if ( width LTE 0 AND height LTE 0 ) {
-            throw(
-                type    = "UserImageVariantService.InvalidVariantType",
-                message = "Variant type dimensions are invalid. At least one of WidthPx or HeightPx must be a positive value."
+            // Variant types may define a fixed box (width+height), width-only, or
+            // height-only output.  At least one dimension must be present.
+            if ( width LTE 0 AND height LTE 0 ) {
+                throw(
+                    type    = "UserImageVariantService.InvalidVariantType",
+                    message = "Variant type dimensions are invalid. At least one of WidthPx or HeightPx must be a positive value."
+                );
+            }
+
+            if ( outputFormat EQ "jpeg" ) {
+                outputFormat = "jpg";
+            }
+
+            var variantDefinition = {
+                outputFormat      = outputFormat,
+                allowTransparency = allowTransparency
+            };
+
+            if ( width GT 0 ) {
+                variantDefinition.width = width;
+            }
+            if ( height GT 0 ) {
+                variantDefinition.height = height;
+            }
+
+            variables.ImageProcessor.generateVariant(
+                sourcePath        = sourceAbsolutePath,
+                destinationPath   = arguments.outputPath,
+                variantDefinition = variantDefinition,
+                offsets = {
+                    x = arguments.frameData.offsetX ?: 0,
+                    y = arguments.frameData.offsetY ?: 0
+                },
+                cropRect = {
+                    x      = val(arguments.cropData.x ?: 0),
+                    y      = val(arguments.cropData.y ?: 0),
+                    width  = val(arguments.cropData.width ?: 0),
+                    height = val(arguments.cropData.height ?: 0)
+                }
             );
-        }
-
-        if ( outputFormat EQ "jpeg" ) {
-            outputFormat = "jpg";
-        }
-
-        var variantDefinition = {
-            outputFormat      = outputFormat,
-            allowTransparency = allowTransparency
-        };
-
-        if ( width GT 0 ) {
-            variantDefinition.width = width;
-        }
-        if ( height GT 0 ) {
-            variantDefinition.height = height;
-        }
-
-        variables.ImageProcessor.generateVariant(
-            sourcePath        = sourceAbsolutePath,
-            destinationPath   = arguments.outputPath,
-            variantDefinition = variantDefinition,
-            offsets = {
-                x = arguments.frameData.offsetX ?: 0,
-                y = arguments.frameData.offsetY ?: 0
-            },
-            cropRect = {
-                x      = val(arguments.cropData.x ?: 0),
-                y      = val(arguments.cropData.y ?: 0),
-                width  = val(arguments.cropData.width ?: 0),
-                height = val(arguments.cropData.height ?: 0)
+        } finally {
+            if ( sourcePathInfo.isTemp AND len(sourcePathInfo.path ?: "") AND fileExists(sourcePathInfo.path) ) {
+                fileDelete(sourcePathInfo.path);
             }
-        );
+        }
+    }
+
+    private struct function _resolveSourcePathInfo( required string sourcePath ) {
+        var rawPath = trim(arguments.sourcePath);
+
+        if ( left(rawPath, 14) EQ "/_temp_source/" ) {
+            return {
+                path = _resolveSourceAbsolutePath(rawPath),
+                isTemp = false
+            };
+        }
+
+        return {
+            path = variables.DropboxProvider.downloadToTemp(rawPath),
+            isTemp = true
+        };
     }
 
     /**

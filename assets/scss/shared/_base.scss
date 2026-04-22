@@ -17,6 +17,11 @@
   --sea-foam: #93e9be;
   --sea-foam-rgb: 147, 233, 190;
   --off-white: #f6f6f6;
+  --off-white-rgb: 246, 246, 246;
+
+  /* Align Bootstrap secondary token with app off-white palette. */
+  --bs-secondary: var(--off-white);
+  --bs-secondary-rgb: var(--off-white-rgb);
   --slate: #54585a;
 
   /* Complimentary Colors */

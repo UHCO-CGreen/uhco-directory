@@ -19,3 +19,72 @@
 .media-modal-preview-image {
   max-height: 70vh;
 }
+
+// ── Source image picker ──────────────────────────────────────────────────────
+
+.source-file-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.625rem;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0.625rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  background: #f8f9fa;
+}
+
+.source-file-picker-modal {
+  max-height: 320px;
+}
+
+.source-file-item {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  margin: 0;
+
+  &:hover {
+    border-color: #adb5bd;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  }
+
+  &.selected {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+  }
+}
+
+.source-file-radio {
+  // visually hidden but still participates in form validation
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.source-file-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #e9ecef;
+}
+
+.source-file-name {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  padding: 0.3rem 0.25rem;
+  text-align: center;
+  word-break: break-all;
+  color: #495057;
+}

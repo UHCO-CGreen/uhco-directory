@@ -63,7 +63,7 @@
                         </div>
                         <div class='dashboard-actions'>
                             <div class='dropdown'>
-                                <button class='btn btn-primary btn-sm dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                                <button class='btn btn-primary btn-sm dropdown-toggle' type='button' data-bs-toggle='dropdown' data-bs-boundary='viewport' aria-expanded='false'>
                                     <i class='bi bi-gear-fill sidebar-icon me-2'></i>Manage Users
                                 </button>
                                 <ul class='dropdown-menu'>

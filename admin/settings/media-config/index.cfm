@@ -8,6 +8,30 @@
 <cfset variantDAO = createObject("component", "dao.UserImageVariantDAO").init()>
 <cfset patterns   = patternDAO.getAllPatterns()>
 <cfset allTypes   = variantDAO.getVariantTypesAllAdmin()>
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+
+<cfset actionMessage = "">
+<cfset actionMessageClass = "alert-success">
+
+<cfif cgi.request_method EQ "POST" AND trim(form.formAction ?: "") EQ "saveDropboxSettings">
+    <cftry>
+        <cfset newBrowseMode = lCase( trim(form.dropboxBrowseMode ?: "files") )>
+        <cfif !listFindNoCase("files,folders,mixed", newBrowseMode)>
+            <cfset newBrowseMode = "files">
+        </cfif>
+        <cfset newFolderBrowseFolders = trim(form.dropboxFolderBrowseFolders ?: "Faculty,Staff")>
+        <cfset appConfigService.setValue("dropbox.browse_mode", newBrowseMode)>
+        <cfset appConfigService.setValue("dropbox.folder_browse_folders", newFolderBrowseFolders)>
+        <cfset actionMessage = "Dropbox settings saved.">  
+    <cfcatch type="any">
+        <cfset actionMessage = cfcatch.message>
+        <cfset actionMessageClass = "alert-danger">
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<cfset currentBrowseMode = lCase( trim( appConfigService.getValue("dropbox.browse_mode", "files") ) )>
+<cfset currentFolderBrowseFolders = trim( appConfigService.getValue("dropbox.folder_browse_folders", "Faculty,Staff") )>
 
 <cfset activePatterns = 0>
 <cfloop from="1" to="#arrayLen(patterns)#" index="i">
@@ -138,6 +162,88 @@
         </div>
     </div>
 
+</div>
+
+</div>
+
+<!--- ── Dropbox Source Settings ──────────────────────────────────────────── --->
+<div class="card shadow-sm mt-4 settings-shell">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cloud-arrow-down me-2"></i>Dropbox Source Settings</h5>
+    </div>
+    <div class="card-body">
+        <cfif len(actionMessage)>
+            <div class="alert #actionMessageClass# alert-dismissible fade show" role="alert">
+                #encodeForHTML(actionMessage)#
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </cfif>
+        <form method="post">
+            <input type="hidden" name="formAction" value="saveDropboxSettings">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Image Browse Mode</label>
+                <p class="text-muted small mb-2">
+                    Controls how the image picker on the Sources page finds images in Dropbox.
+                </p>
+                <div class="form-check mb-1">
+                    <input
+                        class="form-check-input" type="radio"
+                        name="dropboxBrowseMode" id="browseModeFiles" value="files"
+                        #( currentBrowseMode NEQ "folders" ? 'checked' : '' )#
+                    >
+                    <label class="form-check-label" for="browseModeFiles">
+                        <strong>File scan</strong> (default) &mdash;
+                        Lists all files in Dropbox, filtered by the user&rsquo;s flag folders,
+                        then narrows by name tokens (first/last/ID).
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input
+                        class="form-check-input" type="radio"
+                        name="dropboxBrowseMode" id="browseModeFolders" value="folders"
+                        #( currentBrowseMode EQ "folders" ? 'checked' : '' )#
+                    >
+                    <label class="form-check-label" for="browseModeFolders">
+                        <strong>User folder</strong> &mdash;
+                        Looks for a per-user subfolder named after the user&rsquo;s CougarNet ID
+                        (or name token) inside each flag folder.
+                        Requires Dropbox to be organized as
+                        <code>{root}/{FlagFolder}/{cougarnetID}/photo.jpg</code>.
+                    </label>
+                </div>
+                <div class="form-check mt-1">
+                    <input
+                        class="form-check-input" type="radio"
+                        name="dropboxBrowseMode" id="browseModeMixed" value="mixed"
+                        #( currentBrowseMode EQ "mixed" ? 'checked' : '' )#
+                    >
+                    <label class="form-check-label" for="browseModeMixed">
+                        <strong>Mixed</strong> &mdash;
+                        Uses user-folder lookup for selected top-level folders and file scan for the rest.
+                        Example: <code>Faculty, Staff</code> use folder lookup while <code>Students</code> keeps file scan.
+                    </label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold" for="dropboxFolderBrowseFolders">Folder-Lookup Folders</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="dropboxFolderBrowseFolders"
+                    name="dropboxFolderBrowseFolders"
+                    value="#encodeForHTMLAttribute(currentFolderBrowseFolders)#"
+                    placeholder="Faculty,Staff"
+                >
+                <div class="form-text">
+                    Comma-separated top-level Dropbox folders that should use user-folder lookup when browse mode is <code>mixed</code>.
+                    Folders not listed here will use file scan.
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i>Save Dropbox Settings
+            </button>
+        </form>
+    </div>
 </div>
 
 </div>
