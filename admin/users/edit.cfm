@@ -59,6 +59,7 @@
         </cfif>
     </cfif>
 </cfloop>
+
 <!--- ── Faculty Profile tab visibility ── --->
 <cfset showFacultyProfile = false>
 <cfset facultyFlagIDs     = []>
@@ -1031,7 +1032,7 @@
                                 <div>
                                     <strong>#EncodeForHTML(local.dg.DEGREENAME)#</strong>
                                     <cfif len(trim(local.dg.UNIVERSITY ?: ""))> — #EncodeForHTML(local.dg.UNIVERSITY)#</cfif>
-                                    <cfif len(trim(local.dg.DEGREEYEAR ?: ""))> <span class='badge bg-secondary'>#EncodeForHTML(local.dg.DEGREEYEAR)#</span></cfif>
+                                    <cfif len(trim(local.dg.DEGREEYEAR ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.dg.DEGREEYEAR)#</span></cfif>
                                 </div>
                                 <div>
                                     <button type='button' class='btn btn-sm btn-outline-secondary edit-degree-btn' data-idx='#(local.di-1)#'>Edit</button>
@@ -3423,6 +3424,18 @@ document.addEventListener('DOMContentLoaded', function () {
             var genEl = pane.querySelector('[name="Gender"]');
             body.append('DOB', dobEl ? dobEl.value : '');
             body.append('Gender', genEl ? genEl.value : '');
+
+            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age'].forEach(function (f) {
+                var el = pane.querySelector('[name="' + f + '"]');
+                body.append(f, el ? el.value : '');
+            });
+
+            var editorEl = pane ? pane.querySelector('.users-edit-bio-editor') : null;
+            var editorBody = editorEl ? editorEl.querySelector('.ql-editor') : null;
+            var html = editorBody ? editorBody.innerHTML : '';
+            if (html === '<p><br></p>') html = '';
+            body.append('bioContent', html);
+
             saveSectionAjax('bioinfo', body, document.getElementById('save-bioinfo-status'));
         });
     }

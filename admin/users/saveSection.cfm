@@ -407,7 +407,7 @@
         <cfoutput>{"success":true,"message":"UH fields saved."}</cfoutput>
     </cfcase>
 
-    <!--- ── Biographical Info (DOB, Gender) ── --->
+    <!--- ── Biographical Info (DOB, Gender, Student Data) ── --->
     <cfcase value="bioinfo">
         <cfset usersService = createObject("component", "cfc.users_service").init()>
         <cfset existing = usersService.getUser(userID).data>
@@ -417,6 +417,28 @@
         }>
         <cfset userData = buildUserData(existing, overrides)>
         <cfset usersService.updateUser(userID, userData)>
+
+        <!--- Student Data fields now live on the Biographical Information tab. --->
+        <cfset academicService = createObject("component", "cfc.academic_service").init()>
+        <cfset academicService.saveAcademicInfo(
+            userID,
+            structKeyExists(form, "CurrentGradYear")  ? trim(form.CurrentGradYear)  : "",
+            structKeyExists(form, "OriginalGradYear") ? trim(form.OriginalGradYear) : ""
+        )>
+
+        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
+        <cfset studentProfileSvc.saveProfile(
+            userID,
+            structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
+            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
+            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : ""
+        )>
+
+        <cfif structKeyExists(form, "bioContent")>
+            <cfset bioSvc = createObject("component", "cfc.bio_service").init()>
+            <cfset bioSvc.saveBio(userID, form.bioContent ?: "")>
+        </cfif>
+
         <cfoutput>{"success":true,"message":"Biographical info saved."}</cfoutput>
     </cfcase>
 

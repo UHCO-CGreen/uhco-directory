@@ -237,17 +237,23 @@
 
 <cfset quickMatchHtml &= "</div>">
 
+<cfset profileThumbnail = "/assets/images/uh.png">
 
 <cfif arrayLen(profile.images) GT 0>
+    <cfset profileImageFallback = "">
     <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
         <cfset img = profile.images[i]>
+        <cfif NOT len(profileImageFallback) AND lCase(trim(img.IMAGEVARIANT ?: "")) EQ "web_profile">
+            <cfset profileImageFallback = img.IMAGEURL>
+        </cfif>
         <cfif lCase(trim(img.IMAGEVARIANT ?: "")) EQ "web_thumb">
             <cfset profileThumbnail = img.IMAGEURL>
             <cfbreak>
         </cfif>
     </cfloop>
-<cfelse>
-    <cfset profileThumbnail = "/assets/images/uh.png">
+    <cfif profileThumbnail EQ "/assets/images/uh.png" AND len(profileImageFallback)>
+        <cfset profileThumbnail = profileImageFallback>
+    </cfif>
 </cfif>
 
 <cfset SubTitle = "">

@@ -471,12 +471,27 @@ component output="false" singleton {
         }
 
         var safeCode  = reReplace(variantType.CODE, "[^a-zA-Z0-9_\-]", "_", "ALL");
-        var extension = lCase( trim( variantType.OUTPUTFORMAT ?: "" ) );
-        if ( extension EQ "jpeg" ) {
-            extension = "jpg";
+        var mode      = lCase( trim( variantType.MODE ?: "resize_only" ) );
+        var sourceExt = lCase( listLast(source.DROPBOXPATH ?: "", ".") );
+        var extension = "";
+
+        if ( sourceExt EQ "jpeg" ) {
+            sourceExt = "jpg";
         }
-        if ( !listFindNoCase("jpg,png", extension) ) {
-            return { success=false, message="Variant type has invalid output format. Expected jpg or png." };
+
+        if ( mode EQ "passthrough" ) {
+            extension = sourceExt;
+            if ( !listFindNoCase("jpg,png,webp", extension) ) {
+                return { success=false, message="Assigned source has an unsupported file extension for pass-through mode." };
+            }
+        } else {
+            extension = lCase( trim( variantType.OUTPUTFORMAT ?: "" ) );
+            if ( extension EQ "jpeg" ) {
+                extension = "jpg";
+            }
+            if ( !listFindNoCase("jpg,png", extension) ) {
+                return { success=false, message="Variant type has invalid output format. Expected jpg or png." };
+            }
         }
         var outputFilename = "user_#arguments.userID#_src#arguments.userImageSourceID#_#safeCode#.#extension#";
         var outputPath     = variables.localVariantDirAbsolute & outputFilename;
@@ -560,8 +575,6 @@ component output="false" singleton {
                 );
             }
 
-            // ── Pass-through mode ─────────────────────────────────────────
-            // When Mode = passthrough the source is already at final dimensions.
             // Pass-through mode is format-independent: it preserves the source format
             // (PNG, JPG, or WebP) by performing a direct file copy, regardless of the
             // OutputFormat setting. This avoids ColdFusion's imageRead() which cannot

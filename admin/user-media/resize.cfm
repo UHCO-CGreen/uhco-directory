@@ -180,8 +180,23 @@
 <cfif len(previewUrl)>
     <cfset content &= "
     <div class='card mb-4'>
-        <div class='card-header fw-semibold bg-success text-white'>
-            <i class='bi bi-check-circle me-1'></i> Generated Output
+        <div class='card-header fw-semibold bg-success text-white d-flex justify-content-between align-items-center'>
+            <span><i class='bi bi-check-circle me-1'></i> Generated Output</span>
+    ">
+
+    <!--- Publish button in card header, matching crop.cfm layout --->
+    <cfif hasGeneratedFile AND request.hasPermission("media.publish")>
+        <cfset content &= "
+            <form method='post' class='d-inline'>
+                <input type='hidden' name='action' value='publish'>
+                <button type='submit' class='btn btn-sm btn-light'>
+                    <i class='bi bi-cloud-arrow-up me-1'></i> Publish
+                </button>
+            </form>
+        ">
+    </cfif>
+
+    <cfset content &= "
         </div>
         <div class='card-body text-center'>
             <img src='#encodeForHTMLAttribute(previewUrl)#'
@@ -229,17 +244,7 @@
             </form>
 ">
 
-<!--- Publish button — only when a generated file exists --->
-<cfif hasGeneratedFile AND request.hasPermission("media.publish")>
-    <cfset content &= "
-            <form method='post' class='d-inline'>
-                <input type='hidden' name='action' value='publish'>
-                <button type='submit' class='btn btn-primary'>
-                    <i class='bi bi-cloud-arrow-up me-1'></i> Publish
-                </button>
-            </form>
-    ">
-</cfif>
+
 
 <cfset content &= "
         </div>

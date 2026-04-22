@@ -20,7 +20,7 @@
 
 <!--- Validate it looks like a file path (must not be a folder, must have extension) --->
 <cfset ext = lCase(listLast(dropboxPath, "."))>
-<cfif NOT listFindNoCase("jpg,jpeg,png", ext)>
+<cfif NOT listFindNoCase("jpg,jpeg,png,webp", ext)>
     <cfheader statuscode="400">
     <cfabort>
 </cfif>

@@ -343,24 +343,8 @@
                 ">
             </cfif>
 
-            <cfif NOT (isBoolean(v.HASPUBLISHEDIMAGE ?: false) AND v.HASPUBLISHEDIMAGE)>
-                <cfset content &= "
-                    <form method='post' class='d-inline ms-1'>
-                        <input type='hidden' name='action' value='unassign'>
-                        <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
-                        <button type='submit' class='btn btn-sm btn-outline-danger'
-                                onclick='return confirm(\'Remove assignment for #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#?\');'>
-                            <i class='bi bi-x-circle me-1'></i> Remove
-                        </button>
-                    </form>
-                ">
-            <cfelse>
-                <cfset content &= "
-                    <span class='badge text-bg-success ms-1' title='Published variants cannot be removed'>Published</span>
-                ">
-            </cfif>
-
             <cfif (isBoolean(v.HASPUBLISHEDIMAGE ?: false) AND v.HASPUBLISHEDIMAGE)>
+                <!--- Variant is published --->
                 <cfif request.hasPermission("media.unpublish")>
                     <cfset content &= "
                         <form method='post' class='d-inline ms-1'>
@@ -374,9 +358,21 @@
                     ">
                 <cfelse>
                     <cfset content &= "
-                        <span class='badge text-bg-success ms-1'>Published</span>
+                        <span class='badge text-bg-success ms-1' title='Published variant — you do not have permission to unpublish'>Published</span>
                     ">
                 </cfif>
+            <cfelse>
+                <!--- Variant is not published --->
+                <cfset content &= "
+                    <form method='post' class='d-inline ms-1'>
+                        <input type='hidden' name='action' value='unassign'>
+                        <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
+                        <button type='submit' class='btn btn-sm btn-outline-danger'
+                                onclick='return confirm(\'Remove assignment for #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#?\');'>
+                            <i class='bi bi-x-circle me-1'></i> Remove
+                        </button>
+                    </form>
+                ">
             </cfif>
         </cfif>
 
@@ -405,6 +401,22 @@
 </cfif>
 
 <cfset content &= "
+</div>
+">
+
+<cfset content &= "
+<div class='card mb-4'>
+    <div class='card-header fw-semibold'><i class='bi bi-key me-1'></i> Status Key</div>
+    <div class='card-body'>
+        <div class='d-flex flex-wrap gap-3 align-items-start'>
+            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Not Assigned</span><div class='small text-muted mt-1'>Variant type is available but not assigned to this source.</div></div>
+            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Assigned</span><div class='small text-muted mt-1'>Assigned to this source, but no generated or published file exists yet.</div></div>
+            <div><span class='badge bg-info text-dark'><i class='bi bi-circle-fill me-1'></i>Staged</span><div class='small text-muted mt-1'>Generated temp file exists and is ready to publish.</div></div>
+            <div><span class='badge bg-warning text-dark'><i class='bi bi-circle-fill me-1'></i>Outdated</span><div class='small text-muted mt-1'>Published image exists, but the staged or assigned state no longer matches it.</div></div>
+            <div><span class='badge bg-success'><i class='bi bi-circle-fill me-1'></i>Published</span><div class='small text-muted mt-1'>Published image exists and no newer staged version is waiting.</div></div>
+            <div><span class='badge bg-danger'><i class='bi bi-circle-fill me-1'></i>Error</span><div class='small text-muted mt-1'>Generation failed. Review the error message shown in the matrix.</div></div>
+        </div>
+    </div>
 </div>
 ">
 

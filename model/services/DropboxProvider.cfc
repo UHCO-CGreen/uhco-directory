@@ -2,7 +2,7 @@
 
     <cffunction name="init" access="public" returntype="any" output="false">
         <cfset variables.AppConfigService = createObject("component", "cfc.appConfig_service").init()>
-        <cfset variables.allowedExtensions = "jpg,jpeg,png">
+        <cfset variables.allowedExtensions = "jpg,jpeg,png,webp">
         <cfset variables.tokenCacheKey = "uhco_dropbox_access_token_cache">
         <cfreturn this>
     </cffunction>
@@ -209,7 +209,7 @@
             </cfif>
             <cfthrow
                 type="DropboxProvider.DownloadError"
-                message="Dropbox file download failed. (HTTP #httpResp.statusCode#)#len(errorBody) ? ': ' & left(errorBody, 400) : ''#"
+                   message="Dropbox file download failed. (HTTP #httpResp.statusCode#) for path: [#normalizedPath#]#len(errorBody) ? ': ' & left(errorBody, 400) : ''#"
             >
         </cfif>
 

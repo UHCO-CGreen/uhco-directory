@@ -33,7 +33,11 @@ component extends="dao.BaseDAO" output="false" singleton {
             var firstName  = al.firstName  ?: "";
             var middleName = al.middleName ?: "";
             var lastName   = al.lastName   ?: "";
-            var displayName = trim(listToArray([firstName, middleName, lastName], " ", false).toList(" "));
+            var displayParts = [];
+            if ( len(trim(firstName)) )  { arrayAppend(displayParts, trim(firstName)); }
+            if ( len(trim(middleName)) ) { arrayAppend(displayParts, trim(middleName)); }
+            if ( len(trim(lastName)) )   { arrayAppend(displayParts, trim(lastName)); }
+            var displayName = arrayToList(displayParts, " ");
             if ( !len(displayName) ) { displayName = al.displayName ?: "(unnamed)"; }
 
             executeQueryWithRetry(

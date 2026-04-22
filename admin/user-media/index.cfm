@@ -132,6 +132,7 @@
                     userID = rowUserID,
                     totalPublished = 0,
                     variantCountByKey = {},
+                        webThumbURL = "",
                     webProfileURL = "",
                     legacyAlumniURL = "",
                     latestPublishedAt = ""
@@ -143,6 +144,9 @@
             <cfset variantKey = lCase(variantCode)>
             <cfset publishedByUserID[rowUserKey].variantCountByKey[variantKey] = (structKeyExists(publishedByUserID[rowUserKey].variantCountByKey, variantKey) ? publishedByUserID[rowUserKey].variantCountByKey[variantKey] : 0) + 1>
 
+            <cfif NOT len(publishedByUserID[rowUserKey].webThumbURL) AND compareNoCase(variantCode, "WEB_THUMB") EQ 0>
+                <cfset publishedByUserID[rowUserKey].webThumbURL = trim(publishedRow.IMAGEURL ?: "")>
+            </cfif>
             <cfif NOT len(publishedByUserID[rowUserKey].webProfileURL) AND compareNoCase(variantCode, "WEB_PROFILE") EQ 0>
                 <cfset publishedByUserID[rowUserKey].webProfileURL = trim(publishedRow.IMAGEURL ?: "")>
             </cfif>
@@ -259,10 +263,10 @@
                 <cfif NOT len(displayName)>
                     <cfset displayName = "User ID " & rowUserID>
                 </cfif>
-                <cfset thumbURL = len(trim(userStatRow.webProfileURL ?: ""))
-                    ? trim(userStatRow.webProfileURL)
+                <cfset thumbURL = len(trim(userStatRow.webThumbURL ?: ""))
+                    ? trim(userStatRow.webThumbURL)
                     : (len(trim(userStatRow.legacyAlumniURL ?: "")) ? trim(userStatRow.legacyAlumniURL) : "")>
-                <cfset thumbVariantLabel = len(trim(userStatRow.webProfileURL ?: "")) ? "WEB_PROFILE" : "legacy_alumni">
+                <cfset thumbVariantLabel = len(trim(userStatRow.webThumbURL ?: "")) ? "WEB_THUMB" : "legacy_alumni">
 
                 <div class="col">
                     <div class="card h-100 shadow-sm">
@@ -292,10 +296,20 @@
                                 </div>
                             </div>
 
-                            <div class="mt-auto">
-                                <a href="/admin/users/view.cfm?userID=#rowUserID#" class="btn btn-outline-primary w-100">
-                                    <i class="bi bi-eye me-1"></i>Open User Profile
-                                </a>
+                            <div class="mt-auto d-flex flex-column gap-2">
+                                <div class="btn-group w-100" role="group">
+                                    <a href="/admin/users/view.cfm?userID=#rowUserID#" class="btn btn-secondary" title="View user details and media activity for this user">
+                                        <i class="bi bi-eye me-1"></i>Open User Profile
+                                    </a>
+                                    <cfif canManageMedia>
+                                        <a href="/admin/user-media/sources.cfm?userid=#rowUserID#" class="btn btn-secondary" title="Manage media sources and published images for this user">
+                                            <i class="bi bi-images me-1"></i>Manage Media
+                                        </a>
+                                        <a href="/admin/user-media/variants.cfm?userid=#rowUserID#" class="btn btn-secondary" title="Manage image variants for this user">
+                                            <i class="bi bi-sliders me-1"></i>Manage Variants
+                                        </a>
+                                    </cfif>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -329,15 +343,15 @@
         <p class="text-muted mb-0">Manage images and media variants for individual users.</p>
         <div class="d-flex gap-2 flex-wrap">
             <cfif request.hasPermission("media.publish")>
-                <a href="#request.webRoot#/admin/user-media/bulk-transfer.cfm" class="btn btn-outline-secondary">
+                <a href="#request.webRoot#/admin/user-media/bulk-transfer.cfm" class="btn btn-secondary text-dark">
                     <i class="bi bi-arrow-left-right me-1"></i> Bulk Transfer
                 </a>
             </cfif>
             <cfif request.hasPermission("settings.media_config.manage")>
-                <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-outline-secondary">
+                <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-secondary text-dark">
                     <i class="bi bi-file-earmark-text me-1"></i> Filename Patterns
                 </a>
-                <a href="/admin/settings/media-config/variant-types.cfm" class="btn btn-outline-secondary">
+                <a href="/admin/settings/media-config/variant-types.cfm" class="btn btn-secondary text-dark">
                     <i class="bi bi-sliders me-1"></i> Manage Variant Types
                 </a>
             </cfif>
