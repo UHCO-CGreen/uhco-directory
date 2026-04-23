@@ -9,8 +9,7 @@
 
 <cfset allCodes = [
     "missing_uh_api_id",
-    "missing_firstname",
-    "missing_lastname",
+    "missing_primary_alias",
     "missing_email_primary",
     "missing_email_secondary",
     "missing_title1",

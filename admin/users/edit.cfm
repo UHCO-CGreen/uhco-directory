@@ -138,6 +138,53 @@
 <cfset aliasesSvc   = createObject("component", "cfc.aliases_service").init()>
 <cfset userAliases  = aliasesSvc.getAliases(url.userID).data>
 <cfset aliasTypes   = aliasesSvc.getAliasTypes()>
+<cfset primaryAlias = {}>
+<cfset primaryAliasForHeading = {}>
+<cfset editUserHeading = "">
+<cfset resolvedFirstName = trim(user.FIRSTNAME ?: "")>
+<cfset resolvedMiddleName = trim(user.MIDDLENAME ?: "")>
+<cfset resolvedLastName = trim(user.LASTNAME ?: "")>
+
+<cfloop from="1" to="#arrayLen(userAliases)#" index="i">
+    <cfif val(userAliases[i].ISPRIMARY ?: 0) EQ 1>
+        <cfset primaryAliasForHeading = userAliases[i]>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfif NOT structIsEmpty(primaryAliasForHeading)>
+    <cfset headingFirst = trim(primaryAliasForHeading.FIRSTNAME ?: "")>
+    <cfset headingMiddle = trim(primaryAliasForHeading.MIDDLENAME ?: "")>
+    <cfset headingLast = trim(primaryAliasForHeading.LASTNAME ?: "")>
+    <cfset headingMiddleInitial = len(headingMiddle) ? (left(headingMiddle, 1) & ".") : "">
+    <cfset editUserHeading = trim(headingFirst & (len(headingMiddleInitial) ? " " & headingMiddleInitial : "") & (len(headingLast) ? " " & headingLast : ""))>
+</cfif>
+
+<cfloop from="1" to="#arrayLen(userAliases)#" index="i">
+    <cfif val(userAliases[i].ISPRIMARY ?: 0) EQ 1 AND val(userAliases[i].ISACTIVE ?: 0) EQ 1>
+        <cfset primaryAlias = userAliases[i]>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfif structIsEmpty(primaryAlias)>
+    <cfloop from="1" to="#arrayLen(userAliases)#" index="i">
+        <cfif val(userAliases[i].ISACTIVE ?: 0) EQ 1>
+            <cfset primaryAlias = userAliases[i]>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+</cfif>
+
+<cfif structIsEmpty(primaryAlias) AND arrayLen(userAliases) GT 0>
+    <cfset primaryAlias = userAliases[1]>
+</cfif>
+
+<cfif NOT structIsEmpty(primaryAlias)>
+    <cfset resolvedFirstName = trim(primaryAlias.FIRSTNAME ?: resolvedFirstName)>
+    <cfset resolvedMiddleName = trim(primaryAlias.MIDDLENAME ?: resolvedMiddleName)>
+    <cfset resolvedLastName = trim(primaryAlias.LASTNAME ?: resolvedLastName)>
+</cfif>
 
 <!--- ── Degrees (shared across Faculty, Emeritus, Resident) ── --->
 <cfset showDegrees = showFacultyProfile OR showEmeritusProfile OR showResidentProfile OR showStudentProfile>
@@ -180,12 +227,31 @@
     <cfset externalBySystem[toString(userExternalIDs[i].SYSTEMID)] = userExternalIDs[i].EXTERNALVALUE>
 </cfloop>
 
+<cfset cougarNetSystemID = 0>
+<cfset peopleSoftSystemID = 0>
+<cfloop from="1" to="#arrayLen(allSystems)#" index="i">
+    <cfset sysScan = allSystems[i]>
+    <cfset scanText = lCase(trim((sysScan.SYSTEMNAME ?: "") & " " & (sysScan.SYSTEMCODE ?: "")))>
+    <cfif cougarNetSystemID EQ 0 AND findNoCase("cougarnet", scanText)>
+        <cfset cougarNetSystemID = val(sysScan.SYSTEMID)>
+    </cfif>
+    <cfif peopleSoftSystemID EQ 0 AND findNoCase("peoplesoft", scanText)>
+        <cfset peopleSoftSystemID = val(sysScan.SYSTEMID)>
+    </cfif>
+</cfloop>
+
 <cfset extIDHtml = "<div class='mb-3 users-edit-extids'><label class='form-label fw-semibold'>External IDs</label><div class='border p-3 rounded users-edit-extids-shell'><div class='row g-2'>">
 <cfif arrayLen(allSystems) GT 0>
     <cfloop from="1" to="#arrayLen(allSystems)#" index="i">
         <cfset sys = allSystems[i]>
         <cfset sysVal = structKeyExists(externalBySystem, toString(sys.SYSTEMID)) ? externalBySystem[toString(sys.SYSTEMID)] : "">
-        <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><input class='form-control form-control-sm' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'></div>">
+        <cfif cougarNetSystemID GT 0 AND val(sys.SYSTEMID) EQ cougarNetSystemID>
+            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-cougarnet-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-outline-secondary js-cougarnet-lookup' type='button' data-target='extid-cougarnet-input'>Lookup</button></div></div>">
+        <cfelseif peopleSoftSystemID GT 0 AND val(sys.SYSTEMID) EQ peopleSoftSystemID>
+            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-peoplesoft-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-outline-secondary js-cougarnet-lookup' type='button' data-target='extid-peoplesoft-input'>Lookup</button></div></div>">
+        <cfelse>
+            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><input class='form-control form-control-sm' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'></div>">
+        </cfif>
     </cfloop>
 <cfelse>
     <cfset extIDHtml &= "<p class='text-muted mb-0'>No external systems configured.</p>">
@@ -364,8 +430,7 @@
 
 <cfset dqAllCodes = [
     { code="missing_uh_api_id",       label="Missing UH API ID" },
-    { code="missing_firstname",        label="Missing First Name" },
-    { code="missing_lastname",         label="Missing Last Name" },
+    { code="missing_primary_alias",    label="Missing Primary Alias" },
     { code="missing_email_primary",    label="Missing Primary Email" },
     { code="missing_title1",           label="Missing Title" },
     { code="missing_room",             label="Missing Room" },
@@ -500,7 +565,7 @@
 <input type='hidden' id='pageUserID' value='#user.USERID#'>
 
         <div class='d-flex justify-content-between mb-3 align-items-center users-edit-header'>
-            <h1>Edit User: #EncodeForHTML(user.LASTNAME)#</h1>
+            <h1>Edit User: #EncodeForHTML(editUserHeading)#</h1>
             <div class='text-center bg-dark text-white py-2 px-3 rounded users-edit-record-status'>
                 <label class='form-label'><strong>Record Status</strong></label>
 
@@ -563,32 +628,19 @@
     <div class='tab-content users-edit-tab-content' id='editTabsContent'>
 
         <div class='tab-pane fade show active users-edit-tab-pane' id='general-pane' role='tabpanel' aria-labelledby='general-tab'>
+            <!--
             <div class='row mb-3'>
                 <div class='col-md-4'>
-                    <label class='form-label'>Prefix</label>
-                    <input class='form-control' name='Prefix' value='#(user.PREFIX ?: "")#'>
+                    <label class='form-label'>UH API First Name</label>
+                    <input class='form-control' name='FirstName' value='#EncodeForHTMLAttribute(resolvedFirstName)#' disabled>
                 </div>
                 <div class='col-md-4'>
-                    <label class='form-label'>Suffix</label>
-                    <input class='form-control' name='Suffix' value='#(user.SUFFIX ?: "")#'>
+                    <label class='form-label'>UH API Middle Name</label>
+                    <input class='form-control' name='MiddleName' value='#EncodeForHTMLAttribute(resolvedMiddleName)#' disabled>
                 </div>
                 <div class='col-md-4'>
-                    <label class='form-label'>Pronouns</label>
-                    <input class='form-control' name='Pronouns' value='#(user.PRONOUNS ?: "")#'>
-                </div>
-            </div>
-            <div class='row mb-3'>
-                <div class='col-md-4'>
-                    <label class='form-label'>First Name</label>
-                    <input class='form-control' name='FirstName' value='#user.FIRSTNAME#' required>
-                </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>Middle Name</label>
-                    <input class='form-control' name='MiddleName' value='#user.MIDDLENAME#'>
-                </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>Last Name</label>
-                    <input class='form-control' name='LastName' value='#user.LASTNAME#' required>
+                    <label class='form-label'>UH API Last Name</label>
+                    <input class='form-control' name='LastName' value='#EncodeForHTMLAttribute(resolvedLastName)#' disabled>
                 </div>
             </div>
 
@@ -605,11 +657,12 @@
                 </div>
                 
             </div>
+            -->
 
 
 
             <div class='mb-4'>
-                <label class='form-label fw-semibold'>Name Aliases</label>
+                <label class='form-label fw-semibold'>Name Aliases <a href='##' class='btn btn-sm btn-secondary text-dark' data-bs-toggle='tooltip' title='Name Aliases are alternate names associated with the user record, such as maiden names or preferred names. One alias can be designated as the Primary name, which is used for display purposes across the directory. Aliases can also be marked Active or Inactive to control whether they are considered in search results and other features.'>?</a></label>
                 <div id='aliasesContainer'>
 ">
 <cfloop from="1" to="#arrayLen(userAliases)#" index="local.ai">
@@ -618,17 +671,36 @@
     <cfif len(trim(local.al.FIRSTNAME ?: ""))><cfset local.alDisplay &= trim(local.al.FIRSTNAME) & " "></cfif>
     <cfif len(trim(local.al.MIDDLENAME ?: ""))><cfset local.alDisplay &= trim(local.al.MIDDLENAME) & " "></cfif>
     <cfif len(trim(local.al.LASTNAME ?: ""))><cfset local.alDisplay &= trim(local.al.LASTNAME)></cfif>
+
+    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <cfset local.aliasTypeBadge = "<span class='badge bg-secondary text-dark'>#EncodeForHTML(local.al.ALIASTYPE)#</span>"><cfelse><cfset local.aliasTypeBadge = ""></cfif>
+    <cfif len(trim(local.al.SOURCESYSTEM ?: ""))> <cfset local.sourceSystemBadge = "<small class='text-muted'>Source: #EncodeForHTML(local.al.SOURCESYSTEM)#</small>"><cfelse><cfset local.sourceSystemBadge = ""></cfif>
+
+    <cfif val(local.al.ISPRIMARY ?: 0)>
+        <cfset local.primaryBadge = " <span class='badge bg-success rounded-pill'>Primary</span>">
+        <cfset local.setPrimaryButton = "">
+    <cfelse>
+        <cfset local.primaryBadge = "">
+        <cfset local.setPrimaryButton = "<button type='button' class='btn btn-sm btn-outline-primary set-primary-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Set Primary</button>">
+    </cfif>
+    <cfif val(local.al.ISACTIVE ?: 0)>
+        <cfset local.activeBadge = "<span class='badge bg-success rounded-pill'>Active</span>">
+    <cfelse>
+        <cfset local.activeBadge = "<span class='badge bg-warning text-dark rounded-pill'>Inactive</span>">
+    </cfif>
+
     <cfset content &= "
                     <div class='card mb-2 alias-card users-edit-item-card' data-idx='#(local.ai-1)#'>
                         <div class='card-body py-2 px-3 users-edit-item-card-body'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(trim(local.alDisplay))#</strong>
-                                    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.al.ALIASTYPE)#</span></cfif>
-                                    <cfif len(trim(local.al.SOURCESYSTEM ?: ""))> <small class='text-muted'>Source: #EncodeForHTML(local.al.SOURCESYSTEM)#</small></cfif>
-                                    <cfif val(local.al.ISACTIVE ?: 0)> <span class='badge bg-success'>Active</span><cfelse> <span class='badge bg-warning text-dark'>Inactive</span></cfif>
+                                    #local.aliasTypeBadge#
+                                    #local.sourceSystemBadge#
+                                    #local.primaryBadge#
+                                    #local.activeBadge#
                                 </div>
                                 <div>
+                                    #local.setPrimaryButton#    
                                     <button type='button' class='btn btn-sm btn-outline-secondary edit-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Edit</button>
                                     <button type='button' class='btn btn-sm btn-outline-danger remove-alias-btn users-edit-danger-button' data-idx='#(local.ai-1)#'>Remove</button>
                                 </div>
@@ -649,6 +721,7 @@
                 <input type='hidden' data-alias-field='type' data-alias-idx='#(local.ai-1)#' value='#EncodeForHTMLAttribute(local.al.ALIASTYPE ?: "")#'>
                 <input type='hidden' data-alias-field='source' data-alias-idx='#(local.ai-1)#' value='#EncodeForHTMLAttribute(local.al.SOURCESYSTEM ?: "")#'>
                 <input type='hidden' data-alias-field='active' data-alias-idx='#(local.ai-1)#' value='#val(local.al.ISACTIVE ?: 0)#'>
+                <input type='hidden' data-alias-field='primary' data-alias-idx='#(local.ai-1)#' value='#val(local.al.ISPRIMARY ?: 0)#'>
     ">
 </cfloop>
 <cfset content &= "
@@ -656,6 +729,21 @@
                 <div class='mt-2'>
                     <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addAliasBtn'>+ Add Alias</button>
                     <button type='button' class='btn btn-sm btn-success ms-2 users-edit-success-button' id='saveAliasesBtn'>Save Aliases</button>
+                </div>
+            </div>
+
+            <div class='row mb-3'>
+                <div class='col-md-4'>
+                    <label class='form-label'>Prefix</label>
+                    <input class='form-control' name='Prefix' value='#(user.PREFIX ?: "")#'>
+                </div>
+                <div class='col-md-4'>
+                    <label class='form-label'>Suffix</label>
+                    <input class='form-control' name='Suffix' value='#(user.SUFFIX ?: "")#'>
+                </div>
+                <div class='col-md-4'>
+                    <label class='form-label'>Pronouns</label>
+                    <input class='form-control' name='Pronouns' value='#(user.PRONOUNS ?: "")#'>
                 </div>
             </div>
 
@@ -722,6 +810,7 @@
                 </div>
                 <div class='mt-2'>
                     <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addEmailBtn'>+ Add Email</button>
+                    <button type='button' class='btn btn-sm btn-outline-secondary ms-2' id='refreshEmailsBtn'>Refresh</button>
                     <button type='button' class='btn btn-sm btn-success ms-2 users-edit-success-button' id='saveEmailsBtn'>Save Emails</button>
                 </div>
             </div>
@@ -766,6 +855,7 @@
                 </div>
                 <div class='mt-2'>
                     <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addPhoneBtn'>+ Add Phone</button>
+                    <button type='button' class='btn btn-sm btn-outline-secondary ms-2' id='refreshPhonesBtn'>Refresh</button>
                     <button type='button' class='btn btn-sm btn-success ms-2 users-edit-success-button' id='savePhonesBtn'>Save Phones</button>
                 </div>
             </div>
@@ -876,9 +966,41 @@
 
         <div class='tab-pane fade' id='extids-pane' role='tabpanel' aria-labelledby='extids-tab'>
             #extIDHtml#
+            <div id='extids-ldap-status' class='small text-muted mb-2'></div>
             <div class='mt-3'>
                 <button type='button' class='btn btn-primary' id='save-extids-btn'>Save External IDs</button>
                 <span id='save-extids-status' class='ms-2'></span>
+            </div>
+        </div>
+
+        <div class='modal fade' id='extidsLdapModal' tabindex='-1' aria-labelledby='extidsLdapModalLabel' aria-hidden='true'>
+            <div class='modal-dialog modal-lg modal-dialog-scrollable'>
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title' id='extidsLdapModalLabel'>Select CougarNet Account</h5>
+                        <button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Close'></button>
+                    </div>
+                    <div class='modal-body p-0'>
+                        <div class='table-responsive'>
+                            <table class='table table-sm table-hover mb-0 align-middle'>
+                                <thead class='table-light'>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>COUGARNET</th>
+                                        <th>PEOPLESOFT</th>
+                                        <th>Email</th>
+                                        <th class='text-end'>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id='extidsLdapResultsBody'>
+                                    <tr>
+                                        <td colspan='7' class='text-muted p-3'>No results loaded.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1448,6 +1570,57 @@
     /* Alias type options preserved for modal */
     var aliasTypeOptions = [#aliasTypeOptsJS#];
     var aliasTypeLabels  = [#aliasTypeLblsJS#];
+    </script>
+
+    <script>
+    (function () {
+        function getTabFromUrl() {
+            var url = new URL(window.location.href);
+            return (url.searchParams.get('tab') || '').trim();
+        }
+
+        function activateTabById(tabId) {
+            if (!tabId) {
+                return;
+            }
+            var tabBtn = document.getElementById(tabId);
+            if (!tabBtn || tabBtn.getAttribute('data-bs-toggle') !== 'tab') {
+                return;
+            }
+            bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var tabList = document.getElementById('editTabs');
+            if (!tabList) {
+                return;
+            }
+
+            // Restore requested tab after a refresh.
+            activateTabById(getTabFromUrl());
+
+            // Keep URL in sync and notify tab refresh handler.
+            tabList.addEventListener('shown.bs.tab', function (event) {
+                var tabBtn = event && event.target ? event.target : null;
+                if (!tabBtn) {
+                    return;
+                }
+
+                var tabId = tabBtn.id || '';
+                if (!tabId) {
+                    return;
+                }
+
+                var targetUrl = new URL(window.location.href);
+                targetUrl.searchParams.set('tab', tabId);
+                history.replaceState(null, '', targetUrl.toString());
+
+                window.dispatchEvent(new CustomEvent('users-edit-tab-selected', {
+                    detail: { tabId: tabId }
+                }));
+            });
+        });
+    })();
     </script>
 
     <script>
@@ -2072,7 +2245,7 @@
 
 <cfset ViewContent = "">
 <cfset ViewContent &= "
-<h1>#user.FIRSTNAME# #user.LASTNAME#</h1>
+<h1>#EncodeForHTML(resolvedFirstName)# #EncodeForHTML(resolvedLastName)#</h1>
 
 ">
 
@@ -2080,6 +2253,19 @@
 <cfsavecontent variable="pageScripts">
 <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+<style>
+.users-edit-save-needs {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75);
+    border-color: #ffc107;
+    animation: usersEditSavePulse 1.4s ease-out infinite;
+}
+
+@keyframes usersEditSavePulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var editorEl = document.getElementById('bio-editor');
@@ -2380,6 +2566,165 @@ document.addEventListener('DOMContentLoaded', function () {
    ══════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function () {
 
+    var dirtySectionButtons = {
+        general: 'save-general-btn',
+        flags: 'save-flags-btn',
+        orgs: 'save-orgs-btn',
+        extids: 'save-extids-btn',
+        emails: 'saveEmailsBtn',
+        phones: 'savePhonesBtn',
+        aliases: 'saveAliasesBtn',
+        addresses: 'saveAddressesBtn',
+        degrees: 'saveDegreesBtn',
+        awards: 'saveAwardsBtn',
+        uh: 'save-uh-btn',
+        bioinfo: 'save-bioinfo-btn',
+        studentprofile: 'save-studentprofile-btn',
+        tabdegrees: ['save-facultydeg-btn', 'save-emeritusdeg-btn', 'save-residentdeg-btn'],
+        bio: 'save-bio-btn'
+    };
+
+    function setSectionDirty(section, isDirty) {
+        var entry = dirtySectionButtons[section];
+        if (!entry) return;
+        var buttonIds = Array.isArray(entry) ? entry : [entry];
+        buttonIds.forEach(function (buttonId) {
+            var btn = document.getElementById(buttonId);
+            if (!btn) return;
+            btn.classList.toggle('users-edit-save-needs', !!isDirty);
+
+            var badgeId = buttonId + '-unsaved-badge';
+            var badge = document.getElementById(badgeId);
+            if (isDirty) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.id = badgeId;
+                    badge.className = 'badge rounded-pill bg-warning text-dark ms-2';
+                    badge.textContent = 'Unsaved';
+                    btn.insertAdjacentElement('afterend', badge);
+                }
+            } else if (badge) {
+                badge.remove();
+            }
+        });
+    }
+
+    function markDirty(section) { setSectionDirty(section, true); }
+    function clearDirty(section) { setSectionDirty(section, false); }
+
+    function wireSectionDirty(section, rootEl) {
+        if (!rootEl) return;
+        rootEl.addEventListener('input', function () { markDirty(section); });
+        rootEl.addEventListener('change', function () { markDirty(section); });
+    }
+
+    function wireRepeaterDirty(section, containerEl) {
+        if (!containerEl || typeof MutationObserver === 'undefined') return;
+        var observer = new MutationObserver(function () { markDirty(section); });
+        observer.observe(containerEl, { childList: true, subtree: true });
+    }
+
+    function escapeForAttributeSelector(value) {
+        return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
+    function replaceContainerFromFresh(currentPane, freshPane, containerId) {
+        if (!currentPane || !freshPane) return;
+        var currentContainer = currentPane.querySelector('#' + containerId);
+        var freshContainer = freshPane.querySelector('#' + containerId);
+        if (currentContainer && freshContainer) {
+            currentContainer.innerHTML = freshContainer.innerHTML;
+        }
+    }
+
+    function syncNamedFieldsFromFresh(currentPane, freshPane) {
+        if (!currentPane || !freshPane) return;
+        var freshFields = freshPane.querySelectorAll('input[name], select[name], textarea[name]');
+        freshFields.forEach(function (freshField) {
+            var name = freshField.getAttribute('name') || '';
+            if (!name) return;
+
+            var selector = '[name="' + escapeForAttributeSelector(name) + '"]';
+            var currentFields = currentPane.querySelectorAll(selector);
+            if (!currentFields.length) return;
+
+            if (freshField.type === 'checkbox' || freshField.type === 'radio') {
+                currentFields.forEach(function (currentField) {
+                    if ((currentField.value || '') === (freshField.value || '')) {
+                        currentField.checked = !!freshField.checked;
+                    }
+                });
+                return;
+            }
+
+            var currentField = currentFields[0];
+            if (currentField) {
+                currentField.value = freshField.value;
+            }
+        });
+    }
+
+    function fetchFreshEditDocument() {
+        return fetch(window.location.pathname + window.location.search, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store'
+        })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+            return new DOMParser().parseFromString(html, 'text/html');
+        });
+    }
+
+    function refreshTabData(tabId) {
+        var tabBtn = tabId ? document.getElementById(tabId) : null;
+        var paneTarget = tabBtn ? (tabBtn.getAttribute('data-bs-target') || '') : '';
+        if (!paneTarget || paneTarget.charAt(0) !== '#') {
+            return Promise.resolve();
+        }
+
+        var paneId = paneTarget.substring(1);
+        var currentPane = document.getElementById(paneId);
+        if (!currentPane) {
+            return Promise.resolve();
+        }
+
+        return fetchFreshEditDocument().then(function (freshDoc) {
+            var freshPane = freshDoc.getElementById(paneId);
+            if (!freshPane) {
+                return;
+            }
+
+            syncNamedFieldsFromFresh(currentPane, freshPane);
+
+            if (tabId === 'general-tab') {
+                replaceContainerFromFresh(currentPane, freshPane, 'aliasesContainer');
+                clearDirty('aliases');
+            }
+            if (tabId === 'contact-tab') {
+                replaceContainerFromFresh(currentPane, freshPane, 'emailsContainer');
+                replaceContainerFromFresh(currentPane, freshPane, 'phonesContainer');
+                replaceContainerFromFresh(currentPane, freshPane, 'addressesContainer');
+                clearDirty('emails');
+                clearDirty('phones');
+                clearDirty('addresses');
+            }
+            if (tabId === 'bio-info-tab') {
+                replaceContainerFromFresh(currentPane, freshPane, 'degreesContainer');
+                replaceContainerFromFresh(currentPane, freshPane, 'awardsContainer');
+                clearDirty('degrees');
+                clearDirty('awards');
+            }
+            if (tabId === 'student-profile-tab') {
+                replaceContainerFromFresh(currentPane, freshPane, 'spAwardsContainer');
+                clearDirty('studentprofile');
+            }
+        }).catch(function () {
+            // Ignore refresh errors to keep UI usable.
+        });
+    }
+
     /* ── Helper: AJAX save a section ── */
     function ajaxSave(section, body, statusEl, onSuccess) {
         statusEl.textContent = 'Saving...';
@@ -2395,6 +2740,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 statusEl.textContent = 'Saved!';
                 statusEl.className = 'text-success small ms-2';
+                clearDirty(section);
                 if (onSuccess) onSuccess(data);
             } else {
                 statusEl.textContent = 'Error: ' + (data.message || 'Unknown');
@@ -2652,12 +2998,36 @@ document.addEventListener('DOMContentLoaded', function () {
             hiddens.forEach(function (el) {
                 var idx = el.getAttribute('data-alias-idx');
                 var get = function(f) { return (container.querySelector('input[data-alias-field="'+f+'"][data-alias-idx="'+idx+'"]') || {}).value || ''; };
-                items.push({ first: el.value, middle: get('middle'), last: get('last'), type: get('type'), source: get('source'), active: get('active') });
+                items.push({ first: el.value, middle: get('middle'), last: get('last'), type: get('type'), source: get('source'), active: get('active'), primary: get('primary') });
             });
             return items;
         }
 
+        function ensureSinglePrimary(items, preferredIdx) {
+            var idx = typeof preferredIdx === 'number' ? preferredIdx : -1;
+            var i;
+
+            if (idx < 0) {
+                for (i = 0; i < items.length; i++) {
+                    if (items[i].primary === '1') { idx = i; break; }
+                }
+            }
+            if (idx < 0) {
+                for (i = 0; i < items.length; i++) {
+                    if (items[i].active === '1') { idx = i; break; }
+                }
+            }
+            if (idx < 0 && items.length) {
+                idx = 0;
+            }
+
+            for (i = 0; i < items.length; i++) {
+                items[i].primary = (i === idx) ? '1' : '0';
+            }
+        }
+
         function rebuild(items) {
+            ensureSinglePrimary(items);
             container.innerHTML = '';
             items.forEach(function (d, i) {
                 var name = [d.first, d.middle, d.last].filter(Boolean).join(' ');
@@ -2667,8 +3037,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<strong>" + esc(name) + "</strong>" +
                     (d.type ? " <span class='badge bg-info text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.source ? " <small class='text-muted'>(" + esc(d.source) + ")</small>" : "") +
+                    (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     (d.active === '1' ? " <span class='badge bg-success'>Active</span>" : " <span class='badge bg-secondary text-dark'>Inactive</span>") +
                     "</div><div>" +
+                    "<button type='button' class='btn btn-sm btn-outline-primary set-primary-alias-btn' data-idx='" + i + "'" + (d.primary === '1' ? " disabled" : "") + ">Set Primary</button> " +
                     "<button type='button' class='btn btn-sm btn-outline-secondary edit-alias-btn' data-idx='" + i + "'>Edit</button> " +
                     "<button type='button' class='btn btn-sm btn-outline-danger remove-alias-btn' data-idx='" + i + "'>Remove</button>" +
                     "</div></div></div></div>" +
@@ -2677,7 +3049,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<input type='hidden' data-alias-field='last' data-alias-idx='" + i + "' value='" + esc(d.last) + "'>" +
                     "<input type='hidden' data-alias-field='type' data-alias-idx='" + i + "' value='" + esc(d.type) + "'>" +
                     "<input type='hidden' data-alias-field='source' data-alias-idx='" + i + "' value='" + esc(d.source) + "'>" +
-                    "<input type='hidden' data-alias-field='active' data-alias-idx='" + i + "' value='" + (d.active || '0') + "'>"
+                    "<input type='hidden' data-alias-field='active' data-alias-idx='" + i + "' value='" + (d.active || '0') + "'>" +
+                    "<input type='hidden' data-alias-field='primary' data-alias-idx='" + i + "' value='" + (d.primary || '0') + "'>"
                 );
             });
         }
@@ -2724,7 +3097,19 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!d.first && !d.last) { alert('First or Last name is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('aliasEditIdx').value);
-            if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
+            var existingPrimary = '0';
+            if (editIdx >= 0 && items[editIdx]) {
+                existingPrimary = items[editIdx].primary || '0';
+                d.primary = existingPrimary;
+                items[editIdx] = d;
+            } else {
+                d.primary = items.length === 1 ? '1' : '0';
+                items.push(d);
+            }
+
+            if (d.primary === '1' && d.active !== '1') {
+                d.active = '1';
+            }
             rebuild(items);
             modal.hide();
         });
@@ -2732,12 +3117,24 @@ document.addEventListener('DOMContentLoaded', function () {
         container.addEventListener('click', function (e) {
             var btn = e.target.closest('.edit-alias-btn');
             if (btn) { fillModal(parseInt(btn.dataset.idx)); modal.show(); return; }
+            btn = e.target.closest('.set-primary-alias-btn');
+            if (btn) {
+                var items = getAllData();
+                var idx = parseInt(btn.dataset.idx);
+                if (!isNaN(idx) && items[idx]) {
+                    items[idx].active = '1';
+                    ensureSinglePrimary(items, idx);
+                    rebuild(items);
+                }
+                return;
+            }
             btn = e.target.closest('.remove-alias-btn');
             if (btn) { var items = getAllData(); items.splice(parseInt(btn.dataset.idx), 1); rebuild(items); }
         });
 
         document.getElementById('saveAliasesBtn').addEventListener('click', function () {
             var items = getAllData();
+            ensureSinglePrimary(items);
             var body = new URLSearchParams();
             body.append('userID', document.getElementById('pageUserID').value);
             body.append('section', 'aliases');
@@ -2749,6 +3146,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 body.append('type_' + i, d.type);
                 body.append('source_' + i, d.source);
                 body.append('active_' + i, d.active);
+                body.append('primary_' + i, d.primary || '0');
             });
             var status = document.getElementById('saveAliasesBtn').parentNode.querySelector('.save-status') || document.createElement('span');
             if (!status.classList.contains('save-status')) { status.className = 'save-status'; document.getElementById('saveAliasesBtn').parentNode.appendChild(status); }
@@ -3149,6 +3547,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (data) {
                 statusEl.textContent = data.message || (data.success ? 'Saved!' : 'Error');
                 statusEl.style.color = data.success ? 'green' : 'red';
+                if (data.success) {
+                    clearDirty(section);
+                }
                 setTimeout(function () { statusEl.textContent = ''; }, 3000);
             })
             .catch(function (err) {
@@ -3158,6 +3559,45 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var pageUserID = document.getElementById('pageUserID').value;
+
+    wireSectionDirty('general', document.getElementById('general-pane'));
+    wireSectionDirty('flags', document.getElementById('flags-pane'));
+    wireSectionDirty('orgs', document.getElementById('orgs-pane'));
+    wireSectionDirty('extids', document.getElementById('extids-pane'));
+    wireSectionDirty('uh', document.getElementById('address-pane'));
+    wireSectionDirty('bioinfo', document.getElementById('bio-info-pane'));
+    wireSectionDirty('studentprofile', document.getElementById('student-profile-pane'));
+    wireSectionDirty('tabdegrees', document.getElementById('faculty-profile-pane'));
+    wireSectionDirty('tabdegrees', document.getElementById('emeritus-profile-pane'));
+    wireSectionDirty('tabdegrees', document.getElementById('resident-profile-pane'));
+    wireSectionDirty('bio', document.getElementById('bio-pane'));
+
+    wireRepeaterDirty('emails', document.getElementById('emailsContainer'));
+    wireRepeaterDirty('phones', document.getElementById('phonesContainer'));
+    wireRepeaterDirty('aliases', document.getElementById('aliasesContainer'));
+    wireRepeaterDirty('addresses', document.getElementById('addressesContainer'));
+    wireRepeaterDirty('degrees', document.getElementById('degreesContainer'));
+    wireRepeaterDirty('awards', document.getElementById('awardsContainer'));
+
+    window.addEventListener('users-edit-tab-selected', function (event) {
+        var tabId = event && event.detail ? (event.detail.tabId || '') : '';
+        if (!tabId) return;
+        refreshTabData(tabId);
+    });
+
+    var refreshEmailsBtn = document.getElementById('refreshEmailsBtn');
+    if (refreshEmailsBtn) {
+        refreshEmailsBtn.addEventListener('click', function () {
+            refreshTabData('contact-tab');
+        });
+    }
+
+    var refreshPhonesBtn = document.getElementById('refreshPhonesBtn');
+    if (refreshPhonesBtn) {
+        refreshPhonesBtn.addEventListener('click', function () {
+            refreshTabData('contact-tab');
+        });
+    }
 
     /* ── General tab ── */
     var saveGeneralBtn = document.getElementById('save-general-btn');
@@ -3215,6 +3655,278 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* ── External IDs tab ── */
+    function escHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    var extidsLdapModalEl = document.getElementById('extidsLdapModal');
+    var extidsLdapModal = extidsLdapModalEl ? new bootstrap.Modal(extidsLdapModalEl) : null;
+    var extidsLdapRows = [];
+    var extidsLdapStatusEl = document.getElementById('extids-ldap-status');
+    var extidsLdapResultsBody = document.getElementById('extidsLdapResultsBody');
+
+    function setExtidsLdapStatus(text, isError) {
+        if (!extidsLdapStatusEl) {
+            return;
+        }
+        extidsLdapStatusEl.textContent = text || '';
+        extidsLdapStatusEl.classList.toggle('text-danger', !!isError);
+        extidsLdapStatusEl.classList.toggle('text-muted', !isError);
+    }
+
+    function renderExtidsLdapRows(rows) {
+        if (!extidsLdapResultsBody) {
+            return;
+        }
+        if (!rows || !rows.length) {
+            extidsLdapResultsBody.innerHTML = '<tr><td colspan="5" class="text-muted p-3">No matches found.</td></tr>';
+            return;
+        }
+
+        extidsLdapResultsBody.innerHTML = rows.map(function (row, idx) {
+            return '' +
+                '<tr>' +
+                    '<td>' + escHtml(row.displayName) + '</td>' +
+                    '<td><code>' + escHtml(row.samAccountName) + '</code></td>' +
+                    '<td>' + escHtml(row.employeeID) + '</td>' +
+                    '<td>' + escHtml(row.mail) + '</td>' +
+                    '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary js-extids-ldap-select" data-idx="' + idx + '">Use</button></td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function normalizeLdapRow(row) {
+        row = row || {};
+        return {
+            displayName: row.displayName || row.DISPLAYNAME || '',
+            samAccountName: row.samAccountName || row.SAMACCOUNTNAME || '',
+            employeeID: row.employeeID || row.EMPLOYEEID || '',
+            mail: row.mail || row.MAIL || '',
+            department: row.department || row.DEPARTMENT || '',
+            title: row.title || row.TITLE || ''
+        };
+    }
+
+    // Read alias objects from the hidden inputs stamped into the DOM by ColdFusion.
+    function readAliasesFromDOM() {
+        var aliases = {};
+        document.querySelectorAll('[data-alias-field][data-alias-idx]').forEach(function (el) {
+            var idx = el.getAttribute('data-alias-idx');
+            var field = el.getAttribute('data-alias-field');
+            if (!aliases[idx]) { aliases[idx] = {}; }
+            aliases[idx][field] = el.value;
+        });
+        return Object.values(aliases);
+    }
+
+    // Format a name object {first, middle, last} into "Last, First M." style.
+    function formatAliasName(a) {
+        var first = (a.first || '').trim();
+        var middle = (a.middle || '').trim();
+        var last = (a.last || '').trim();
+        if (!first && !last) { return ''; }
+        var middleInitial = middle.length ? (' ' + middle.charAt(0)) : '';
+        if (first && last) { return last + ', ' + first + middleInitial; }
+        return (first + ' ' + last).trim();
+    }
+
+    // Build the ordered list of search terms to try for an LDAP name-based lookup.
+    // Returns an array: name terms first (deduplicated), email as final fallback.
+    function buildLdapSearchTerms(cougarnetEl, emailEl) {
+        var aliases = readAliasesFromDOM();
+        var nameTerms = [];
+        var seen = {};
+
+        // If CougarNet ID is populated, use it exclusively (sAMAccountName match).
+        if (cougarnetEl && cougarnetEl.value.trim().length) {
+            return [cougarnetEl.value.trim()];
+        }
+
+        // Check for an alias flagged as LDAP source — if found, use only that one.
+        var ldapAlias = null;
+        for (var i = 0; i < aliases.length; i++) {
+            if ((aliases[i].source || '').trim().toUpperCase() === 'LDAP') {
+                ldapAlias = aliases[i];
+                break;
+            }
+        }
+
+        if (ldapAlias) {
+            var t = formatAliasName(ldapAlias);
+            if (t.length >= 2) { nameTerms.push(t); }
+        } else {
+            // Use all aliases.
+            for (var j = 0; j < aliases.length; j++) {
+                var term = formatAliasName(aliases[j]);
+                if (term.length >= 2 && !seen[term]) {
+                    seen[term] = true;
+                    nameTerms.push(term);
+                }
+            }
+
+            // Also include the canonical name from the form fields.
+            var firstEl  = document.querySelector('#general-pane [name="FirstName"]');
+            var middleEl = document.querySelector('#general-pane [name="MiddleName"]');
+            var lastEl   = document.querySelector('#general-pane [name="LastName"]');
+            var canonical = formatAliasName({
+                first:  firstEl  ? firstEl.value  : '',
+                middle: middleEl ? middleEl.value : '',
+                last:   lastEl   ? lastEl.value   : ''
+            });
+            if (canonical.length >= 2 && !seen[canonical]) {
+                seen[canonical] = true;
+                nameTerms.push(canonical);
+            }
+        }
+
+        // Email fallback appended last.
+        var email = emailEl ? emailEl.value.trim() : '';
+        if (email.length >= 2 && !seen[email]) {
+            nameTerms.push(email);
+        }
+
+        return nameTerms;
+    }
+
+    // Run one LDAP fetch for a single search term; resolves with the payload.
+    function fetchLdapTerm(term) {
+        var body = new URLSearchParams();
+        body.append('searchTerm', term);
+        body.append('userID', pageUserID);
+        body.append('maxRows', '25');
+        return fetch('/admin/users/ldap_lookup.cfm', {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin'
+        }).then(function (r) { return r.json(); });
+    }
+
+    // Try each search term in sequence; stop as soon as one returns rows.
+    function fetchLdapSequential(terms) {
+        if (!terms.length) {
+            return Promise.resolve({ success: false, message: 'No search terms available.', data: [] });
+        }
+        return fetchLdapTerm(terms[0]).then(function (payload) {
+            var ok   = payload && (payload.success === true || payload.SUCCESS === true);
+            var rows = payload ? (payload.data || payload.DATA || []) : [];
+            if (ok && rows.length > 0) {
+                return payload;
+            }
+            // No results — try remaining terms.
+            var remaining = terms.slice(1);
+            if (!remaining.length) {
+                return payload; // Return the last (empty) payload as the final answer.
+            }
+            return fetchLdapSequential(remaining);
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        var lookupBtn = event.target.closest('.js-cougarnet-lookup');
+        if (lookupBtn) {
+            var cougarnetEl = document.getElementById('extid-cougarnet-input');
+            var emailEl = document.querySelector('#address-pane [name="EmailPrimary"]') || document.querySelector('#general-pane [name="EmailPrimary"]');
+            var searchTerms = buildLdapSearchTerms(cougarnetEl, emailEl);
+
+            if (!searchTerms.length || (searchTerms.length === 1 && searchTerms[0].length < 2)) {
+                setExtidsLdapStatus('Enter at least 2 characters in CougarNet ID, email, or name before lookup.', true);
+                return;
+            }
+
+            lookupBtn.disabled = true;
+            setExtidsLdapStatus('Searching LDAP...', false);
+
+            fetchLdapSequential(searchTerms)
+            .then(function (payload) {
+                var ok = payload && (payload.success === true || payload.SUCCESS === true);
+                var message = payload ? (payload.message || payload.MESSAGE) : '';
+                var rows = payload ? (payload.data || payload.DATA || []) : [];
+
+                if (!ok) {
+                    extidsLdapRows = [];
+                    renderExtidsLdapRows(extidsLdapRows);
+                    setExtidsLdapStatus(message || 'Lookup failed.', true);
+                    if (extidsLdapModal) { extidsLdapModal.show(); }
+                    return;
+                }
+
+                extidsLdapRows = rows.map(normalizeLdapRow);
+                renderExtidsLdapRows(extidsLdapRows);
+                setExtidsLdapStatus(extidsLdapRows.length + ' match(es) found.', false);
+                if (extidsLdapModal) { extidsLdapModal.show(); }
+            })
+            .catch(function (err) {
+                setExtidsLdapStatus('Network error: ' + err.message, true);
+            })
+            .finally(function () {
+                lookupBtn.disabled = false;
+            });
+            return;
+        }
+
+        var selectBtn = event.target.closest('.js-extids-ldap-select');
+        if (selectBtn) {
+            var idx = parseInt(selectBtn.getAttribute('data-idx'), 10);
+            var row = extidsLdapRows[idx] || null;
+            var cougarnetInput = document.getElementById('extid-cougarnet-input');
+            var peoplesoftInput = document.getElementById('extid-peoplesoft-input');
+            if (row) {
+                if (cougarnetInput) {
+                    cougarnetInput.value = row.samAccountName || '';
+                }
+                if (peoplesoftInput) {
+                    peoplesoftInput.value = row.employeeID || '';
+                }
+                markDirty('extids');
+                setExtidsLdapStatus('Selected ' + (row.samAccountName || '') + '.', false);
+
+                if (row.mail) {
+                    var emailBody = new URLSearchParams();
+                    emailBody.append('userID', pageUserID);
+                    emailBody.append('section', 'addLdapEmailIfMissing');
+                    emailBody.append('email', row.mail);
+                    fetch('/admin/users/saveSection.cfm', {
+                        method: 'POST',
+                        body: emailBody,
+                        credentials: 'same-origin'
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (payload) {
+                        if (payload && payload.success && payload.inserted) {
+                            setExtidsLdapStatus('Selected ' + (row.samAccountName || '') + ' and added email ' + row.mail + '.', false);
+                        }
+                    })
+                    .catch(function () {
+                        // Ignore background email sync failures to keep lookup UX smooth.
+                    });
+                }
+
+                if (row.displayName) {
+                    var aliasBody = new URLSearchParams();
+                    aliasBody.append('userID', pageUserID);
+                    aliasBody.append('section', 'addLdapAliasIfMissing');
+                    aliasBody.append('displayName', row.displayName);
+                    fetch('/admin/users/saveSection.cfm', {
+                        method: 'POST',
+                        body: aliasBody,
+                        credentials: 'same-origin'
+                    })
+                    .catch(function () {
+                        // Ignore background alias sync failures to keep lookup UX smooth.
+                    });
+                }
+            }
+            if (extidsLdapModal) {
+                extidsLdapModal.hide();
+            }
+        }
+    });
+
     var saveExtidsBtn = document.getElementById('save-extids-btn');
     if (saveExtidsBtn) {
         saveExtidsBtn.addEventListener('click', function () {

@@ -100,6 +100,12 @@
                             <span class="sidebar-label">Search UH API</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#request.webRoot#/admin/users/search_UH_LDAP.cfm">
+                            <i class="bi bi-person-vcard sidebar-icon"></i>
+                            <span class="sidebar-label">Search UH LDAP</span>
+                        </a>
+                    </li>
                 </ul>
             </li>
             <cfif request.hasPermission("media.view")>
@@ -308,33 +314,72 @@
         <cfif isDefined('url.dump')><cfdump var="#session.user#">
 
         <!---filter="(&(objectClass=user)(sAMAccountName=chlorens))"--->
-        <cfldap 
+    <cfldap 
+        action="QUERY" 
+        name="qGetGroupDN" 
+        start="DC=cougarnet,DC=uh,DC=edu" 
+        scope="subtree" 
+        filter="(&(objectCategory=group)(cn=OPT-*))" 
+        attributes="distinguishedName"
+        server="cougarnet.uh.edu"
+        username="COUGARNET\uhcoweb"
+        password="5E9##WN!ag">
+    </cfldap>
+    <cfldap 
         action="QUERY"
         name="qFindUser"
         attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials"
-        start="DC=cougarnet,DC=uh,DC=edu"
-        scope="SUBTREE"
-        maxrows="1"
+        scope="subtree"
+        maxrows="500"
         server="cougarnet.uh.edu"
-        filter="(&(objectClass=user)(sAMAccountName=mcgonz24))"
+        start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
+        filter="(&(objectCategory=person)(displayName=*Nguyen*))"
         username="COUGARNET\uhcoweb"
         password="5E9##WN!ag">
-        </cfldap>
-         <cfldap 
+    </cfldap>
+    <cfldap 
         action="QUERY"
         name="qFindUser2"
-        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials"
-        start="DC=cougarnet,DC=uh,DC=edu"
+        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials,employeeid"
+        start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
         scope="SUBTREE"
-        maxrows="1"
         server="cougarnet.uh.edu"
-        filter="(&(objectClass=user)(sAMAccountName=adezzell))"
+        filter="(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=oaborahm)(displayName=oaborahm)(mail=oaborahm)(userPrincipalName=oaborahm)))"
         username="COUGARNET\svc-opt-cfserv"
         password="Xu&mLtgdtKV5bQ@M">
-        </cfldap>
-        
+    </cfldap>
+    <cfset searchTerm = "oaborahm">
+    <cfset filter = "(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=#searchTerm#)(displayName=#searchTerm#)(mail=#searchTerm#)(userPrincipalName=#searchTerm#))(|(memberOf=CN=OPT-Class2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)))">
+    <cfldap 
+        action="QUERY"
+        name="qFindUser3"
+        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials,employeeid"
+        start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
+        scope="SUBTREE"
+        server="cougarnet.uh.edu"
+        filter="#filter#"
+        username="COUGARNET\svc-opt-cfserv"
+        password="Xu&mLtgdtKV5bQ@M">
+    </cfldap>
+
+
+
+
+
+
+    CN=OPT-ClassOf2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu
+
+        CN=OPT-OPTOMETRY,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-ClassOf2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-ClassOf2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-ClassOf2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-ClassOf2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-Staff,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        -OPT-Faculty,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
+        <cfdump var="#qGetGroupDN#" label="Group DNs for Optometry distribution groups">
         <cfdump var="#qFindUser#" label="User found with uhcoweb account">
         <cfdump var="#qFindUser2#" label="User found with svc-opt-cfserv account">
+        <cfdump var="#qFindUser3#" label="User found in class of groups">
         </cfif>
     </main>
 
@@ -425,7 +470,8 @@
             WEBROOT+'/admin/users/edit.cfm',
             WEBROOT+'/admin/users/view.cfm',
             WEBROOT+'/admin/users/deleteconfirm.cfm',
-            WEBROOT+'/admin/users/search_UH_API.cfm'
+            WEBROOT+'/admin/users/search_UH_API.cfm',
+            WEBROOT+'/admin/users/search_UH_LDAP.cfm'
         ];
         if (usersPages.some(p => window.location.pathname.toLowerCase().startsWith(p))) {
             const usersSubmenu = document.getElementById('usersSubmenu');
@@ -560,6 +606,19 @@
                 }
             }
         });
+
+        // Ensure Users parent item is active for child routes that do not have direct sidebar links.
+        const usersBasePath = (WEBROOT + '/admin/users/').toLowerCase();
+        if (currentPage.startsWith(usersBasePath)) {
+            const usersToggle = document.getElementById('usersToggle');
+            if (usersToggle) {
+                usersToggle.classList.add('active');
+                const usersTopNavItem = usersToggle.closest('.nav-item');
+                if (usersTopNavItem) {
+                    usersTopNavItem.classList.add('active');
+                }
+            }
+        }
     });
 </script>
 </body>

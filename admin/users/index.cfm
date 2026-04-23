@@ -39,6 +39,7 @@
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset flagsService     = createObject("component", "cfc.flags_service").init()>
 <cfset orgsService      = createObject("component", "cfc.organizations_service").init()>
+<cfset aliasesDAO       = createObject("component", "dao.aliases_DAO").init()>
 <cfset helpers          = createObject("component", "cfc.helpers")>
 <cfif needsAcademic>
     <cfset academicService = createObject("component", "cfc.academic_service").init()>
@@ -361,6 +362,25 @@
 <cfset sliceStart   = ((currentPage - 1) * perPage) + 1>
 <cfset sliceEnd     = min(sliceStart + perPage - 1, totalRecords)>
 <cfset pageRows     = totalRecords GT 0 ? arraySlice(filteredUsers, sliceStart, min(perPage, totalRecords - sliceStart + 1)) : []>
+<cfset pageUserIDs  = []>
+<cfset preferredAliasMap = {}>
+
+<cfloop array="#pageRows#" index="pageUserRow">
+    <cfif structKeyExists(pageUserRow, "USERID") AND isNumeric(pageUserRow.USERID)>
+        <cfset arrayAppend(pageUserIDs, val(pageUserRow.USERID))>
+    </cfif>
+</cfloop>
+
+<cfif arrayLen(pageUserIDs)>
+    <cfset preferredAliasMap = aliasesDAO.getPreferredAliasMap(pageUserIDs)>
+</cfif>
+
+<cfloop from="1" to="#arrayLen(pageRows)#" index="pageRowIndex">
+    <cfset aliasKey = toString(val(pageRows[pageRowIndex].USERID ?: 0))>
+    <cfset preferredAlias = structKeyExists(preferredAliasMap, aliasKey) ? preferredAliasMap[aliasKey] : {}>
+    <cfset pageRows[pageRowIndex].RESOLVEDFIRSTNAME = len(trim(preferredAlias.FIRSTNAME ?: "")) ? trim(preferredAlias.FIRSTNAME) : trim(pageRows[pageRowIndex].FIRSTNAME ?: "")>
+    <cfset pageRows[pageRowIndex].RESOLVEDLASTNAME = len(trim(preferredAlias.LASTNAME ?: "")) ? trim(preferredAlias.LASTNAME) : trim(pageRows[pageRowIndex].LASTNAME ?: "")>
+</cfloop>
 
 <!--- Column count for no-data colspan --->
 <cfset colCount = 7>
@@ -659,8 +679,8 @@
     </cfif>
 
     <cfset content &= "
-            <td>#deceasedIcon##u.FIRSTNAME#</td>
-            <td>#u.LASTNAME#</td>
+            <td>#deceasedIcon##EncodeForHTML(u.RESOLVEDFIRSTNAME ?: u.FIRSTNAME ?: '')#</td>
+            <td>#EncodeForHTML(u.RESOLVEDLASTNAME ?: u.LASTNAME ?: '')#</td>
             <td class='users-list-email-cell'>#displayEmail##(displayEmailExternal ? " <span class='badge text-dark users-list-external-badge' title='Non-UH email'>External</span>" : "")#</td>
     ">
 

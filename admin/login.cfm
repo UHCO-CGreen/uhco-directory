@@ -43,7 +43,7 @@
 
           <!-- Password with Toggle -->
           <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
+            <label for="password" class="form-label">PASSWORD</label>
 
             <div class="input-group">
               <input
@@ -54,7 +54,7 @@
                 required
               >
               <button
-                class="btn btn-outline-secondary"
+                class="btn btn-secondary text-dark"
                 type="button"
                 id="togglePassword"
                 aria-label="Show password"
@@ -83,6 +83,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+
+    document.getElementById("username").focus();
+
     // Bootstrap client-side validation
     (() => {
       'use strict';

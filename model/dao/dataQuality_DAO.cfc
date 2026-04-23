@@ -40,10 +40,16 @@ component extends="dao.BaseDAO" output="false" singleton {
 
                 SELECT UserID, 'missing_uh_api_id'       AS IssueCode FROM Users WHERE ISNULL(UH_API_ID,'')      = ''
                 UNION ALL
-                SELECT UserID, 'missing_firstname'                      FROM Users WHERE ISNULL(FirstName,'')     = ''
-                UNION ALL
-                SELECT UserID, 'missing_lastname'                       FROM Users WHERE ISNULL(LastName,'')      = ''
-                UNION ALL
+                                SELECT u.UserID, 'missing_primary_alias'
+                                FROM Users u
+                                WHERE NOT EXISTS (
+                                        SELECT 1
+                                        FROM UserAliases ua
+                                        WHERE ua.UserID = u.UserID
+                                            AND ISNULL(ua.IsActive, 0) = 1
+                                            AND ISNULL(ua.IsPrimary, 0) = 1
+                                )
+                                UNION ALL
                 SELECT UserID, 'missing_email_primary'                  FROM Users WHERE ISNULL(EmailPrimary,'')  = ''
                 UNION ALL
                 SELECT UserID, 'missing_title1'                         FROM Users WHERE ISNULL(Title1,'')        = ''
@@ -200,14 +206,27 @@ component extends="dao.BaseDAO" output="false" singleton {
             params["issueCode"] = { value=trim(arguments.filterCode), cfsqltype="cf_sql_nvarchar" };
         }
         var qry = executeQueryWithRetry(
-            "SELECT dqi.UserID, u.FirstName, u.LastName, u.EmailPrimary, u.UH_API_ID,
+            "SELECT dqi.UserID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.EmailPrimary, u.UH_API_ID,
                     STRING_AGG(dqi.IssueCode, ',') WITHIN GROUP (ORDER BY dqi.IssueCode) AS IssueCodes,
                     COUNT(*) AS IssueCount
              FROM DataQualityIssues dqi
              INNER JOIN Users u ON dqi.UserID = u.UserID
+             OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 2147483647),
+                    ua.AliasID
+             ) pa
              WHERE dqi.RunID = :runID" & codeFilter & "
-             GROUP BY dqi.UserID, u.FirstName, u.LastName, u.EmailPrimary, u.UH_API_ID
-             ORDER BY COUNT(*) DESC, u.LastName, u.FirstName",
+             GROUP BY dqi.UserID, COALESCE(pa.FirstName, u.FirstName), COALESCE(pa.LastName, u.LastName), u.EmailPrimary, u.UH_API_ID
+             ORDER BY COUNT(*) DESC, COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             params,
             { datasource=variables.datasource, timeout=60 }
         );

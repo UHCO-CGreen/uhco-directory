@@ -65,4 +65,59 @@ component extends="dao.BaseDAO" output="false" singleton {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry( "DELETE FROM UserEmails WHERE UserID = :id", idParam, { datasource=variables.datasource, timeout=30 } );
     }
+
+    public boolean function addEmailIfMissing(
+        required numeric userID,
+        required string emailAddress,
+        string emailType = "UH"
+    ) {
+        var normalizedEmail = lCase(trim(arguments.emailAddress));
+        var existingQry = "";
+        var nextSortQry = "";
+        var nextSort = 0;
+
+        if (!len(normalizedEmail)) {
+            return false;
+        }
+
+        existingQry = executeQueryWithRetry(
+            "SELECT TOP 1 EmailID
+             FROM UserEmails
+             WHERE UserID = :id
+               AND LOWER(LTRIM(RTRIM(EmailAddress))) = :email",
+            {
+                id    = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                email = { value=normalizedEmail, cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        if (existingQry.recordCount GT 0) {
+            return false;
+        }
+
+        nextSortQry = executeQueryWithRetry(
+            "SELECT ISNULL(MAX(SortOrder), -1) + 1 AS NextSort
+             FROM UserEmails
+             WHERE UserID = :id",
+            { id = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30 }
+        );
+        nextSort = val(nextSortQry.NextSort[1]);
+
+        executeQueryWithRetry(
+            "INSERT INTO UserEmails (UserID, EmailAddress, EmailType, IsPrimary, SortOrder)
+             VALUES (:id, :EmailAddress, :EmailType, :IsPrimary, :SortOrder)",
+            {
+                id           = { value=arguments.userID, cfsqltype="cf_sql_integer"  },
+                EmailAddress = { value=trim(arguments.emailAddress), cfsqltype="cf_sql_nvarchar" },
+                EmailType    = { value=trim(arguments.emailType), cfsqltype="cf_sql_nvarchar" },
+                IsPrimary    = { value=0, cfsqltype="cf_sql_bit" },
+                SortOrder    = { value=nextSort, cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+
+        return true;
+    }
 }

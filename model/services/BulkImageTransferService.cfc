@@ -9,6 +9,7 @@ component output="false" singleton {
     public any function init() {
         variables.UsersDAO     = createObject("component", "dao.users_DAO").init();
         variables.UsersService = createObject("component", "cfc.users_service").init();
+        variables.AliasesDAO   = createObject("component", "dao.aliases_DAO").init();
         variables.ExternalIDsDAO = createObject("component", "dao.externalIDs_DAO").init();
         variables.PatternDAO   = createObject("component", "dao.FileNamePatternDAO").init();
         variables.SourceDAO    = createObject("component", "dao.UserImageSourceDAO").init();
@@ -219,6 +220,7 @@ component output="false" singleton {
         var publishedUrl = "";
         var dimensions = "";
         var outputExtension = "";
+        var preferredUserData = {};
 
         if ( !len(sourceAbsolutePath) OR !fileExists(sourceAbsolutePath) ) {
             return { success=false, message="Source file not found in _temp_source.", sourceID=0, userID=arguments.userID };
@@ -272,9 +274,14 @@ component output="false" singleton {
             directoryCreate( variables.publishedDirAbsolute );
         }
 
+        preferredUserData = _resolvePreferredUser(
+            userID = arguments.userID,
+            user = userResult.data
+        );
+
         outputExtension = _resolveOutputExtension( variantType, cleanSourcePath );
         publishedFilename = _buildPublishedFilename(
-            user              = userResult.data,
+            user              = preferredUserData,
             variantCode       = variantType.CODE,
             outputExtension   = outputExtension,
             userImageSourceID = sourceResult.sourceID
@@ -294,7 +301,7 @@ component output="false" singleton {
             userID             = arguments.userID,
             imageVariant       = variantType.CODE,
             imageURL           = publishedUrl,
-            imageDescription   = _buildDescription( userResult.data, variantType.DESCRIPTION ?: variantType.CODE ),
+            imageDescription   = _buildDescription( preferredUserData, variantType.DESCRIPTION ?: variantType.CODE ),
             imageDimensions    = dimensions,
             sortOrder          = 0,
             userImageSourceID  = sourceResult.sourceID
@@ -307,7 +314,7 @@ component output="false" singleton {
 
         return {
             success      = true,
-            message      = "Transferred and published #listLast(cleanSourcePath, '/\\')# for #userResult.data.FIRSTNAME# #userResult.data.LASTNAME#.",
+            message      = "Transferred and published #listLast(cleanSourcePath, '/\\')# for #preferredUserData.FIRSTNAME# #preferredUserData.LASTNAME#.",
             sourceID     = sourceResult.sourceID,
             userID       = arguments.userID,
             variantCode  = variantType.CODE,
@@ -317,6 +324,7 @@ component output="false" singleton {
 
     private array function _buildUserTokenProfiles() {
         var users = variables.UsersDAO.getAllUsers();
+        var preferredAliasMap = variables.AliasesDAO.getPreferredAliasMap();
         var allExternalIDs = variables.ExternalIDsDAO.getAllExternalIDs();
         var patterns = variables.PatternDAO.getActivePatterns();
         var externalIDsByUser = {};
@@ -340,17 +348,21 @@ component output="false" singleton {
             }
 
             var key = toString( user.USERID );
+            var preferredAlias = structKeyExists(preferredAliasMap, key) ? preferredAliasMap[key] : {};
+            var preferredFirst = len(trim(preferredAlias.FIRSTNAME ?: "")) ? trim(preferredAlias.FIRSTNAME) : trim(user.FIRSTNAME ?: "");
+            var preferredMiddle = len(trim(preferredAlias.MIDDLENAME ?: "")) ? trim(preferredAlias.MIDDLENAME) : trim(user.MIDDLENAME ?: "");
+            var preferredLast = len(trim(preferredAlias.LASTNAME ?: "")) ? trim(preferredAlias.LASTNAME) : trim(user.LASTNAME ?: "");
             var tokens = _buildUserTokens(
-                firstName   = user.FIRSTNAME ?: "",
-                lastName    = user.LASTNAME ?: "",
-                middleName  = user.MIDDLENAME ?: "",
+                firstName   = preferredFirst,
+                lastName    = preferredLast,
+                middleName  = preferredMiddle,
                 externalIDs = structKeyExists(externalIDsByUser, key) ? externalIDsByUser[key] : [],
                 patterns    = patterns
             );
 
             arrayAppend(result, {
                 userID        = user.USERID,
-                userDisplayName = trim( (user.FIRSTNAME ?: "") & " " & (user.LASTNAME ?: "") ),
+                userDisplayName = trim( preferredFirst & " " & preferredLast ),
                 userEmail     = user.EMAILPRIMARY ?: "",
                 tokens        = tokens
             });
@@ -899,6 +911,47 @@ component output="false" singleton {
         arrayAppend(parts, "Image");
 
         return arrayToList(parts, " ");
+    }
+
+    private struct function _resolvePreferredUser(
+        required numeric userID,
+        required struct user
+    ) {
+        var resolved = duplicate(arguments.user);
+        var aliases = variables.AliasesDAO.getAliases(arguments.userID);
+        var preferredAlias = {};
+
+        for (var i = 1; i <= arrayLen(aliases); i++) {
+            if (val(aliases[i].ISPRIMARY ?: 0) EQ 1 AND val(aliases[i].ISACTIVE ?: 0) EQ 1) {
+                preferredAlias = aliases[i];
+                break;
+            }
+        }
+        if (structIsEmpty(preferredAlias)) {
+            for (var j = 1; j <= arrayLen(aliases); j++) {
+                if (val(aliases[j].ISACTIVE ?: 0) EQ 1) {
+                    preferredAlias = aliases[j];
+                    break;
+                }
+            }
+        }
+        if (structIsEmpty(preferredAlias) AND arrayLen(aliases) GT 0) {
+            preferredAlias = aliases[1];
+        }
+
+        if (!structIsEmpty(preferredAlias)) {
+            if (len(trim(preferredAlias.FIRSTNAME ?: ""))) {
+                resolved.FIRSTNAME = trim(preferredAlias.FIRSTNAME);
+            }
+            if (len(trim(preferredAlias.MIDDLENAME ?: ""))) {
+                resolved.MIDDLENAME = trim(preferredAlias.MIDDLENAME);
+            }
+            if (len(trim(preferredAlias.LASTNAME ?: ""))) {
+                resolved.LASTNAME = trim(preferredAlias.LASTNAME);
+            }
+        }
+
+        return resolved;
     }
 
 }

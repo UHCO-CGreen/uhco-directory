@@ -13,6 +13,14 @@ component output="false" singleton {
         variables.EmailsDAO.replaceEmails( userID, emails );
     }
 
+    public boolean function addEmailIfMissing(
+        required numeric userID,
+        required string emailAddress,
+        string emailType = "UH"
+    ) {
+        return variables.EmailsDAO.addEmailIfMissing(argumentCollection=arguments);
+    }
+
     public struct function getAllEmailsMap() {
         return variables.EmailsDAO.getAllEmailsMap();
     }

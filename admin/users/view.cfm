@@ -17,6 +17,36 @@
 <!--- ── Aliases ── --->
 <cfset aliasesSvc    = createObject("component", "cfc.aliases_service").init()>
 <cfset userAliases   = aliasesSvc.getAliases(val(url.userID)).data>
+<cfset primaryAlias = {}>
+<cfset resolvedFirstName = trim(profile.user.FIRSTNAME ?: "")>
+<cfset resolvedMiddleName = trim(profile.user.MIDDLENAME ?: "")>
+<cfset resolvedLastName = trim(profile.user.LASTNAME ?: "")>
+
+<cfloop from="1" to="#arrayLen(userAliases)#" index="i">
+    <cfif val(userAliases[i].ISPRIMARY ?: 0) EQ 1 AND val(userAliases[i].ISACTIVE ?: 0) EQ 1>
+        <cfset primaryAlias = userAliases[i]>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfif structIsEmpty(primaryAlias)>
+    <cfloop from="1" to="#arrayLen(userAliases)#" index="i">
+        <cfif val(userAliases[i].ISACTIVE ?: 0) EQ 1>
+            <cfset primaryAlias = userAliases[i]>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+</cfif>
+
+<cfif structIsEmpty(primaryAlias) AND arrayLen(userAliases) GT 0>
+    <cfset primaryAlias = userAliases[1]>
+</cfif>
+
+<cfif NOT structIsEmpty(primaryAlias)>
+    <cfset resolvedFirstName = trim(primaryAlias.FIRSTNAME ?: resolvedFirstName)>
+    <cfset resolvedMiddleName = trim(primaryAlias.MIDDLENAME ?: resolvedMiddleName)>
+    <cfset resolvedLastName = trim(primaryAlias.LASTNAME ?: resolvedLastName)>
+</cfif>
 
 <!--- ── Addresses ── --->
 <cfset addressesSvc  = createObject("component", "cfc.addresses_service").init()>
@@ -124,8 +154,8 @@
             <cfset peopleArray = responseData>
         </cfif>
 
-        <cfset localFirstName = lCase(trim(profile.user.FIRSTNAME ?: ""))>
-        <cfset localLastName = lCase(trim(profile.user.LASTNAME ?: ""))>
+        <cfset localFirstName = lCase(trim(resolvedFirstName ?: ""))>
+        <cfset localLastName = lCase(trim(resolvedLastName ?: ""))>
 
         <cfloop from="1" to="#arrayLen(peopleArray)#" index="i">
             <cfset person = peopleArray[i]>
@@ -210,7 +240,7 @@
 <cfset quickMatchHtml = "
 <div class='card card-body mb-3 mt-4 users-view-quickmatch'>
     <h5 class='mb-2'>Quick API Match</h5>
-    <p class='text-muted mb-2'>Compare this user by first and last name against UH API.</p>
+    <p class='text-muted mb-2'>Compare this user by primary alias first/last name against UH API.</p>
     <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline'>
         <input type='hidden' name='quickApiMatch' value='1'>
         <button type='submit' class='btn btn-sm btn-outline-primary'>Run Quick API Match</button>
@@ -277,7 +307,7 @@
 <div class='users-view-page'>
 <div class='users-view-header clearfix'>
 <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
-<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##profile.user.FIRSTNAME# #profile.user.LASTNAME##(len(suffix) ? ', ' & suffix : '')#</h1>
+<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')#</h1>
 <div class='users-view-subtitle'>#SubTitle#</div>
 </div>
 

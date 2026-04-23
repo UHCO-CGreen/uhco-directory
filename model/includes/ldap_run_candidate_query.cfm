@@ -1,0 +1,13 @@
+<cfldap
+    action="QUERY"
+    name="qResult"
+    attributes="#ldapAttributes#"
+    start="#searchStartDN#"
+    scope="SUBTREE"
+    maxrows="#ldapMaxRows#"
+    server="#ldapServer#"
+    timeout="#ldapTimeout#"
+    filter="#ldapFilter#"
+    username="#bindUsername#"
+    password="#bindPassword#">
+</cfldap>

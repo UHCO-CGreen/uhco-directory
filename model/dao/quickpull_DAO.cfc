@@ -10,8 +10,22 @@ component extends="dao.BaseDAO" output="false" singleton {
      */
     public array function getAttendingUsers() {
         var qry = executeQueryWithRetry(
-            "SELECT u.UserID, u.FirstName, u.MiddleName, u.LastName, u.Degrees
+            "SELECT u.UserID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.Degrees
              FROM   Users u
+                    OUTER APPLY (
+                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                        FROM UserAliases ua
+                        WHERE ua.UserID = u.UserID
+                        ORDER BY
+                            CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                            ISNULL(ua.SortOrder, 2147483647),
+                            ua.AliasID
+                    ) pa
              WHERE  u.Active = 1
                AND  EXISTS (
                         SELECT 1
@@ -20,7 +34,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Clinical-Attending'
                     )
-             ORDER BY u.LastName, u.FirstName",
+             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
@@ -33,13 +47,26 @@ component extends="dao.BaseDAO" output="false" singleton {
      */
     public array function getGradClassUsers( required numeric gradYear, required string programName ) {
         var qry = executeQueryWithRetry(
-            "SELECT u.UserID, u.FirstName, u.MiddleName, u.LastName,
+            "SELECT u.UserID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName,
                     uai.CurrentGradYear,
                     o.OrgName AS Program
              FROM   Users u
                     INNER JOIN UserAcademicInfo uai ON u.UserID = uai.UserID
                     INNER JOIN UserOrganizations uo ON u.UserID = uo.UserID
                     INNER JOIN Organizations o ON uo.OrgID = o.OrgID
+                    OUTER APPLY (
+                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                        FROM UserAliases ua
+                        WHERE ua.UserID = u.UserID
+                        ORDER BY
+                            CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                            ISNULL(ua.SortOrder, 2147483647),
+                            ua.AliasID
+                    ) pa
              WHERE  u.Active = 1
                AND  uai.CurrentGradYear = :gradYear
                AND  o.OrgName = :programName
@@ -51,7 +78,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Alumni'
                     )
-             ORDER BY u.LastName, u.FirstName",
+                         ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {
                 gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" },
                 programName = { value=arguments.programName, cfsqltype="cf_sql_varchar" }
@@ -67,13 +94,26 @@ component extends="dao.BaseDAO" output="false" singleton {
      */
     public array function getGraduateUser( required numeric userID ) {
         var qry = executeQueryWithRetry(
-            "SELECT u.UserID, u.FirstName, u.MiddleName, u.LastName,
+            "SELECT u.UserID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName,
                     uai.CurrentGradYear,
                     usp.FirstExternship, usp.SecondExternship,
                     usp.HometownCity, usp.HometownState
              FROM   Users u
                     LEFT JOIN UserAcademicInfo    uai ON u.UserID = uai.UserID
                     LEFT JOIN UserStudentProfile  usp ON u.UserID = usp.UserID
+                    OUTER APPLY (
+                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                        FROM UserAliases ua
+                        WHERE ua.UserID = u.UserID
+                        ORDER BY
+                            CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                            ISNULL(ua.SortOrder, 2147483647),
+                            ua.AliasID
+                    ) pa
              WHERE  u.Active = 1
                AND  u.UserID = :userID
                AND  EXISTS (
@@ -95,8 +135,21 @@ component extends="dao.BaseDAO" output="false" singleton {
      */
     public array function getDeansUsers() {
         var qry = executeQueryWithRetry(
-            "SELECT u.UserID, u.FirstName, u.MiddleName, u.LastName
+            "SELECT u.UserID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName
              FROM   Users u
+                    OUTER APPLY (
+                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                        FROM UserAliases ua
+                        WHERE ua.UserID = u.UserID
+                        ORDER BY
+                            CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                            CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                            ISNULL(ua.SortOrder, 2147483647),
+                            ua.AliasID
+                    ) pa
              WHERE  u.Active = 1
                AND  EXISTS (
                         SELECT 1
@@ -105,7 +158,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                         WHERE  ufa.UserID = u.UserID
                           AND  uf.FlagName = 'Deans'
                     )
-             ORDER BY u.LastName, u.FirstName",
+             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );

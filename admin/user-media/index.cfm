@@ -19,6 +19,7 @@
 <cfset imagesService = createObject("component", "cfc.images_service").init()>
 <cfset sourceService = createObject("component", "cfc.UserImageSourceService").init()>
 <cfset variantService = createObject("component", "cfc.UserImageVariantService").init()>
+<cfset aliasesDAO = createObject("component", "dao.aliases_DAO").init()>
 <cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
 
 <cftry>
@@ -28,6 +29,23 @@
     </cfcatch>
 </cftry>
 
+<cfset usersByID = {}>
+<cfset allUserIDs = []>
+<cfloop array="#allUsers#" index="directoryUserRow">
+    <cfif structKeyExists(directoryUserRow, "USERID") AND isNumeric(directoryUserRow.USERID)>
+        <cfset arrayAppend(allUserIDs, val(directoryUserRow.USERID))>
+        <cfset usersByID[toString(val(directoryUserRow.USERID))] = directoryUserRow>
+    </cfif>
+</cfloop>
+
+<cfset preferredAliasMap = aliasesDAO.getPreferredAliasMap(allUserIDs)>
+<cfloop from="1" to="#arrayLen(allUsers)#" index="ai">
+    <cfset userKey = toString(val(allUsers[ai].USERID ?: 0))>
+    <cfset preferredAlias = structKeyExists(preferredAliasMap, userKey) ? preferredAliasMap[userKey] : {}>
+    <cfset allUsers[ai].RESOLVEDFIRSTNAME = len(trim(preferredAlias.FIRSTNAME ?: "")) ? trim(preferredAlias.FIRSTNAME) : trim(allUsers[ai].FIRSTNAME ?: "")>
+    <cfset allUsers[ai].RESOLVEDMIDDLENAME = len(trim(preferredAlias.MIDDLENAME ?: "")) ? trim(preferredAlias.MIDDLENAME) : trim(allUsers[ai].MIDDLENAME ?: "")>
+    <cfset allUsers[ai].RESOLVEDLASTNAME = len(trim(preferredAlias.LASTNAME ?: "")) ? trim(preferredAlias.LASTNAME) : trim(allUsers[ai].LASTNAME ?: "")>
+</cfloop>
 <cfset usersByID = {}>
 <cfloop array="#allUsers#" index="directoryUserRow">
     <cfif structKeyExists(directoryUserRow, "USERID") AND isNumeric(directoryUserRow.USERID)>
@@ -79,8 +97,8 @@
         <cfset needsPublishingLookup[manageUserKey] = true>
         <cfset arrayAppend(needsPublishingUserRows, {
             USERID = val(manageUserRow.USERID ?: 0),
-            FIRSTNAME = manageUserRow.FIRSTNAME ?: "",
-            LASTNAME = manageUserRow.LASTNAME ?: "",
+            FIRSTNAME = manageUserRow.RESOLVEDFIRSTNAME ?: (manageUserRow.FIRSTNAME ?: ""),
+            LASTNAME = manageUserRow.RESOLVEDLASTNAME ?: (manageUserRow.LASTNAME ?: ""),
             EMAILPRIMARY = manageUserRow.EMAILPRIMARY ?: "",
             ActiveSourceCount = activeSourceCount,
             PublishedImageCount = publishedImageCount,
@@ -259,7 +277,7 @@
             <cfloop array="#pagedPublishedUsers#" index="userStatRow">
                 <cfset rowUserID = val(userStatRow.userID)>
                 <cfset rowUser = structKeyExists(usersByID, toString(rowUserID)) ? usersByID[toString(rowUserID)] : {}>
-                <cfset displayName = trim((rowUser.FIRSTNAME ?: "") & " " & (rowUser.LASTNAME ?: ""))>
+                <cfset displayName = trim((rowUser.RESOLVEDFIRSTNAME ?: rowUser.FIRSTNAME ?: "") & " " & (rowUser.RESOLVEDLASTNAME ?: rowUser.LASTNAME ?: ""))>
                 <cfif NOT len(displayName)>
                     <cfset displayName = "User ID " & rowUserID>
                 </cfif>
@@ -437,7 +455,8 @@
                     <div class="col">
                         <div class="card h-100 shadow-sm">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title mb-1">#encodeForHTML(u.FIRSTNAME ?: "")# #encodeForHTML(u.LASTNAME ?: "")#</h5>
+                                <cfset cardDisplayName = trim((u.RESOLVEDFIRSTNAME ?: u.FIRSTNAME ?: "") & " " & (u.RESOLVEDLASTNAME ?: u.LASTNAME ?: ""))>
+                                <h5 class="card-title mb-1">#encodeForHTML(cardDisplayName)#</h5>
 
                                 <cfif len(displayEmail)>
                                     <p class="card-text text-muted small mb-2"><i class="bi bi-envelope"></i> #encodeForHTML(displayEmail)#</p>
@@ -481,7 +500,8 @@
                     <div class="col">
                         <div class="card h-100 shadow-sm border-warning-subtle">
                             <div class="card-body d-flex flex-column">
-                                <h5 class="card-title mb-1">#encodeForHTML(u.FIRSTNAME ?: "")# #encodeForHTML(u.LASTNAME ?: "")#</h5>
+                                <cfset cardDisplayName = trim((u.RESOLVEDFIRSTNAME ?: u.FIRSTNAME ?: "") & " " & (u.RESOLVEDLASTNAME ?: u.LASTNAME ?: ""))>
+                                <h5 class="card-title mb-1">#encodeForHTML(cardDisplayName)#</h5>
 
                                 <cfif len(displayEmail)>
                                     <p class="card-text text-muted small mb-2"><i class="bi bi-envelope"></i> #encodeForHTML(displayEmail)#</p>

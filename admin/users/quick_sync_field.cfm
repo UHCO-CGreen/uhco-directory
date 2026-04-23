@@ -29,6 +29,7 @@
 <cfset syncableIssues = {
     "missing_firstname"     : { apiKeys="first_name,firstName",   userField="FirstName",    label="First Name"    },
     "missing_lastname"      : { apiKeys="last_name,lastName",     userField="LastName",     label="Last Name"     },
+    "missing_primary_alias" : { apiKeys="first_name,firstName",   userField="PrimaryAlias", label="Primary Alias" },
     "missing_email_primary" : { apiKeys="email,emailAddress",     userField="EmailPrimary", label="Primary Email" },
     "missing_title1"        : { apiKeys="title",                  userField="Title1",       label="Title"         },
     "missing_room"          : { apiKeys="room",                   userField="Room",         label="Room"          },
@@ -154,6 +155,80 @@
         return "";
     }
 </cfscript>
+
+<cfif uCase(issueMap.userField) EQ "PRIMARYALIAS">
+    <cfset aliasesSvc = createObject("component", "cfc.aliases_service").init()>
+    <cfset existingAliases = aliasesSvc.getAliases(targetUserID).data>
+    <cfset aliasesToSave = []>
+    <cfset primaryIdx = 0>
+    <cfset firstActiveIdx = 0>
+
+    <cfset apiFirst = trim(qsfGetApiValue(apiPerson, "first_name,firstName"))>
+    <cfset apiMiddle = trim(qsfGetApiValue(apiPerson, "middle_name,middleName"))>
+    <cfset apiLast = trim(qsfGetApiValue(apiPerson, "last_name,lastName"))>
+
+    <cfif NOT len(apiFirst) AND NOT len(apiLast)>
+        <cfset sep = find("?", returnTo) ? "&" : "?">
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('UH API did not return name values for Primary Alias sync')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfloop from="1" to="#arrayLen(existingAliases)#" index="i">
+        <cfif val(existingAliases[i].ISPRIMARY ?: 0) EQ 1>
+            <cfset primaryIdx = i>
+            <cfbreak>
+        </cfif>
+        <cfif firstActiveIdx EQ 0 AND val(existingAliases[i].ISACTIVE ?: 0) EQ 1>
+            <cfset firstActiveIdx = i>
+        </cfif>
+    </cfloop>
+
+    <cfif primaryIdx EQ 0>
+        <cfset primaryIdx = firstActiveIdx>
+    </cfif>
+
+    <cfloop from="1" to="#arrayLen(existingAliases)#" index="i">
+        <cfset a = existingAliases[i]>
+        <cfset row = {
+            firstName = trim(a.FIRSTNAME ?: ""),
+            middleName = trim(a.MIDDLENAME ?: ""),
+            lastName = trim(a.LASTNAME ?: ""),
+            aliasType = trim(a.ALIASTYPE ?: ""),
+            sourceSystem = trim(a.SOURCESYSTEM ?: ""),
+            isActive = val(a.ISACTIVE ?: 0),
+            isPrimary = val(a.ISPRIMARY ?: 0)
+        }>
+
+        <cfif i EQ primaryIdx>
+            <cfset row.firstName = apiFirst>
+            <cfset row.middleName = apiMiddle>
+            <cfset row.lastName = apiLast>
+            <cfif NOT len(row.aliasType)><cfset row.aliasType = "SOURCE_VARIANT"></cfif>
+            <cfif NOT len(row.sourceSystem)><cfset row.sourceSystem = "UH API"></cfif>
+            <cfset row.isActive = 1>
+            <cfset row.isPrimary = 1>
+        </cfif>
+
+        <cfset arrayAppend(aliasesToSave, row)>
+    </cfloop>
+
+    <cfif arrayLen(aliasesToSave) EQ 0>
+        <cfset arrayAppend(aliasesToSave, {
+            firstName = apiFirst,
+            middleName = apiMiddle,
+            lastName = apiLast,
+            aliasType = "SOURCE_VARIANT",
+            sourceSystem = "UH API",
+            isActive = 1,
+            isPrimary = 1
+        })>
+    </cfif>
+
+    <cfset aliasesSvc.replaceAliases(targetUserID, aliasesToSave)>
+    <cfset sep = find("?", returnTo) ? "&" : "?">
+    <cflocation url="#returnTo##sep#msg=synced&syncField=#urlEncodedFormat(issueMap.label)#" addtoken="false">
+    <cfabort>
+</cfif>
 
 <cfset apiValue = trim(qsfGetApiValue(apiPerson, issueMap.apiKeys))>
 <cfif NOT len(apiValue)>

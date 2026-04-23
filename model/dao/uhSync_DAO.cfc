@@ -171,9 +171,21 @@ component extends="dao.BaseDAO" output="false" singleton {
     ) {
         var sql = "
             SELECT d.DiffID, d.UserID, d.FieldName, d.LocalValue, d.ApiValue,
-                   u.FirstName, u.LastName, u.EmailPrimary, u.UH_API_ID
+                   COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                   COALESCE(pa.LastName, u.LastName) AS LastName,
+                   u.EmailPrimary, u.UH_API_ID
             FROM UHSyncDiffs d
             INNER JOIN Users u ON u.UserID = d.UserID
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 2147483647),
+                    ua.AliasID
+            ) pa
             WHERE d.RunID = :run
               AND d.Resolution IS NULL
         ";
@@ -182,7 +194,7 @@ component extends="dao.BaseDAO" output="false" singleton {
             sql &= " AND d.FieldName = :field";
             params["field"] = { value=trim(arguments.filterField), cfsqltype="cf_sql_nvarchar" };
         }
-        sql &= " ORDER BY u.LastName, u.FirstName, d.FieldName";
+        sql &= " ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName), d.FieldName";
         var qry = executeQueryWithRetry(sql, params, { datasource=variables.datasource, timeout=60 });
         return queryToArray(qry);
     }
@@ -208,12 +220,24 @@ component extends="dao.BaseDAO" output="false" singleton {
     public array function getGoneByRun( required numeric runID ) {
         var qry = executeQueryWithRetry(
             "SELECT g.GoneID, g.UserID,
-                    u.FirstName, u.LastName, u.EmailPrimary, u.UH_API_ID,
+                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
+                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.EmailPrimary, u.UH_API_ID,
                     u.Title1, u.Department
              FROM UHSyncGone g
              INNER JOIN Users u ON u.UserID = g.UserID
+             OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 2147483647),
+                    ua.AliasID
+             ) pa
              WHERE g.RunID = :run AND g.Resolution IS NULL
-             ORDER BY u.LastName, u.FirstName",
+             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             { run = { value=runID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=60 }
         );

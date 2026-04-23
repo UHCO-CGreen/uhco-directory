@@ -200,6 +200,7 @@
 
                 <cfif isStruct(syncApiPerson)>
                     <cfset apiFirstName      = trim(syncAllGetApiValue(syncApiPerson, "first_name,firstName"))>
+                    <cfset apiMiddleName     = trim(syncAllGetApiValue(syncApiPerson, "middle_name,middleName"))>
                     <cfset apiLastName       = trim(syncAllGetApiValue(syncApiPerson, "last_name,lastName"))>
                     <cfset apiEmail          = trim(syncAllGetApiValue(syncApiPerson, "email,emailAddress"))>
                     <cfset apiPhone          = trim(syncAllGetApiValue(syncApiPerson, "phone,phoneNumber"))>
@@ -215,6 +216,7 @@
                     <cfset apiMailcode       = trim(syncAllGetApiValue(syncApiPerson, "mailcode,mail_code"))>
 
                     <cfif len(apiFirstName)>      <cfset userData.FirstName = apiFirstName>                         </cfif>
+                    <cfif len(apiMiddleName)>     <cfset userData.MiddleName = apiMiddleName>                       </cfif>
                     <cfif len(apiLastName)>        <cfset userData.LastName = apiLastName>                           </cfif>
                     <cfif len(apiEmail)>           <cfset userData.EmailPrimary = lCase(apiEmail)>                   </cfif>
                     <cfif len(apiPhone)>           <cfset userData.Phone = apiPhone>                                 </cfif>
@@ -235,6 +237,58 @@
                     <cfset saveMessage = "Sync All failed while updating user fields: " & (updateResult.message ?: "Unknown error")>
                     <cfset saveMessageClass = "alert-danger">
                 <cfelse>
+                    <!--- Also update primary alias with API name values --->
+                    <cfif len(apiFirstName) OR len(apiLastName)>
+                        <cfset uhSyncAliasesSvcSA = createObject("component", "cfc.aliases_service").init()>
+                        <cfset uhSyncExistingAliasesSA = uhSyncAliasesSvcSA.getAliases(applyUserID).data ?: []>
+                        <cfset uhSyncPrimaryIdxSA = 0>
+                        <cfset uhSyncFirstActiveIdxSA = 0>
+                        <cfloop from="1" to="#arrayLen(uhSyncExistingAliasesSA)#" index="uhSyncAliIdxSA">
+                            <cfif val(uhSyncExistingAliasesSA[uhSyncAliIdxSA].ISPRIMARY ?: 0) EQ 1>
+                                <cfset uhSyncPrimaryIdxSA = uhSyncAliIdxSA>
+                                <cfbreak>
+                            </cfif>
+                            <cfif uhSyncFirstActiveIdxSA EQ 0 AND val(uhSyncExistingAliasesSA[uhSyncAliIdxSA].ISACTIVE ?: 0) EQ 1>
+                                <cfset uhSyncFirstActiveIdxSA = uhSyncAliIdxSA>
+                            </cfif>
+                        </cfloop>
+                        <cfif uhSyncPrimaryIdxSA EQ 0><cfset uhSyncPrimaryIdxSA = uhSyncFirstActiveIdxSA></cfif>
+                        <cfset uhSyncAliasesToSaveSA = []>
+                        <cfif uhSyncPrimaryIdxSA GT 0>
+                            <cfloop from="1" to="#arrayLen(uhSyncExistingAliasesSA)#" index="uhSyncAliIdxSA">
+                                <cfset uhSyncA = uhSyncExistingAliasesSA[uhSyncAliIdxSA]>
+                                <cfset uhSyncAliRow = {
+                                    firstName    = trim(uhSyncA.FIRSTNAME ?: ""),
+                                    middleName   = trim(uhSyncA.MIDDLENAME ?: ""),
+                                    lastName     = trim(uhSyncA.LASTNAME ?: ""),
+                                    aliasType    = trim(uhSyncA.ALIASTYPE ?: ""),
+                                    sourceSystem = trim(uhSyncA.SOURCESYSTEM ?: ""),
+                                    isActive     = val(uhSyncA.ISACTIVE ?: 0),
+                                    isPrimary    = val(uhSyncA.ISPRIMARY ?: 0)
+                                }>
+                                <cfif uhSyncAliIdxSA EQ uhSyncPrimaryIdxSA>
+                                    <cfif len(apiFirstName)><cfset uhSyncAliRow.firstName = apiFirstName></cfif>
+                                    <cfif len(apiMiddleName)><cfset uhSyncAliRow.middleName = apiMiddleName></cfif>
+                                    <cfif len(apiLastName)><cfset uhSyncAliRow.lastName = apiLastName></cfif>
+                                    <cfif NOT len(uhSyncAliRow.aliasType)><cfset uhSyncAliRow.aliasType = "SOURCE_VARIANT"></cfif>
+                                    <cfif NOT len(uhSyncAliRow.sourceSystem)><cfset uhSyncAliRow.sourceSystem = "UH API"></cfif>
+                                    <cfset uhSyncAliRow.isPrimary = 1>
+                                </cfif>
+                                <cfset arrayAppend(uhSyncAliasesToSaveSA, uhSyncAliRow)>
+                            </cfloop>
+                        <cfelse>
+                            <cfset arrayAppend(uhSyncAliasesToSaveSA, {
+                                firstName    = apiFirstName,
+                                middleName   = apiMiddleName,
+                                lastName     = apiLastName,
+                                aliasType    = "SOURCE_VARIANT",
+                                sourceSystem = "UH API",
+                                isActive     = 1,
+                                isPrimary    = 1
+                            })>
+                        </cfif>
+                        <cfset uhSyncAliasesSvcSA.replaceAliases(applyUserID, uhSyncAliasesToSaveSA)>
+                    </cfif>
                     <cfset flagsService = createObject("component", "cfc.flags_service").init()>
                     <cfset allFlagsResult = flagsService.getAllFlags()>
                     <cfset syncFlagsUpdated = 0>
@@ -419,6 +473,8 @@
 
             <cfif applyField EQ "FIRSTNAME">
                 <cfset userData.FirstName = applyValue>
+            <cfelseif applyField EQ "MIDDLENAME">
+                <cfset userData.MiddleName = applyValue>
             <cfelseif applyField EQ "LASTNAME">
                 <cfset userData.LastName = applyValue>
             <cfelseif applyField EQ "EMAILPRIMARY">
@@ -455,6 +511,58 @@
                 <cfif structKeyExists(updateResult, "success") AND updateResult.success>
                     <cfset saveMessage = "Updated " & applyField & " from API value.">
                     <cfset saveMessageClass = "alert-success">
+                    <!--- Also update primary alias for name field syncs --->
+                    <cfif listFindNoCase("FIRSTNAME,MIDDLENAME,LASTNAME", applyField)>
+                        <cfset uhSyncAliasesSvcSF = createObject("component", "cfc.aliases_service").init()>
+                        <cfset uhSyncExistingAliasesSF = uhSyncAliasesSvcSF.getAliases(applyUserID).data ?: []>
+                        <cfset uhSyncPrimaryIdxSF = 0>
+                        <cfset uhSyncFirstActiveIdxSF = 0>
+                        <cfloop from="1" to="#arrayLen(uhSyncExistingAliasesSF)#" index="uhSyncAliIdxSF">
+                            <cfif val(uhSyncExistingAliasesSF[uhSyncAliIdxSF].ISPRIMARY ?: 0) EQ 1>
+                                <cfset uhSyncPrimaryIdxSF = uhSyncAliIdxSF>
+                                <cfbreak>
+                            </cfif>
+                            <cfif uhSyncFirstActiveIdxSF EQ 0 AND val(uhSyncExistingAliasesSF[uhSyncAliIdxSF].ISACTIVE ?: 0) EQ 1>
+                                <cfset uhSyncFirstActiveIdxSF = uhSyncAliIdxSF>
+                            </cfif>
+                        </cfloop>
+                        <cfif uhSyncPrimaryIdxSF EQ 0><cfset uhSyncPrimaryIdxSF = uhSyncFirstActiveIdxSF></cfif>
+                        <cfset uhSyncAliasesToSaveSF = []>
+                        <cfif uhSyncPrimaryIdxSF GT 0>
+                            <cfloop from="1" to="#arrayLen(uhSyncExistingAliasesSF)#" index="uhSyncAliIdxSF">
+                                <cfset uhSyncASF = uhSyncExistingAliasesSF[uhSyncAliIdxSF]>
+                                <cfset uhSyncAliRowSF = {
+                                    firstName    = trim(uhSyncASF.FIRSTNAME ?: ""),
+                                    middleName   = trim(uhSyncASF.MIDDLENAME ?: ""),
+                                    lastName     = trim(uhSyncASF.LASTNAME ?: ""),
+                                    aliasType    = trim(uhSyncASF.ALIASTYPE ?: ""),
+                                    sourceSystem = trim(uhSyncASF.SOURCESYSTEM ?: ""),
+                                    isActive     = val(uhSyncASF.ISACTIVE ?: 0),
+                                    isPrimary    = val(uhSyncASF.ISPRIMARY ?: 0)
+                                }>
+                                <cfif uhSyncAliIdxSF EQ uhSyncPrimaryIdxSF>
+                                    <cfif applyField EQ "FIRSTNAME"><cfset uhSyncAliRowSF.firstName = applyValue></cfif>
+                                    <cfif applyField EQ "MIDDLENAME"><cfset uhSyncAliRowSF.middleName = applyValue></cfif>
+                                    <cfif applyField EQ "LASTNAME"><cfset uhSyncAliRowSF.lastName = applyValue></cfif>
+                                    <cfif NOT len(uhSyncAliRowSF.aliasType)><cfset uhSyncAliRowSF.aliasType = "SOURCE_VARIANT"></cfif>
+                                    <cfif NOT len(uhSyncAliRowSF.sourceSystem)><cfset uhSyncAliRowSF.sourceSystem = "UH API"></cfif>
+                                    <cfset uhSyncAliRowSF.isPrimary = 1>
+                                </cfif>
+                                <cfset arrayAppend(uhSyncAliasesToSaveSF, uhSyncAliRowSF)>
+                            </cfloop>
+                        <cfelse>
+                            <cfset arrayAppend(uhSyncAliasesToSaveSF, {
+                                firstName    = applyField EQ "FIRSTNAME" ? applyValue : trim(currentUser.FIRSTNAME ?: ""),
+                                middleName   = applyField EQ "MIDDLENAME" ? applyValue : trim(currentUser.MIDDLENAME ?: ""),
+                                lastName     = applyField EQ "LASTNAME" ? applyValue : trim(currentUser.LASTNAME ?: ""),
+                                aliasType    = "SOURCE_VARIANT",
+                                sourceSystem = "UH API",
+                                isActive     = 1,
+                                isPrimary    = 1
+                            })>
+                        </cfif>
+                        <cfset uhSyncAliasesSvcSF.replaceAliases(applyUserID, uhSyncAliasesToSaveSF)>
+                    </cfif>
                 <cfelse>
                     <cfset saveMessage = "Update failed: " & (updateResult.message ?: "Unknown error")>
                     <cfset saveMessageClass = "alert-danger">
@@ -658,8 +766,25 @@
             <tbody>
         ">
 
+        <!--- Load primary alias to resolve name field DB values for comparison --->
+        <cfset uhSyncDispAliasesSvc = createObject("component", "cfc.aliases_service").init()>
+        <cfset uhSyncDispAliasesResult = uhSyncDispAliasesSvc.getAliases(val(sourceUserID))>
+        <cfset uhSyncDispPrimaryAlias = {}>
+        <cfif structKeyExists(uhSyncDispAliasesResult, "data") AND isArray(uhSyncDispAliasesResult.data)>
+            <cfloop from="1" to="#arrayLen(uhSyncDispAliasesResult.data)#" index="uhSyncDispAliIdx">
+                <cfif val(uhSyncDispAliasesResult.data[uhSyncDispAliIdx].ISPRIMARY ?: 0) EQ 1>
+                    <cfset uhSyncDispPrimaryAlias = uhSyncDispAliasesResult.data[uhSyncDispAliIdx]>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        </cfif>
+        <cfset uhSyncResolvedFirstName  = len(trim(uhSyncDispPrimaryAlias.FIRSTNAME  ?: "")) ? trim(uhSyncDispPrimaryAlias.FIRSTNAME)  : trim(dbUser.FIRSTNAME  ?: "")>
+        <cfset uhSyncResolvedMiddleName = len(trim(uhSyncDispPrimaryAlias.MIDDLENAME ?: "")) ? trim(uhSyncDispPrimaryAlias.MIDDLENAME) : trim(dbUser.MIDDLENAME ?: "")>
+        <cfset uhSyncResolvedLastName   = len(trim(uhSyncDispPrimaryAlias.LASTNAME   ?: "")) ? trim(uhSyncDispPrimaryAlias.LASTNAME)   : trim(dbUser.LASTNAME   ?: "")>
+
         <cfset comparisonRows = [
             { label="First Name",             dbKey="FIRSTNAME",              apiKeys="first_name,firstName",                                        canUpdate=true },
+            { label="Middle Name",            dbKey="MIDDLENAME",             apiKeys="middle_name,middleName",                                       canUpdate=true },
             { label="Last Name",              dbKey="LASTNAME",               apiKeys="last_name,lastName",                                          canUpdate=true },
             { label="Email",                  dbKey="EMAILPRIMARY",           apiKeys="email,emailAddress",                                          canUpdate=true },
             { label="Phone",                  dbKey="PHONE",                  apiKeys="phone,phoneNumber",                                           canUpdate=true },
@@ -686,6 +811,13 @@
             <cfset dbVal        = getDbValue(dbUser, row.dbKey)>
             <cfset apiVal       = getApiValue(apiPerson, row.apiKeys)>
             <cfset dbRaw        = trim(toString(dbVal ?: ""))>
+            <cfif row.dbKey EQ "FIRSTNAME">
+                <cfset dbRaw = uhSyncResolvedFirstName>
+            <cfelseif row.dbKey EQ "MIDDLENAME">
+                <cfset dbRaw = uhSyncResolvedMiddleName>
+            <cfelseif row.dbKey EQ "LASTNAME">
+                <cfset dbRaw = uhSyncResolvedLastName>
+            </cfif>
             <cfset apiRaw       = trim(toString(apiVal ?: ""))>
             <cfset hasDbValue   = len(dbRaw) GT 0>
             <cfset hasApiValue  = len(apiRaw) GT 0>

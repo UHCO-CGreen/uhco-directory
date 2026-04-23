@@ -84,6 +84,55 @@
     <cfreturn arrayToList(result, " ")>
 </cffunction>
 
+<cffunction name="parseDisplayNameParts" access="private" returntype="struct" output="false">
+    <cfargument name="displayName" type="string" required="true">
+
+    <cfset var nameRaw = trim(arguments.displayName)>
+    <cfset var cleaned = "">
+    <cfset var parts = []>
+    <cfset var structOut = { firstName = "", middleName = "", lastName = "" }>
+    <cfset var firstMiddle = "">
+    <cfset var firstParts = []>
+    <cfset var i = 0>
+
+    <cfif NOT len(nameRaw)>
+        <cfreturn structOut>
+    </cfif>
+
+    <cfset cleaned = rereplace(nameRaw, "\s+", " ", "all")>
+
+    <!--- Last, First Middle --->
+    <cfif find(",", cleaned) GT 0>
+        <cfset structOut.lastName = toProperName(trim(listFirst(cleaned, ",")))>
+        <cfset firstMiddle = trim(listRest(cleaned, ","))>
+        <cfif len(firstMiddle)>
+            <cfset firstParts = listToArray(firstMiddle, " ")>
+            <cfif arrayLen(firstParts) GTE 1>
+                <cfset structOut.firstName = toProperName(trim(firstParts[1]))>
+            </cfif>
+            <cfif arrayLen(firstParts) GTE 2>
+                <cfset structOut.middleName = toProperName(trim(arrayToList(arraySlice(firstParts, 2, arrayLen(firstParts) - 1), " ")))>
+            </cfif>
+        </cfif>
+        <cfreturn structOut>
+    </cfif>
+
+    <!--- First Middle Last --->
+    <cfset parts = listToArray(cleaned, " ")>
+    <cfif arrayLen(parts) EQ 1>
+        <cfset structOut.firstName = toProperName(trim(parts[1]))>
+    <cfelseif arrayLen(parts) EQ 2>
+        <cfset structOut.firstName = toProperName(trim(parts[1]))>
+        <cfset structOut.lastName = toProperName(trim(parts[2]))>
+    <cfelse>
+        <cfset structOut.firstName = toProperName(trim(parts[1]))>
+        <cfset structOut.lastName = toProperName(trim(parts[arrayLen(parts)]))>
+        <cfset structOut.middleName = toProperName(trim(arrayToList(arraySlice(parts, 2, arrayLen(parts) - 2), " ")))>
+    </cfif>
+
+    <cfreturn structOut>
+</cffunction>
+
 <!--- Helper: builds a full userData struct from existing record, overlaying only supplied keys --->
 <cffunction name="buildUserData" access="private" returntype="struct" output="false">
     <cfargument name="existing" type="struct" required="true">
@@ -143,6 +192,94 @@
         <cfoutput>{"success":true,"message":"Emails saved."}</cfoutput>
     </cfcase>
 
+    <!--- ── Add LDAP email if missing (no-op if exists) ── --->
+    <cfcase value="addldapemailifmissing">
+        <cfset emailsSvc = createObject("component", "cfc.emails_service").init()>
+        <cfset ldapEmail = structKeyExists(form, "email") ? trim(form.email) : "">
+        <cfset ldapEmailType = "@Cougarnet">
+
+        <cfif NOT len(ldapEmail)>
+            <cfoutput>{"success":false,"message":"Missing email."}</cfoutput><cfabort>
+        </cfif>
+
+        <cfif reFindNoCase("@central", ldapEmail)>
+            <cfset ldapEmailType = "@Central">
+        </cfif>
+
+        <cfset wasInserted = emailsSvc.addEmailIfMissing(userID=userID, emailAddress=ldapEmail, emailType=ldapEmailType)>
+        <cfif wasInserted>
+            <cfoutput>{"success":true,"inserted":true,"message":"Email added."}</cfoutput>
+        <cfelse>
+            <cfoutput>{"success":true,"inserted":false,"message":"Email already exists."}</cfoutput>
+        </cfif>
+    </cfcase>
+
+    <!--- ── Add LDAP alias from displayName if missing (no-op if exists) ── --->
+    <cfcase value="addldapaliasifmissing">
+        <cfset aliasesSvc = createObject("component", "cfc.aliases_service").init()>
+        <cfset ldapDisplayName = structKeyExists(form, "displayName") ? trim(form.displayName) : "">
+        <cfset aliasTypeCode = "SOURCE_VARIANT">
+        <cfset sourceSystem = "LDAP">
+        <cfset parsed = {}>
+        <cfset existingAliases = []>
+        <cfset aliasesToSave = []>
+        <cfset existing = {}>
+        <cfset alreadyExists = false>
+
+        <cfif NOT len(ldapDisplayName)>
+            <cfoutput>{"success":false,"message":"Missing displayName."}</cfoutput><cfabort>
+        </cfif>
+
+        <cfset parsed = parseDisplayNameParts(ldapDisplayName)>
+        <cfif NOT len(parsed.firstName) AND NOT len(parsed.middleName) AND NOT len(parsed.lastName)>
+            <cfoutput>{"success":false,"message":"Could not parse displayName into alias parts."}</cfoutput><cfabort>
+        </cfif>
+
+        <cfset existingAliases = aliasesSvc.getAliases(userID).data>
+
+        <cfloop array="#existingAliases#" index="existing">
+            <cfif
+                lCase(trim(existing.ALIASTYPE ?: "")) EQ lCase(aliasTypeCode)
+                AND lCase(trim(existing.SOURCESYSTEM ?: "")) EQ lCase(sourceSystem)
+                AND lCase(trim(existing.FIRSTNAME ?: "")) EQ lCase(parsed.firstName)
+                AND lCase(trim(existing.MIDDLENAME ?: "")) EQ lCase(parsed.middleName)
+                AND lCase(trim(existing.LASTNAME ?: "")) EQ lCase(parsed.lastName)
+            >
+                <cfset alreadyExists = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+
+        <cfif alreadyExists>
+            <cfoutput>{"success":true,"inserted":false,"message":"Alias already exists."}</cfoutput><cfabort>
+        </cfif>
+
+        <cfloop array="#existingAliases#" index="existing">
+            <cfset arrayAppend(aliasesToSave, {
+                firstName = trim(existing.FIRSTNAME ?: ""),
+                middleName = trim(existing.MIDDLENAME ?: ""),
+                lastName = trim(existing.LASTNAME ?: ""),
+                aliasType = trim(existing.ALIASTYPE ?: ""),
+                sourceSystem = trim(existing.SOURCESYSTEM ?: ""),
+                isActive = val(existing.ISACTIVE ?: 0),
+                isPrimary = val(existing.ISPRIMARY ?: 0)
+            })>
+        </cfloop>
+
+        <cfset arrayAppend(aliasesToSave, {
+            firstName = parsed.firstName,
+            middleName = parsed.middleName,
+            lastName = parsed.lastName,
+            aliasType = aliasTypeCode,
+            sourceSystem = sourceSystem,
+            isActive = 1,
+            isPrimary = 0
+        })>
+
+        <cfset aliasesSvc.replaceAliases(userID, aliasesToSave)>
+        <cfoutput>{"success":true,"inserted":true,"message":"Alias added."}</cfoutput>
+    </cfcase>
+
     <!--- ── Phones ── --->
     <cfcase value="phones">
         <cfset phoneSvc = createObject("component", "cfc.phone_service").init()>
@@ -172,8 +309,17 @@
             <cfset aType   = structKeyExists(form, "type_#i#")   ? trim(form["type_#i#"])   : "">
             <cfset aSource = structKeyExists(form, "source_#i#") ? trim(form["source_#i#"]) : "">
             <cfset aActive = structKeyExists(form, "active_#i#") ? val(form["active_#i#"])  : 0>
+            <cfset aPrimary = structKeyExists(form, "primary_#i#") ? val(form["primary_#i#"]) : 0>
             <cfif len(aType) AND (len(aFirst) OR len(aMiddle) OR len(aLast))>
-                <cfset arrayAppend(aliasesToSave, { firstName=aFirst, middleName=aMiddle, lastName=aLast, aliasType=aType, sourceSystem=aSource, isActive=aActive })>
+                <cfset arrayAppend(aliasesToSave, {
+                    firstName=aFirst,
+                    middleName=aMiddle,
+                    lastName=aLast,
+                    aliasType=aType,
+                    sourceSystem=aSource,
+                    isActive=aActive,
+                    isPrimary=aPrimary
+                })>
             </cfif>
         </cfloop>
         <cfset aliasesSvc.replaceAliases(userID, aliasesToSave)>

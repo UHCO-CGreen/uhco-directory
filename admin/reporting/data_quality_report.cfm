@@ -10,6 +10,7 @@
     "missing_uh_api_id"      : "Missing UH API ID",
     "missing_firstname"      : "Missing First Name",
     "missing_lastname"       : "Missing Last Name",
+    "missing_primary_alias"  : "Missing Primary Alias",
     "missing_email_primary"  : "Missing Primary Email (@uh.edu)",
     "missing_email_secondary": "Missing Secondary Email (@cougarnet or @central)",
     "missing_title1"         : "Missing Title",
@@ -31,6 +32,7 @@
     "missing_uh_api_id"      : "high",
     "missing_firstname"      : "high",
     "missing_lastname"       : "high",
+    "missing_primary_alias"  : "high",
     "missing_email_primary"  : "high",
     "missing_email_secondary": "mid",
     "missing_title1"         : "high",
@@ -249,7 +251,7 @@
 <!--- ── Summary cards ── --->
 <cfset content &= "<div class='collapse show' id='filterCards'><div class='row g-3 mb-4'>">
 <cfset orderedCodes = [
-    "missing_uh_api_id", "missing_firstname", "missing_lastname",
+    "missing_uh_api_id", "missing_primary_alias",
     "missing_email_primary", "missing_email_secondary", "missing_title1",
     "missing_room", "missing_building", "no_flags", "no_orgs",
     "missing_cougarnet", "missing_peoplesoft", "missing_legacy_id", "missing_grad_year",
@@ -313,8 +315,7 @@
         <tbody>
     ">
     <!--- Quick-sync label map: issue codes that map directly to a UH API field --->    <cfset quickSyncLabels = {
-        "missing_firstname"     : "Sync First Name",
-        "missing_lastname"      : "Sync Last Name",
+        "missing_primary_alias" : "Sync Primary Alias",
         "missing_email_primary" : "Sync Primary Email",
         "missing_title1"        : "Sync Title",
         "missing_room"          : "Sync Room",
