@@ -46,6 +46,7 @@
   --gold: #f6be00;
   --mustard: #d89b00;
   --ocher: #b97800;
+  --ocher-rgb: 185, 120, 0;
 
   /* White Accents */
   --ghost-white: #f8f8ff;
@@ -131,4 +132,43 @@ code {
   background: brand.$code-inline-bg;
   padding: 0.1em 0.3em;
   border-radius: 0.2em;
+}
+
+.btn-save-action,
+button[id^='save'],
+input[type='submit'][id^='save'] {
+  border-color: #3d8b61;
+  background: linear-gradient(180deg, #4ca06f 0%, #3d8b61 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-save-action:hover,
+.btn-save-action:focus,
+button[id^='save']:hover,
+button[id^='save']:focus,
+input[type='submit'][id^='save']:hover,
+input[type='submit'][id^='save']:focus {
+  border-color: #32704e;
+  background: linear-gradient(180deg, #418e63 0%, #32704e 100%);
+  color: #fff;
+}
+
+.btn-save-needs,
+.users-edit-save-needs {
+  box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75);
+  border-color: #ffc107;
+  animation: usersEditSavePulse 1.4s ease-out infinite;
+}
+
+@keyframes usersEditSavePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
 }

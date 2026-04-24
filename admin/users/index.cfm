@@ -475,12 +475,41 @@
     ">
 </cfif>
 
+<cfset usersListMenuHTML = "
+            <div class='dropdown'>
+                <button class='btn btn-sm btn-secondary text-dark dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                    <i class='bi bi-person-fill me-1'></i>Change User Type
+                </button>
+                <ul class='dropdown-menu dropdown-menu-end'>
+                    <li><a class='dropdown-item#(listType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
+                    <li><a class='dropdown-item#(listType EQ "faculty" ? " active" : "")#' href='/admin/users/index.cfm?list=faculty'><i class='bi bi-people-fill me-2'></i>Faculty</a></li>
+                    <li><a class='dropdown-item#(listType EQ "staff" ? " active" : "")#' href='/admin/users/index.cfm?list=staff'><i class='bi bi-people-fill me-2'></i>Staff</a></li>
+                    <li><a class='dropdown-item#(listType EQ "current-students" ? " active" : "")#' href='/admin/users/index.cfm?list=current-students'><i class='bi bi-people-fill me-2'></i>Current Students</a></li>
+                    <li><a class='dropdown-item#(listType EQ "alumni" ? " active" : "")#' href='/admin/users/index.cfm?list=alumni'><i class='bi bi-mortarboard me-2'></i>Alumni</a></li>
+                    <li><a class='dropdown-item#(listType EQ "inactive" ? " active" : "")#' href='/admin/users/index.cfm?list=inactive'><i class='bi bi-person-dash me-2'></i>Inactive Records</a></li>
+                    <li><a class='dropdown-item#(listType EQ "all" ? " active" : "")#' href='/admin/users/index.cfm?list=all'><i class='bi bi-list me-2'></i>All Records</a></li>
+                </ul>
+            </div>
+">
+
 <!--- ======================== BUILD PAGE CONTENT ======================== --->
 <cfset content = "
-<div class='d-flex justify-content-between mb-4 users-list-page-header'>
-    <h1><i class='bi bi-people-fill me-2'></i>#pageTitle# <span class='badge bg-secondary fs-6 users-list-count-badge'>#totalRecords#</span></h1>
+<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
+    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-secondary text-dark'>
+        <i class='bi bi-search me-1'></i>Search The UH API
+    </a>
+    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-secondary text-dark'>
+        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
+    </a>
+</div>
+
+<div class='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 users-list-page-header'>
+    <div class='d-flex align-items-center gap-2 flex-wrap'>
+        <h1 class='mb-0'><i class='bi bi-people-fill me-2'></i>#pageTitle# </h1>
+        #usersListMenuHTML#
+    </div>
     <div class='d-flex gap-2'>
-        <a href='/admin/users/new.cfm' class='btn btn-primary'>New User</a>
+        <a href='/admin/users/new.cfm' class='btn btn-lg btn-primary'><i class='bi bi-plus me-1'></i>New User</a>
     </div>
 </div>
 

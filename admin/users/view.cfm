@@ -48,6 +48,48 @@
     <cfset resolvedLastName = trim(primaryAlias.LASTNAME ?: resolvedLastName)>
 </cfif>
 
+<!--- ── Contact + profile detail datasets ── --->
+<cfset emailsSvc   = createObject("component", "cfc.emails_service").init()>
+<cfset userEmails  = emailsSvc.getEmails(val(url.userID)).data>
+
+<cfset phoneSvc    = createObject("component", "cfc.phone_service").init()>
+<cfset userPhones  = phoneSvc.getPhones(val(url.userID)).data>
+
+<cfset degreesSvc  = createObject("component", "cfc.degrees_service").init()>
+<cfset userDegrees = degreesSvc.getDegrees(val(url.userID)).data>
+
+<cfset bioSvc      = createObject("component", "cfc.bio_service").init()>
+<cfset bioData     = bioSvc.getBio(val(url.userID)).data>
+<cfset bioContent  = structIsEmpty(bioData) ? "" : (bioData.BIOCONTENT ?: "")>
+
+<cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
+<cfset allSystems        = externalIDService.getSystems().data>
+<cfset userExternalIDs   = externalIDService.getExternalIDs(val(url.userID)).data>
+<cfset externalBySystem  = {}>
+<cfloop from="1" to="#arrayLen(userExternalIDs)#" index="i">
+    <cfset externalBySystem[toString(userExternalIDs[i].SYSTEMID)] = userExternalIDs[i].EXTERNALVALUE>
+</cfloop>
+
+<cfset dqDAO            = createObject("component", "dao.dataQuality_DAO").init()>
+<cfset dqExclusionsList = dqDAO.getExclusionsForUser(val(url.userID))>
+<cfset dqExclusionLabelMap = {
+    "missing_uh_api_id"      : "Missing UH API ID",
+    "missing_primary_alias"  : "Missing Primary Alias",
+    "missing_email_primary"  : "Missing Primary Email",
+    "missing_title1"         : "Missing Title",
+    "missing_room"           : "Missing Room",
+    "missing_building"       : "Missing Building",
+    "missing_phone"          : "Missing Phone",
+    "missing_degrees"        : "Missing Degrees",
+    "no_flags"               : "Zero Flags",
+    "no_orgs"                : "Zero Organizations",
+    "no_images"              : "No Images",
+    "missing_cougarnet"      : "Missing CougarNet ID",
+    "missing_peoplesoft"     : "Missing PeopleSoft ID",
+    "missing_legacy_id"      : "Missing Legacy ID",
+    "missing_grad_year"      : "Missing Grad Year (Students Only)"
+}>
+
 <!--- ── Addresses ── --->
 <cfset addressesSvc  = createObject("component", "cfc.addresses_service").init()>
 <cfset userAddresses = addressesSvc.getAddresses(val(url.userID)).data>
@@ -237,6 +279,7 @@
     <cfset userAliasesHtml &= "</ul></div>">
 </cfif>
 
+<!---
 <cfset quickMatchHtml = "
 <div class='card card-body mb-3 mt-4 users-view-quickmatch'>
     <h5 class='mb-2'>Quick API Match</h5>
@@ -266,6 +309,7 @@
 </cfif>
 
 <cfset quickMatchHtml &= "</div>">
+--->
 
 <cfset profileThumbnail = "/assets/images/uh.png">
 
@@ -303,16 +347,50 @@
     <cfset SubTitle = "<p class='text-muted fs-5'>&nbsp;</p>">
 </cfif>
 
+<cfset flagsRowHtml = "">
+<cfif arrayLen(profile.flags) GT 0>
+    <cfset flagsRowHtml = "<div class='users-view-pill-stack mt-1 mb-2'>">
+    <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
+        <cfset flag = profile.flags[f]>
+        <cfset flagsRowHtml &= "<span class='badge rounded-pill users-view-badge users-view-badge-flag'>" & EncodeForHTML(flag.FLAGNAME) & "</span>">
+    </cfloop>
+    <cfset flagsRowHtml &= "</div>">
+<cfelse>
+    <cfset flagsRowHtml = "<p class='text-muted small mt-1 mb-2'>No flags assigned</p>">
+</cfif>
+
+<!---#quickMatchHtml#--->
+
+<cfif len(trim(profile.user.UH_API_ID ?: ""))>
+        <cfset uhSyncUrl = "/admin/users/uh_sync.cfm?userID=" & urlEncodedFormat(profile.user.USERID) & "&uhApiId=" & urlEncodedFormat(profile.user.UH_API_ID)>
+        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-secondary text-dark'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
+    <cfelse>
+        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-secondary text-dark disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
+    </cfif>
+
 <cfset content = "
+<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
+    <a href='/admin/users/edit.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-secondary text-dark'>
+        <i class='bi bi-pencil me-1'></i>Edit This User
+    </a>
+    #uhSyncButtonHtml#
+    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-secondary text-dark'>
+        <i class='bi bi-search me-1'></i>Search The UH API
+    </a>
+    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-secondary text-dark'>
+        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
+    </a>
+</div>
 <div class='users-view-page'>
 <div class='users-view-header clearfix'>
 <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
-<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')#</h1>
+<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
 <div class='users-view-subtitle'>#SubTitle#</div>
+#flagsRowHtml#
 </div>
 
 
-#quickMatchHtml#
+
 
 <div class='row mt-4'>
     <div class='col-md-6'>
@@ -346,29 +424,7 @@
         </div>" : "" )#
     </div>
 
-    <div class='col-md-3'>
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Flags</div>
-            <div class='card-body'>
-" />
-
-<cfif arrayLen(profile.flags) gt 0>
-    <cfset content &= "<div class='users-view-pill-stack'>">
-    <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
-        <cfset flag = profile.flags[f]>
-        <cfset content &= "<span class='badge rounded-pill users-view-badge users-view-badge-flag'>#EncodeForHTML(flag.FLAGNAME)#</span>">
-    </cfloop>
-    <cfset content &= "</div>">
-<cfelse>
-    <cfset content &= "<p class='text-muted'>No flags assigned</p>">
-</cfif>
-
-<cfset content &= "
-            </div>
-        </div>
-    </div>
-
-    <div class='col-md-3'>
+    <div class='col-md-6'>
         <div class='card mb-3 users-view-card'>
             <div class='card-header fw-semibold'>Organizations</div>
             <div class='card-body'>
@@ -390,6 +446,99 @@
 
 <cfset content &= "
                 </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class='row'>
+    <div class='col-md-6'>
+        <div class='card mb-3 users-view-card'>
+            <div class='card-header fw-semibold'>Contact Details</div>
+            <div class='card-body'>
+                <p class='mb-2'><strong>Emails</strong></p>
+">
+
+<cfif arrayLen(userEmails) GT 0>
+    <cfset content &= "<ul class='mb-3 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userEmails)#" index="emIdx">
+        <cfset em = userEmails[emIdx]>
+        <cfset emType = len(trim(em.EMAILTYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(em.EMAILTYPE) & "</span>" : "">
+        <cfset emPrimary = val(em.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge bg-success users-view-badge'>Primary</span>" : "">
+        <cfset content &= "<li>" & EncodeForHTML(em.EMAILADDRESS ?: "") & emType & emPrimary & "</li>">
+    </cfloop>
+    <cfset content &= "</ul>">
+<cfelse>
+    <cfset content &= "<p class='text-muted small mb-3'>No email records.</p>">
+</cfif>
+
+<cfset content &= "<p class='mb-2'><strong>Phones</strong></p>">
+
+<cfif arrayLen(userPhones) GT 0>
+    <cfset content &= "<ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userPhones)#" index="phIdx">
+        <cfset ph = userPhones[phIdx]>
+        <cfset phType = len(trim(ph.PHONETYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(ph.PHONETYPE) & "</span>" : "">
+        <cfset phPrimary = val(ph.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge bg-success users-view-badge'>Primary</span>" : "">
+        <cfset content &= "<li>" & EncodeForHTML(ph.PHONENUMBER ?: "") & phType & phPrimary & "</li>">
+    </cfloop>
+    <cfset content &= "</ul>">
+<cfelse>
+    <cfset content &= "<p class='text-muted small mb-0'>No phone records.</p>">
+</cfif>
+
+<cfset content &= "
+            </div>
+        </div>
+
+        <div class='card mb-3 users-view-card'>
+            <div class='card-header fw-semibold'>External IDs</div>
+            <div class='card-body'>
+                <ul class='mb-0 users-view-org-list'>
+">
+
+<cfif arrayLen(allSystems) GT 0>
+    <cfloop from="1" to="#arrayLen(allSystems)#" index="sysIdx">
+        <cfset sys = allSystems[sysIdx]>
+        <cfset sysVal = structKeyExists(externalBySystem, toString(sys.SYSTEMID)) ? externalBySystem[toString(sys.SYSTEMID)] : "">
+        <cfset content &= "<li><strong>" & EncodeForHTML(sys.SYSTEMNAME ?: "System") & ":</strong> " & (len(trim(sysVal)) ? EncodeForHTML(sysVal) : "<span class='text-muted'>Not set</span>") & "</li>">
+    </cfloop>
+<cfelse>
+    <cfset content &= "<li class='text-muted'>No external systems configured.</li>">
+</cfif>
+
+<cfset content &= "
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class='col-md-6'>
+        <div class='card mb-3 users-view-card'>
+            <div class='card-header fw-semibold'>Bio / About Me</div>
+            <div class='card-body'>
+                " & (len(trim(bioContent)) ? bioContent : "<p class='text-muted mb-0'>No bio content.</p>") & "
+            </div>
+        </div>
+
+        <div class='card mb-3 users-view-card'>
+            <div class='card-header fw-semibold'>Data Quality Exclusions</div>
+            <div class='card-body'>
+">
+
+<cfif arrayLen(dqExclusionsList) GT 0>
+    <cfset content &= "<ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(dqExclusionsList)#" index="dqIdx">
+        <cfset dqCode = dqExclusionsList[dqIdx]>
+        <cfset dqLabel = structKeyExists(dqExclusionLabelMap, dqCode) ? dqExclusionLabelMap[dqCode] : dqCode>
+        <cfset content &= "<li>" & EncodeForHTML(dqLabel) & "</li>">
+    </cfloop>
+    <cfset content &= "</ul>">
+<cfelse>
+    <cfset content &= "<p class='text-muted mb-0'>No exclusions; all checks are included.</p>">
+</cfif>
+
+<cfset content &= "
             </div>
         </div>
     </div>

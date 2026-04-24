@@ -21,7 +21,7 @@
 </cfif>
 
 <cftry>
-    <cfset ldapLookupService = createObject("component", "cfc.ldapLookup_service").init()>
+    <cfset ldapLookupService = createObject("component", "cfc.ldapLookup_simple_service").init()>
     <cfset result = ldapLookupService.searchCandidates(
         searchTerm = term,
         userType = userType,

@@ -6,11 +6,32 @@ component extends="dao.BaseDAO" output="false" singleton {
     
     public struct function getUserByID( required numeric userID ) {
         var qry = executeQueryWithRetry(
-            "SELECT * FROM Users WHERE UserID = :id",
+            "SELECT u.*, 
+                    COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '')   AS PreferredLastName
+             FROM Users u
+             OUTER APPLY (
+                 SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                 FROM UserAliases ua
+                 WHERE ua.UserID = u.UserID
+                   AND ua.IsActive = 1
+                 ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+             ) pa
+             WHERE u.UserID = :id",
             { id = { value=userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=60, fetchSize=100 }
         );
-        return (qry.recordCount > 0) ? qry.getRow(1) : {};
+        if ( qry.recordCount EQ 0 ) {
+            return {};
+        }
+
+        var row = qry.getRow(1);
+        _applyPreferredNameToRow( row );
+        return row;
     }
 
     public struct function getUserByCougarnet( required string cougarnetID ) {
@@ -70,11 +91,28 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     public array function getAllUsers() {
         var qry = executeQueryWithRetry(
-            "SELECT * FROM Users ORDER BY LastName, FirstName",
+            "SELECT u.*, 
+                    COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '')   AS PreferredLastName
+             FROM Users u
+             OUTER APPLY (
+                 SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                 FROM UserAliases ua
+                 WHERE ua.UserID = u.UserID
+                   AND ua.IsActive = 1
+                 ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+             ) pa
+             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
             {},
             { datasource=variables.datasource, timeout=60, fetchSize=1000 }
         );
-        return queryToArray(qry);
+        var rows = queryToArray(qry);
+        _applyPreferredNameToRows( rows );
+        return rows;
     }
 
     public struct function searchUsers(
@@ -174,7 +212,10 @@ component extends="dao.BaseDAO" output="false" singleton {
         dataParams["rows"]   = { value=arguments.maxRows,      cfsqltype="cf_sql_integer" };
 
         var dataQry = executeQueryWithRetry(
-            "SELECT u.*, thumb.ImageURL AS WebThumbURL
+            "SELECT u.*, thumb.ImageURL AS WebThumbURL,
+                    COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '')   AS PreferredLastName
              FROM Users u
              OUTER APPLY (
                  SELECT TOP 1 img.ImageURL
@@ -182,13 +223,59 @@ component extends="dao.BaseDAO" output="false" singleton {
                  WHERE img.UserID = u.UserID AND img.ImageVariant = 'WEB_THUMB'
                  ORDER BY img.SortOrder
              ) thumb
-             #where# ORDER BY u.LastName, u.FirstName
+             OUTER APPLY (
+                 SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                 FROM UserAliases ua
+                 WHERE ua.UserID = u.UserID
+                   AND ua.IsActive = 1
+                 ORDER BY
+                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+             ) pa
+             #where# ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)
              OFFSET :offset ROWS FETCH NEXT :rows ROWS ONLY",
             dataParams,
             { datasource=variables.datasource, timeout=60 }
         );
 
-        return { data: queryToArray(dataQry), totalCount: total };
+        var dataRows = queryToArray(dataQry);
+        _applyPreferredNameToRows( dataRows );
+
+        return { data: dataRows, totalCount: total };
+    }
+
+    private void function _applyPreferredNameToRows( required array rows ) {
+        for ( var i = 1; i <= arrayLen(arguments.rows); i++ ) {
+            _applyPreferredNameToRow( arguments.rows[i] );
+        }
+    }
+
+    private void function _applyPreferredNameToRow( required struct row ) {
+        var first = len(trim(arguments.row.PREFERREDFIRSTNAME ?: "")) ? trim(arguments.row.PREFERREDFIRSTNAME) : trim(arguments.row.FIRSTNAME ?: "");
+        var middle = len(trim(arguments.row.PREFERREDMIDDLENAME ?: "")) ? trim(arguments.row.PREFERREDMIDDLENAME) : trim(arguments.row.MIDDLENAME ?: "");
+        var last = len(trim(arguments.row.PREFERREDLASTNAME ?: "")) ? trim(arguments.row.PREFERREDLASTNAME) : trim(arguments.row.LASTNAME ?: "");
+
+        arguments.row["FIRSTNAME"] = first;
+        arguments.row["MIDDLENAME"] = middle;
+        arguments.row["LASTNAME"] = last;
+
+        var parts = [];
+        if ( len(first) ) {
+            arrayAppend(parts, first);
+        }
+        if ( len(middle) ) {
+            arrayAppend(parts, middle);
+        }
+        if ( len(last) ) {
+            arrayAppend(parts, last);
+        }
+
+        arguments.row["FULLNAME"] = arrayToList(parts, " ");
+
+        structDelete(arguments.row, "PREFERREDFIRSTNAME", false);
+        structDelete(arguments.row, "PREFERREDMIDDLENAME", false);
+        structDelete(arguments.row, "PREFERREDLASTNAME", false);
     }
 
     public numeric function createUser( required struct data ) {

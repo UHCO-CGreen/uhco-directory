@@ -1,6 +1,7 @@
 # Folders
 _temp_source/
 .vscode/
+.github/
 examples/
 sql/
 xml/
@@ -27,7 +28,9 @@ NPM_Cheatsheet.md
 ADMIN_PERMISSIONS_PLAN.md
 DEPLOY_TASKS.md
 testapp.cfm
+dev/code-dump.html
 admin/ldap-tests.cfm
+AGENTS.md
 
 _published_images/*
 !_published_images/.gitkeep

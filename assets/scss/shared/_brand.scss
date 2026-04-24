@@ -5,7 +5,7 @@ $danger: #c8102e;
 $info: #fff9d9;
 $warning: #f6be00;
 
-$admin-sidebar-bg: #212529;
+$admin-sidebar-bg: var(--slate, #212529);
 $admin-sidebar-text: #adb5bd;
 $admin-sidebar-active: #f0d878;
 $admin-viewbar-bg: #efefef;

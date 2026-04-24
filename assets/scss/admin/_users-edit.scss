@@ -14,8 +14,21 @@
 .users-edit-record-status {
   min-width: 180px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, #314a61 0%, #22384d 100%) !important;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  cursor: pointer;
+}
+
+.users-edit-record-status:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.users-edit-record-status.users-edit-record-status-active {
+  background: linear-gradient(180deg, var(--green) 0%, rgba(var(--green-rgb), 0.82) 100%) !important;
+}
+
+.users-edit-record-status.users-edit-record-status-inactive {
+  background: linear-gradient(180deg, var(--ocher) 0%, rgba(var(--ocher-rgb), 0.82) 100%) !important;
 }
 
 .users-edit-record-status .form-label,

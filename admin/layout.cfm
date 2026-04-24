@@ -40,73 +40,10 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link d-flex align-items-center justify-content-between" href="##"
-                   id="usersToggle"
-                   role="button"
-                   aria-expanded="false"
-                   onclick="toggleUsers(event)">
-                    <span class="d-flex align-items-center gap-3">
-                        <i class="bi bi-people-fill sidebar-icon"></i>
-                        <span class="sidebar-label">Users</span>
-                    </span>
-                    <i class="bi bi-chevron-down sidebar-chevron" id="usersChevron"></i>
+                <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=all" id="usersToggle">
+                    <i class="bi bi-people-fill sidebar-icon"></i>
+                    <span class="sidebar-label">Users</span>
                 </a>
-                <ul class="nav flex-column ms-1 mt-1 sidebar-nav" id="usersSubmenu" style="display:none;">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=problems">
-                            <i class="bi bi-exclamation-triangle sidebar-icon"></i>
-                            <span class="sidebar-label">Problem Records</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=faculty">
-                            <i class="bi bi-people-fill sidebar-icon"></i>
-                            <span class="sidebar-label">Faculty</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=staff">
-                            <i class="bi bi-people-fill sidebar-icon"></i>
-                            <span class="sidebar-label">Staff</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=current-students">
-                            <i class="bi bi-people-fill sidebar-icon"></i>
-                            <span class="sidebar-label">Current Students</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=alumni">
-                            <i class="bi bi-mortarboard sidebar-icon"></i>
-                            <span class="sidebar-label">Alumni</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=inactive">
-                            <i class="bi bi-person-dash sidebar-icon"></i>
-                            <span class="sidebar-label">Inactive Records</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/index.cfm?list=all">
-                            <i class="bi bi-list sidebar-icon"></i>
-                            <span class="sidebar-label">All Records</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/search_UH_API.cfm">
-                            <i class="bi bi-search sidebar-icon"></i>
-                            <span class="sidebar-label">Search UH API</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/search_UH_LDAP.cfm">
-                            <i class="bi bi-person-vcard sidebar-icon"></i>
-                            <span class="sidebar-label">Search UH LDAP</span>
-                        </a>
-                    </li>
-                </ul>
             </li>
             <cfif request.hasPermission("media.view")>
             <li class="nav-item">
@@ -123,8 +60,6 @@
                 </a>
             </li>
             
-            
-            
             <li class="nav-item">
                 <a class="nav-link" href="#request.webRoot#/admin/orgs/index.cfm">
                     <i class="bi bi-building-fill sidebar-icon"></i>
@@ -137,117 +72,25 @@
                     <span class="sidebar-label">External IDs</span>
                 </a>
             </li>
-            <!---<li class="nav-item">
-                <a class="nav-link d-flex align-items-center justify-content-between" href="#"
-                   id="apiToggle"
-                   role="button"
-                   aria-expanded="false"
-                   onclick="toggleAPI(event)">
-                    <span class="d-flex align-items-center gap-3">
-                        <i class="bi bi-braces sidebar-icon"></i>
-                        <span class="sidebar-label">UHCO API</span>
-                    </span>
-                    <i class="bi bi-chevron-down sidebar-chevron" id="apiChevron"></i>
-                </a>
-                <ul class="nav flex-column ms-1 mt-1 sidebar-nav" id="apiSubmenu" style="display:none;">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/settings/uhco-api/tokens/index.cfm">
-                            <i class="bi bi-key sidebar-icon"></i>
-                            <span class="sidebar-label">Tokens</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/settings/uhco-api/secrets/index.cfm">
-                            <i class="bi bi-shield-lock sidebar-icon"></i>
-                            <span class="sidebar-label">Secrets</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/api/docs.html" target="_blank">
-                            <i class="bi bi-book sidebar-icon"></i>
-                            <span class="sidebar-label">Documentation</span>
-                        </a>
-                    </li>
-                </ul>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#request.webRoot#/admin/access/index.cfm">
-                    <i class="bi bi-lock sidebar-icon"></i>
-                    <span class="sidebar-label">Access Areas</span>
-                </a>
-            </li>
             
-            
-
-            <li class="nav-item">
-                <a class="nav-link d-flex align-items-center justify-content-between" href="#"
-                   id="reportingToggle"
-                   role="button"
-                   aria-expanded="false"
-                   onclick="toggleReporting(event)">
-                    <span class="d-flex align-items-center gap-3">
-                        <i class="bi bi-database-fill-gear sidebar-icon"></i>
-                        <span class="sidebar-label">SQL</span>
-                    </span>
-                    <i class="bi bi-chevron-down sidebar-chevron" id="reportingChevron"></i>
-                </a>
-                <ul class="nav flex-column ms-1 mt-1 sidebar-nav" id="reportingSubmenu" style="display:none;">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/uh_people_import.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">UH Import</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/users/uh_people_db_not_in_api.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">DB vs API Compare</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/reporting/OLD/cs-migration.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">CS Migration &amp; Compare</span>
-                        </a>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/reporting/OLD/CS-bulk-import.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">CS Bulk Import</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/reporting/OLD/CS-alumni-bulk-import.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">CS Alumni Import</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#request.webRoot#/admin/reporting/OLD/OD-student-audit.cfm">
-                            <i class="bi bi-arrow-right-short sidebar-icon"></i>
-                            <span class="sidebar-label">OD Student Audit</span>
-                        </a>
-                    </li>
-                </ul>
-            </li>--->
         </ul>
             <!-- User Info & Logout at Bottom -->
             <cfif structKeyExists(session, "user") and structKeyExists(session.user, "displayName")>
-            <div class="mt-auto pt-3 pb-2 border-top">
-                <div class="row align-items-center text-white" style="font-size:1rem;">
-                    <div class="col-9 user">
-                    <i class="bi bi-person-circle me-2"></i>
-                    <cfoutput>#session.user.displayName#</cfoutput>
-                    <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
-                        <cfset sidebarImpersonation = application.authService.getImpersonationState()>
-                        <div class="mt-2 ms-4">
-                            <span class="badge text-bg-warning text-dark" title="Current effective access">
-                                <i class="bi bi-person-down me-1"></i><cfoutput>#encodeForHTML(sidebarImpersonation.label ?: "Impersonating")#</cfoutput>
-                            </span>
-                        </div>
-                    </cfif>
+            <div class="mt-auto pt-3 pb-1 border-top d-flex align-items-center text-white justify-content-between">
+                <div class="d-flex flex-column text-white" style="font-size:1rem;" id="userInfo">
+                    <div>
+                        <i class="bi bi-person-circle me-2"></i>
+                        <cfoutput>#session.user.displayName#</cfoutput>
+                        <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+                            <cfset sidebarImpersonation = application.authService.getImpersonationState()>
+                            <div class="mt-2 ms-4">
+                                <span class="badge text-bg-warning text-dark" title="Current effective access">
+                                    <i class="bi bi-person-down me-1"></i><cfoutput>#encodeForHTML(sidebarImpersonation.label ?: "Impersonating")#</cfoutput>
+                                </span>
+                            </div>
+                        </cfif>
                     </div>
+                </div>
                     <cfif request.hasPermission("settings.view") OR request.hasAnyPermission([
                         "settings.app_config.manage",
                         "settings.media_config.manage",
@@ -265,22 +108,22 @@
                         "settings.scheduled_tasks.manage",
                         "settings.workflows.manage"
                     ])>
-                    <div class="col-3 justify-content-center settings">
-                        <a href="#request.webRoot#/admin/settings/" class="text-white settings" title="Settings" id="settingsGear">
-                        <i class="bi bi-gear-fill"></i> 
+                    <div class="col d-flex gap-1 justify-content-end">
+                        <a href="#request.webRoot#/admin/settings/" class="text-white settings settings-btn" title="Settings" id="settingsGear">
+                            <i class="bi bi-gear-fill"></i> 
+                        </a>
+                        <a href="#request.webRoot#/admin/logout.cfm" class="text-white settings-btn" title="Logout" id="logoutLink">
+                            <i class="bi bi-box-arrow-right me-1"></i> <span></span>
                         </a>
                     </div>
                     </cfif>
-                </div>
-            </div>
-            <div class="d-flex justify-content-center mb-3 logout">
-                <a href="#request.webRoot#/admin/logout.cfm" class="btn btn-outline-light btn-sm w-100">
-                    <i class="bi bi-box-arrow-right me-1"></i> <span>Logout</span>
-                </a>
+                
             </div>
             </cfif>
     </nav>
     </cfoutput>
+    
+    
 
     <!-- Main Content wrapper — offset for fixed sidebar -->
     <div class="main-content d-flex" id="mainContent">
@@ -291,7 +134,10 @@
         }
     </script>
     <cfset isSettingsSection = structKeyExists(cgi, "script_name") AND findNoCase("/admin/settings/", cgi.script_name) GT 0>
-    <main class="flex-fill p-4<cfif isSettingsSection> admin-main-settings</cfif>" style="min-width:0; overflow-x:hidden;">
+
+    
+
+    <main class="flex-fill py-4 px-4 pt-2<cfif isSettingsSection> admin-main-settings</cfif>" style="min-width:0; overflow-x:hidden;">
         <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
             <cfset impersonationState = application.authService.getImpersonationState()>
             <cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
@@ -313,53 +159,33 @@
         
         <cfif isDefined('url.dump')><cfdump var="#session.user#">
 
-        <!---filter="(&(objectClass=user)(sAMAccountName=chlorens))"--->
-    <cfldap 
-        action="QUERY" 
-        name="qGetGroupDN" 
-        start="DC=cougarnet,DC=uh,DC=edu" 
-        scope="subtree" 
-        filter="(&(objectCategory=group)(cn=OPT-*))" 
-        attributes="distinguishedName"
-        server="cougarnet.uh.edu"
-        username="COUGARNET\uhcoweb"
-        password="5E9##WN!ag">
-    </cfldap>
-    <cfldap 
-        action="QUERY"
-        name="qFindUser"
-        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials"
-        scope="subtree"
-        maxrows="500"
-        server="cougarnet.uh.edu"
-        start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
-        filter="(&(objectCategory=person)(displayName=*Nguyen*))"
-        username="COUGARNET\uhcoweb"
-        password="5E9##WN!ag">
-    </cfldap>
+       
     <cfldap 
         action="QUERY"
         name="qFindUser2"
-        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials,employeeid"
+        attributes="displayName,sAMAccountName,mail,employeeid"
         start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
         scope="SUBTREE"
         server="cougarnet.uh.edu"
-        filter="(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=oaborahm)(displayName=oaborahm)(mail=oaborahm)(userPrincipalName=oaborahm)))"
+        filter="(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=amarchi2)(displayName=amarchi2)(mail=amarchi2)(userPrincipalName=amarchi2)))"
         username="COUGARNET\svc-opt-cfserv"
         password="Xu&mLtgdtKV5bQ@M">
     </cfldap>
     <cfset searchTerm = "oaborahm">
     <cfset filter = "(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=#searchTerm#)(displayName=#searchTerm#)(mail=#searchTerm#)(userPrincipalName=#searchTerm#))(|(memberOf=CN=OPT-Class2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-Class2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)))">
+    <cfset attributes = "displayName,sAMAccountName,mail,employeeid">
+    <cfset user = "COUGARNET\svc-opt-cfserv">
+    <cfset password = "Xu&mLtgdtKV5bQ@M">
     <cfldap 
         action="QUERY"
         name="qFindUser3"
-        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials,employeeid"
+        attributes="#attributes#"
         start="OU=Master Users,DC=cougarnet,DC=uh,DC=edu"
         scope="SUBTREE"
         server="cougarnet.uh.edu"
-        filter="#filter#"
-        username="COUGARNET\svc-opt-cfserv"
-        password="Xu&mLtgdtKV5bQ@M">
+        filter="(&(objectClass=user)(objectCategory=person)(|(sAMAccountName=#searchTerm#)(displayName=#searchTerm#)(mail=#searchTerm#)(userPrincipalName=#searchTerm#)))"
+        username="#user#"
+        password="#password#">
     </cfldap>
 
 
@@ -367,7 +193,7 @@
 
 
 
-    CN=OPT-ClassOf2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu
+   <!--- CN=OPT-ClassOf2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2027,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2028,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu|CN=OPT-ClassOf2029,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu
 
         CN=OPT-OPTOMETRY,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
         -OPT-ClassOf2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
@@ -377,7 +203,7 @@
         -OPT-Staff,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
         -OPT-Faculty,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu<Br/>
         <cfdump var="#qGetGroupDN#" label="Group DNs for Optometry distribution groups">
-        <cfdump var="#qFindUser#" label="User found with uhcoweb account">
+        <cfdump var="#qFindUser#" label="User found with uhcoweb account">--->
         <cfdump var="#qFindUser2#" label="User found with svc-opt-cfserv account">
         <cfdump var="#qFindUser3#" label="User found in class of groups">
         </cfif>
@@ -426,15 +252,6 @@
 <cfoutput><script>const WEBROOT='#request.webRoot#';</script></cfoutput>
 
 <script>
-    function toggleUsers(e) {
-        e.preventDefault();
-        const submenu = document.getElementById('usersSubmenu');
-        const chevron  = document.getElementById('usersChevron');
-        const open     = submenu.style.display === 'block';
-        submenu.style.display = open ? 'none' : 'block';
-        chevron.style.transform = open ? '' : 'rotate(180deg)';
-    }
-
     function toggleUserMedia(e) {
         e.preventDefault();
         const submenu = document.getElementById('userMediaSubmenu');
@@ -463,23 +280,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Auto-expand Users submenu when a child page is active
-        const usersPages = [
-            WEBROOT+'/admin/users/index.cfm',
-            WEBROOT+'/admin/users/new.cfm',
-            WEBROOT+'/admin/users/edit.cfm',
-            WEBROOT+'/admin/users/view.cfm',
-            WEBROOT+'/admin/users/deleteconfirm.cfm',
-            WEBROOT+'/admin/users/search_UH_API.cfm',
-            WEBROOT+'/admin/users/search_UH_LDAP.cfm'
-        ];
-        if (usersPages.some(p => window.location.pathname.toLowerCase().startsWith(p))) {
-            const usersSubmenu = document.getElementById('usersSubmenu');
-            const usersChevron = document.getElementById('usersChevron');
-            if (usersSubmenu) { usersSubmenu.style.display = 'block'; }
-            if (usersChevron) { usersChevron.style.transform = 'rotate(180deg)'; }
-        }
-
         // Auto-expand API submenu when a child page is active
         const apiPages = [
             WEBROOT+'/admin/settings/uhco-api/tokens/',
