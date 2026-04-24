@@ -79,6 +79,7 @@
                 <h4>
                     <cfswitch expression="#run.STATUS#">
                         <cfcase value="completed"><span class="badge bg-success">#run.STATUS#</span></cfcase>
+                        <cfcase value="completed_w_errors"><span class="badge bg-warning text-dark">#run.STATUS#</span></cfcase>
                         <cfcase value="failed"><span class="badge bg-danger">#run.STATUS#</span></cfcase>
                         <cfcase value="rolled_back"><span class="badge bg-warning text-dark">#run.STATUS#</span></cfcase>
                         <cfcase value="executing"><span class="badge bg-info">#run.STATUS#</span></cfcase>
@@ -161,10 +162,14 @@
 </div>
 
 <!--- ── Rollback button ── --->
-<cfif run.STATUS EQ "completed">
+<cfif listFindNoCase("completed,completed_w_errors,failed", run.STATUS)>
     <div class="mt-3">
         <form method="post" action="/admin/settings/migrations/save_grad_migration_settings.cfm"
-              onsubmit="return confirm('Roll back this migration? All #run.TOTALMIGRATED# migrated users will be reverted to current-student status.');">
+              class="js-confirm-submit"
+              data-confirm-title="Confirm Rollback"
+              data-confirm-class="warning"
+              data-confirm-message="Roll back this migration? All #run.TOTALMIGRATED# migrated users will be reverted to current-student status."
+              data-confirm-ok="Rollback">
             <input type="hidden" name="action" value="rollback">
             <input type="hidden" name="runID" value="#run.RUNID#">
             <button type="submit" class="btn btn-warning">
@@ -246,6 +251,65 @@
 </cfif>
 
 </div>
+
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmActionModalLabel">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="confirmActionModalBody">Are you sure?</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmActionModalOk">Continue</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var confirmModalEl = document.getElementById('confirmActionModal');
+    if (!confirmModalEl || !(window.bootstrap && bootstrap.Modal)) {
+        return;
+    }
+
+    var confirmModal = new bootstrap.Modal(confirmModalEl);
+    var titleEl = document.getElementById('confirmActionModalLabel');
+    var bodyEl = document.getElementById('confirmActionModalBody');
+    var okBtn = document.getElementById('confirmActionModalOk');
+    var pendingForm = null;
+
+    document.querySelectorAll('form.js-confirm-submit').forEach(function (form) {
+        form.addEventListener('submit', function (evt) {
+            evt.preventDefault();
+            pendingForm = form;
+
+            var title = form.getAttribute('data-confirm-title') || 'Confirm Action';
+            var msg = form.getAttribute('data-confirm-message') || 'Are you sure you want to continue?';
+            var okText = form.getAttribute('data-confirm-ok') || 'Continue';
+            var style = form.getAttribute('data-confirm-class') || 'primary';
+
+            titleEl.textContent = title;
+            bodyEl.textContent = msg;
+            okBtn.textContent = okText;
+            okBtn.className = 'btn btn-' + style;
+
+            confirmModal.show();
+        });
+    });
+
+    okBtn.addEventListener('click', function () {
+        if (pendingForm) {
+            var formToSubmit = pendingForm;
+            pendingForm = null;
+            confirmModal.hide();
+            formToSubmit.submit();
+        }
+    });
+});
+</script>
 
 </cfoutput>
 </cfsavecontent>

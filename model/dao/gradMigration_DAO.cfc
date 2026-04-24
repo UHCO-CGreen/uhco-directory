@@ -79,7 +79,7 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /** Update run status and set CompletedAt when finishing. */
     public void function updateRunStatus( required numeric runID, required string status ) {
-        var setCompleted = ( arguments.status == "completed" || arguments.status == "failed" )
+        var setCompleted = ( listFindNoCase("completed,completed_w_errors,failed", arguments.status) )
             ? ", CompletedAt = GETDATE()" : "";
         executeQueryWithRetry(
             "UPDATE GradMigrationRuns SET Status = :st #setCompleted# WHERE RunID = :id",
@@ -241,11 +241,11 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
-    /** Bulk-mark all migrated details as rolled_back for a given run. */
+    /** Bulk-mark migrated/error details as rolled_back for a given run. */
     public void function markDetailsRolledBack( required numeric runID ) {
         executeQueryWithRetry(
             "UPDATE GradMigrationDetails SET Status = 'rolled_back'
-             WHERE RunID = :id AND Status = 'migrated'",
+             WHERE RunID = :id AND Status IN ('migrated','error')",
             { id = { value=arguments.runID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30 }
         );
@@ -276,7 +276,8 @@ component extends="dao.BaseDAO" output="false" singleton {
     public array function getGraduatingStudents( required numeric gradYear ) {
         var qry = executeQueryWithRetry(
             "SELECT u.UserID, u.FirstName, u.LastName, u.EmailPrimary,
-                    u.Title1, u.CougarNetID,
+                                        u.Title1,
+                                        cnet.ExternalValue AS CougarNetID,
                     uai.CurrentGradYear,
                     uf.FlagID AS CurrentStudentFlagID
              FROM   Users u
@@ -284,6 +285,14 @@ component extends="dao.BaseDAO" output="false" singleton {
              INNER JOIN UserFlags           uf  ON uf.FlagID  = ufa.FlagID
                                                AND LOWER(TRIM(uf.FlagName)) = 'current-student'
              INNER JOIN UserAcademicInfo    uai ON uai.UserID = u.UserID
+                         OUTER APPLY (
+                                 SELECT TOP 1 ue.ExternalValue
+                                 FROM UserExternalIDs ue
+                                 INNER JOIN ExternalSystems es ON es.SystemID = ue.SystemID
+                                 WHERE ue.UserID = u.UserID
+                                     AND LOWER(TRIM(es.SystemName)) = 'cougarnet'
+                                 ORDER BY ue.ExternalValue
+                         ) cnet
              WHERE  uai.CurrentGradYear = :yr
                AND  u.Active = 1
              ORDER BY u.LastName, u.FirstName",
@@ -307,29 +316,27 @@ component extends="dao.BaseDAO" output="false" singleton {
             "INSERT INTO DataQualityExclusions (UserID, IssueCode, CreatedAt)
              SELECT :uid, codes.IssueCode, GETDATE()
              FROM (
-                 VALUES
-                     ('missing_uh_api_id'),
-                     ('missing_email_primary'),
-                     ('missing_room'),
-                     ('missing_building'),
-                     ('missing_phone'),
-                     ('missing_degrees'),
-                     ('missing_cougarnet'),
-                     ('missing_peoplesoft'),
-                     ('missing_legacy_id')
+                 SELECT 'missing_uh_api_id'   AS IssueCode
+                 UNION ALL SELECT 'missing_email_primary'
+                 UNION ALL SELECT 'missing_room'
+                 UNION ALL SELECT 'missing_building'
+                 UNION ALL SELECT 'missing_phone'
+                 UNION ALL SELECT 'missing_degrees'
+                 UNION ALL SELECT 'missing_cougarnet'
+                 UNION ALL SELECT 'missing_peoplesoft'
+                 UNION ALL SELECT 'missing_legacy_id'
              ) AS codes(IssueCode)
              WHERE NOT EXISTS (
                  SELECT 1 FROM DataQualityExclusions x
                  WHERE x.UserID = :uid2 AND x.IssueCode = codes.IssueCode
-             );
-             SELECT @@ROWCOUNT AS RowsInserted;",
+             )",
             {
                 uid  = { value=arguments.userID, cfsqltype="cf_sql_integer" },
                 uid2 = { value=arguments.userID, cfsqltype="cf_sql_integer" }
             },
             { datasource=variables.datasource, timeout=30 }
         );
-        return val(qry.RowsInserted);
+        return val(qry.recordCount ?: 0);
     }
 
     /**
@@ -345,12 +352,11 @@ component extends="dao.BaseDAO" output="false" singleton {
         var qry = executeQueryWithRetry(
             "DELETE FROM DataQualityExclusions
              WHERE UserID = :uid
-               AND IssueCode IN ('missing_degrees','missing_phone','missing_building','missing_room');
-             SELECT @@ROWCOUNT AS RowsDeleted;",
+                             AND IssueCode IN ('missing_degrees','missing_phone','missing_building','missing_room')",
             { uid = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30 }
         );
-        return val(qry.RowsDeleted);
+                return val(qry.recordCount ?: 0);
     }
 
     /**
@@ -366,12 +372,11 @@ component extends="dao.BaseDAO" output="false" singleton {
                    'missing_uh_api_id','missing_email_primary','missing_room',
                    'missing_building','missing_phone','missing_degrees',
                    'missing_cougarnet','missing_peoplesoft','missing_legacy_id'
-               );
-             SELECT @@ROWCOUNT AS RowsDeleted;",
+               )",
             { uid = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30 }
         );
-        return val(qry.RowsDeleted);
+        return val(qry.recordCount ?: 0);
     }
 
     /**
@@ -383,24 +388,22 @@ component extends="dao.BaseDAO" output="false" singleton {
             "INSERT INTO DataQualityExclusions (UserID, IssueCode, CreatedAt)
              SELECT :uid, codes.IssueCode, GETDATE()
              FROM (
-                 VALUES
-                     ('missing_degrees'),
-                     ('missing_phone'),
-                     ('missing_building'),
-                     ('missing_room')
+                 SELECT 'missing_degrees'  AS IssueCode
+                 UNION ALL SELECT 'missing_phone'
+                 UNION ALL SELECT 'missing_building'
+                 UNION ALL SELECT 'missing_room'
              ) AS codes(IssueCode)
              WHERE NOT EXISTS (
                  SELECT 1 FROM DataQualityExclusions x
                  WHERE x.UserID = :uid2 AND x.IssueCode = codes.IssueCode
-             );
-             SELECT @@ROWCOUNT AS RowsInserted;",
+             )",
             {
                 uid  = { value=arguments.userID, cfsqltype="cf_sql_integer" },
                 uid2 = { value=arguments.userID, cfsqltype="cf_sql_integer" }
             },
             { datasource=variables.datasource, timeout=30 }
         );
-        return val(qry.RowsInserted);
+        return val(qry.recordCount ?: 0);
     }
 
 }

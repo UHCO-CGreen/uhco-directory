@@ -574,4 +574,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    public void function updateTitle1Field( required numeric userID, required string title1 ) {
+        executeQueryWithRetry(
+            "UPDATE Users SET Title1 = :Title1, UpdatedAt = GETDATE() WHERE UserID = :id",
+            {
+                id     = { value=userID,            cfsqltype="cf_sql_integer"  },
+                Title1 = { value=arguments.title1, cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
 }

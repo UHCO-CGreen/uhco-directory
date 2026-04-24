@@ -1,6 +1,6 @@
 <cfcomponent displayname="DirectoryHelpers" output="false" hint="CFC of Helper functions">
 <cffunction name="init" returntype="any">
-    <cfreturn>
+    <cfreturn this>
 </cffunction>
 <cffunction name="getDisplayEmail" returntype="string">
     <cfargument name="emailPrimary"   type="string" required="true">

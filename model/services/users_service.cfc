@@ -106,6 +106,10 @@ component output="false" singleton {
         variables.UsersDAO.updateDegreesField( userID, degrees );
     }
 
+    public void function updateTitle1Field( required numeric userID, required string title1 ) {
+        variables.UsersDAO.updateTitle1Field( userID, trim(arguments.title1 ?: "") );
+    }
+
     /**
      * Delete a user and all related records
      */

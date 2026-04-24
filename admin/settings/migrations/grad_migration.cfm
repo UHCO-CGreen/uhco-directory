@@ -13,6 +13,47 @@
 <cfset msgParam  = structKeyExists(url, "msg")  ? trim(url.msg)  : "">
 <cfset errParam  = structKeyExists(url, "err")  ? trim(url.err)  : "">
 <cfset runIDParam = ( structKeyExists(url, "runID") AND isNumeric(url.runID) ) ? val(url.runID) : 0>
+<cfset rolledParam = ( structKeyExists(url, "rolled") AND isNumeric(url.rolled) ) ? val(url.rolled) : 0>
+<cfset rollbackErrParam = ( structKeyExists(url, "errors") AND isNumeric(url.errors) ) ? val(url.errors) : 0>
+<cfset migrationErrCountParam = ( structKeyExists(url, "errors") AND isNumeric(url.errors) ) ? val(url.errors) : 0>
+
+<!--- Status modal config --->
+<cfset showStatusModal = false>
+<cfset statusModalTitle = "">
+<cfset statusModalBody = "">
+<cfset statusModalClass = "primary">
+
+<cfif msgParam EQ "ran" AND runIDParam GT 0>
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "success">
+    <cfset statusModalTitle = "Migration Completed">
+    <cfset statusModalBody = "Migration completed successfully. <a href='/admin/settings/migrations/grad_migration_detail.cfm?runID=#runIDParam#'>View details</a>.">
+<cfelseif msgParam EQ "ran_with_errors" AND runIDParam GT 0>
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "warning">
+    <cfset statusModalTitle = "Migration Completed With Errors">
+    <cfset statusModalBody = "Migration completed with errors.#(migrationErrCountParam GT 0 ? ' <strong>#migrationErrCountParam#</strong> record(s) reported errors.' : '')# <a href='/admin/settings/migrations/grad_migration_detail.cfm?runID=#runIDParam#'>View details</a>.">
+<cfelseif msgParam EQ "error">
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "danger">
+    <cfset statusModalTitle = "Operation Failed">
+    <cfset statusModalBody = encodeForHTML(errParam)>
+<cfelseif msgParam EQ "skipped">
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "warning">
+    <cfset statusModalTitle = "Operation Skipped">
+    <cfset statusModalBody = encodeForHTML(errParam)>
+<cfelseif msgParam EQ "rollback">
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "success">
+    <cfset statusModalTitle = "Rollback Completed">
+    <cfset statusModalBody = "Rollback completed successfully.#(runIDParam GT 0 ? ' Run ###runIDParam#' : '')##(rolledParam GT 0 ? ' reverted <strong>#rolledParam#</strong> user(s)' : '')##(rollbackErrParam GT 0 ? ' with <strong>#rollbackErrParam#</strong> error(s)' : '')##(runIDParam GT 0 ? ". <a href='/admin/settings/migrations/grad_migration_detail.cfm?runID=#runIDParam#'>View details</a>." : "")#">
+<cfelseif msgParam EQ "settings">
+    <cfset showStatusModal = true>
+    <cfset statusModalClass = "success">
+    <cfset statusModalTitle = "Settings Saved">
+    <cfset statusModalBody = "Settings saved.">
+</cfif>
 
 <!--- ── Load service & data ── --->
 <cfset migrationService = createObject("component", "cfc.gradMigration_service").init()>
@@ -43,7 +84,8 @@
         <cfset previewData = migrationService.preview( previewYear )>
         <cfset showPreview = true>
     <cfcatch type="any">
-        <cfset errParam = cfcatch.message>
+        <cfset showPreview = true>
+        <cfset previewData = { success=false, message=(cfcatch.message & (len(trim(cfcatch.detail)) ? ' — ' & cfcatch.detail : '')) }>
     </cfcatch>
     </cftry>
 </cfif>
@@ -105,34 +147,6 @@
 <h1 class="mb-1"><i class="bi bi-mortarboard-fill me-2"></i>Graduation Migration</h1>
 <p class="text-muted">Migrate graduating students to alumni status around Memorial Day.</p>
 
-<!--- Status messages --->
-<cfif msgParam EQ "ran" AND runIDParam GT 0>
-    <div class="alert alert-success mt-3">
-        <i class="bi bi-check-circle-fill me-1"></i>
-        Migration completed successfully.
-        <a href="/admin/settings/migrations/grad_migration_detail.cfm?runID=#runIDParam#">View details</a>
-    </div>
-<cfelseif msgParam EQ "error">
-    <div class="alert alert-danger mt-3">
-        <strong>Error:</strong> #encodeForHTML(errParam)#
-    </div>
-<cfelseif msgParam EQ "skipped">
-    <div class="alert alert-warning mt-3">
-        <i class="bi bi-skip-forward-fill me-1"></i>
-        #encodeForHTML(errParam)#
-    </div>
-<cfelseif msgParam EQ "rollback">
-    <div class="alert alert-info mt-3">
-        <i class="bi bi-arrow-counterclockwise me-1"></i>
-        Rollback completed successfully.
-    </div>
-<cfelseif msgParam EQ "settings">
-    <div class="alert alert-success mt-3">
-        <i class="bi bi-check-circle-fill me-1"></i>
-        Settings saved.
-    </div>
-</cfif>
-
 <cfif NOT dbOk>
     <div class="alert alert-danger mt-3">
         <strong>Database Error:</strong> #encodeForHTML(dbError)#
@@ -167,7 +181,7 @@
                     <cfif autoExecute>
                         <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ON</span>
                     <cfelse>
-                        <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>OFF</span>
+                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>OFF</span>
                     </cfif>
                 </h4>
             </div>
@@ -217,10 +231,10 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>Email</th>
-                                <th>CougarNet</th>
                                 <th>Grad Year</th>
-                                <th>Current Title1</th>
+                                <th>Flag</th>
+                                <th>Title1</th>
+                                <th>Data Quality Exclusions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -231,10 +245,10 @@
                                             #encodeForHTML(s.LASTNAME)#, #encodeForHTML(s.FIRSTNAME)#
                                         </a>
                                     </td>
-                                    <td>#encodeForHTML(s.EMAILPRIMARY)#</td>
-                                    <td>#encodeForHTML(s.COUGARNETID)#</td>
                                     <td>#s.CURRENTGRADYEAR#</td>
-                                    <td>#encodeForHTML(s.TITLE1)#</td>
+                                    <td>Current-Student &gt;&gt; Alumni</td>
+                                    <td>#encodeForHTML( (len(trim(s.TITLE1 ?: "")) ? s.TITLE1 : "(blank)") )# &gt;&gt; Alumni</td>
+                                    <td>Student-specific set &gt;&gt; Alumni-specific set</td>
                                 </tr>
                             </cfloop>
                         </tbody>
@@ -243,7 +257,11 @@
 
                 <!--- Execute button --->
                 <form method="post" action="/admin/settings/migrations/run_grad_migration.cfm?force=true"
-                      onsubmit="return confirm('This will migrate #previewData.totalStudents# student(s) from current-student to alumni. This action can be rolled back. Continue?');">
+                      class="js-confirm-submit"
+                      data-confirm-title="Execute Migration"
+                      data-confirm-class="danger"
+                      data-confirm-message="This will migrate #previewData.totalStudents# student(s) from current-student to alumni. This action can be rolled back. Continue?"
+                      data-confirm-ok="Execute">
                     <input type="hidden" name="triggeredBy" value="#encodeForHTMLAttribute(session.user.displayName ?: 'admin')#">
                     <button type="submit" class="btn btn-danger">
                         <i class="bi bi-play-fill me-1"></i>Execute Migration — Class of #previewData.gradYear#
@@ -359,6 +377,7 @@
                                 <td>
                                     <cfswitch expression="#r.STATUS#">
                                         <cfcase value="completed"><span class="badge bg-success">#r.STATUS#</span></cfcase>
+                                        <cfcase value="completed_w_errors"><span class="badge bg-warning text-dark">#r.STATUS#</span></cfcase>
                                         <cfcase value="failed"><span class="badge bg-danger">#r.STATUS#</span></cfcase>
                                         <cfcase value="rolled_back"><span class="badge bg-warning text-dark">#r.STATUS#</span></cfcase>
                                         <cfcase value="executing"><span class="badge bg-info">#r.STATUS#</span></cfcase>
@@ -376,10 +395,13 @@
                                        class="btn btn-outline-primary btn-sm" title="View Details">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <cfif r.STATUS EQ "completed">
+                                    <cfif listFindNoCase("completed,completed_w_errors,failed", r.STATUS)>
                                         <form method="post" action="/admin/settings/migrations/save_grad_migration_settings.cfm"
-                                              class="d-inline"
-                                              onsubmit="return confirm('Roll back migration run ###r.RUNID# (Class of #r.GRADYEAR#)? This will revert all migrated users back to current-student status.');">
+                                              class="d-inline js-confirm-submit"
+                                              data-confirm-title="Confirm Rollback"
+                                              data-confirm-class="warning"
+                                              data-confirm-message="Roll back migration run ###r.RUNID# (Class of #r.GRADYEAR#)? This will revert all migrated users back to current-student status."
+                                              data-confirm-ok="Rollback">
                                             <input type="hidden" name="action" value="rollback">
                                             <input type="hidden" name="runID" value="#r.RUNID#">
                                             <button type="submit" class="btn btn-outline-warning btn-sm" title="Rollback">
@@ -399,6 +421,92 @@
 </cfif>
 
 </div>
+
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmActionModalLabel">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="confirmActionModalBody">Are you sure?</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmActionModalOk">Continue</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<cfif showStatusModal>
+    <div class="modal fade" id="migrationStatusModal" tabindex="-1" aria-labelledby="migrationStatusModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-#statusModalClass#">
+                <div class="modal-header bg-#statusModalClass# text-white">
+                    <h5 class="modal-title" id="migrationStatusModalLabel">#statusModalTitle#</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">#statusModalBody#</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var el = document.getElementById('migrationStatusModal');
+        if (el && window.bootstrap && bootstrap.Modal) {
+            var modal = new bootstrap.Modal(el, { backdrop: 'static' });
+            modal.show();
+        }
+    });
+    </script>
+</cfif>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var confirmModalEl = document.getElementById('confirmActionModal');
+    if (!confirmModalEl || !(window.bootstrap && bootstrap.Modal)) {
+        return;
+    }
+
+    var confirmModal = new bootstrap.Modal(confirmModalEl);
+    var titleEl = document.getElementById('confirmActionModalLabel');
+    var bodyEl = document.getElementById('confirmActionModalBody');
+    var okBtn = document.getElementById('confirmActionModalOk');
+    var pendingForm = null;
+
+    document.querySelectorAll('form.js-confirm-submit').forEach(function (form) {
+        form.addEventListener('submit', function (evt) {
+            evt.preventDefault();
+            pendingForm = form;
+
+            var title = form.getAttribute('data-confirm-title') || 'Confirm Action';
+            var msg = form.getAttribute('data-confirm-message') || 'Are you sure you want to continue?';
+            var okText = form.getAttribute('data-confirm-ok') || 'Continue';
+            var style = form.getAttribute('data-confirm-class') || 'primary';
+
+            titleEl.textContent = title;
+            bodyEl.textContent = msg;
+            okBtn.textContent = okText;
+            okBtn.className = 'btn btn-' + style;
+
+            confirmModal.show();
+        });
+    });
+
+    okBtn.addEventListener('click', function () {
+        if (pendingForm) {
+            var formToSubmit = pendingForm;
+            pendingForm = null;
+            confirmModal.hide();
+            formToSubmit.submit();
+        }
+    });
+});
+</script>
 
 </cfoutput>
 </cfsavecontent>

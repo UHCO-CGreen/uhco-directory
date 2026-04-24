@@ -20,7 +20,9 @@
         <cftry>
             <cfset result = migrationService.rollback( rollbackRunID, rolledBy )>
             <cfif result.success>
-                <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=rollback" addtoken="false">
+                <cfset rolledCount = structKeyExists(result, "totalRolledBack") ? val(result.totalRolledBack) : 0>
+                <cfset errCount = structKeyExists(result, "totalErrors") ? val(result.totalErrors) : 0>
+                <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=rollback&runID=#rollbackRunID#&rolled=#rolledCount#&errors=#errCount#" addtoken="false">
             <cfelse>
                 <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=error&err=#urlEncodedFormat(result.message)#" addtoken="false">
             </cfif>

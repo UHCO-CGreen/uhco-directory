@@ -103,7 +103,11 @@
 </cfif>
 
 <cfif success>
-    <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=ran&runID=#result.runID#" addtoken="false">
+    <cfif structKeyExists(result, "totalErrors") AND val(result.totalErrors) GT 0>
+        <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=ran_with_errors&runID=#result.runID#&errors=#val(result.totalErrors)#" addtoken="false">
+    <cfelse>
+        <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=ran&runID=#result.runID#" addtoken="false">
+    </cfif>
 <cfelse>
     <cflocation url="#request.webRoot#/admin/settings/migrations/grad_migration.cfm?msg=error&err=#urlEncodedFormat(errorMsg)#" addtoken="false">
 </cfif>
