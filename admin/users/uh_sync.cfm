@@ -586,8 +586,8 @@
 <cfif len(returnTo)>
     <cfset content &= "<a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-outline-primary mb-3 me-2'>&##8592; Back to Report</a>">
 </cfif>
-<cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User</a>">
-<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
+<cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-secondary text-dark mb-3 me-2'>Back to User</a>">
+<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-secondary text-dark mb-3'>Back to All Users</a>">
 <cfif saveMessage NEQ "">
     <cfset content &= "<div class='alert #saveMessageClass# mt-3'>#EncodeForHTML(saveMessage)#</div>">
 </cfif>

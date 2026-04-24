@@ -6,7 +6,7 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
-<cfparam name="url.list" default="problems">
+<cfparam name="url.list" default="all">
 <cfset listType = lcase(trim(url.list))>
 <cfif NOT listFindNoCase("problems,all,alumni,current-students,faculty,staff,inactive", listType)>
     <cfset listType = "problems">
@@ -148,6 +148,7 @@
 </cfif>
 <cfset selectedOrgFilterCount = arrayLen(selectedOrgFilterIDs) + (includeNoOrgFilter ? 1 : 0)>
 <cfset orgFilterHasSelection = selectedOrgFilterCount GT 0>
+<cfset currentListUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & trim(cgi.query_string) : "?list=" & urlEncodedFormat(listType))>
 <cfparam name="pageMessage" default="">
 <cfparam name="pageMessageClass" default="alert-info">
 
@@ -726,7 +727,7 @@
 
     <cfset editLink = "">
     <cfif request.hasPermission("users.edit")>
-        <cfset editLink = "<a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>">
+        <cfset editLink = "<a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#&returnTo=#urlEncodedFormat(currentListUrl)#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>">
     </cfif>
 
     <cfset content &= "
@@ -734,7 +735,7 @@
             <td class='users-list-col-flags'><div class='d-flex flex-wrap gap-1 align-items-start users-list-pill-stack'>#flagsHTML#</div></td>
             <td class='users-list-col-actions text-end'><div class='d-flex flex-wrap gap-1 align-items-start users-list-actions'>
                 #editLink#
-                <a class='btn btn-sm btn-secondary users-list-action-button users-list-action-button-view' href='/admin/users/view.cfm?userID=#u.USERID#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
+                <a class='btn btn-sm btn-secondary users-list-action-button users-list-action-button-view' href='/admin/users/view.cfm?userID=#u.USERID#&returnTo=#urlEncodedFormat(currentListUrl)#' title='View User' data-bs-toggle='tooltip' data-bs-title='View User'><i class='bi bi-eye'></i></a>
                 #deleteLink#
                 #mediaLink#</div>
             </td>
@@ -754,5 +755,46 @@
 
 <!--- Bottom pagination --->
 <cfinclude template="/includes/pagination.cfm">
+
+<cfset pageScripts = "">
+<cfsavecontent variable="pageScripts">
+<script>
+(function () {
+    var filterForm = document.querySelector('.users-list-filter-form');
+    if (!filterForm) return;
+
+    var currentUrl = window.location.href;
+    history.replaceState({ usersListUrl: currentUrl }, '', currentUrl);
+
+    filterForm.addEventListener('submit', function () {
+        var params = new URLSearchParams();
+        filterForm.querySelectorAll('input, select, textarea').forEach(function (el) {
+            if (!el.name || el.disabled) return;
+            if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
+            params.append(el.name, el.value);
+        });
+
+        // Collapse multiple filterOrg values into a single comma-joined param
+        var orgValues = [];
+        filterForm.querySelectorAll('input[name="filterOrg"]:checked').forEach(function (cb) {
+            orgValues.push(cb.value);
+        });
+        params.delete('filterOrg');
+        if (orgValues.length) {
+            params.set('filterOrg', orgValues.join(','));
+        }
+
+        var newUrl = window.location.pathname + '?' + params.toString();
+        history.pushState({ usersListUrl: newUrl }, '', newUrl);
+    });
+
+    window.addEventListener('popstate', function (e) {
+        if (e.state && e.state.usersListUrl) {
+            window.location.href = e.state.usersListUrl;
+        }
+    });
+})();
+</script>
+</cfsavecontent>
 
 <cfinclude template="/admin/layout.cfm">

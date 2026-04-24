@@ -126,8 +126,9 @@ component output="false" singleton {
             if (len(trim(users[i].MIDDLENAME))) arrayAppend(parts, trim(users[i].MIDDLENAME));
             if (len(trim(users[i].LASTNAME)))   arrayAppend(parts, trim(users[i].LASTNAME));
             var fullName = arrayToList(parts, " ");
-            if (len(trim(users[i].DEGREES ?: ""))) {
-                fullName &= ", " & trim(users[i].DEGREES);
+            var attendingDegreeSuffix = _getAttendingDegreeSuffix(users[i].DEGREES ?: "");
+            if (len(attendingDegreeSuffix)) {
+                fullName &= ", " & attendingDegreeSuffix;
             }
             users[i]["FULLNAME"] = fullName;
         }
@@ -585,6 +586,30 @@ component output="false" singleton {
         token = reReplace(token, "_{2,}", "_", "all");
         token = reReplace(token, "^_|_$", "", "all");
         return token;
+    }
+
+    private string function _getAttendingDegreeSuffix( string degrees = "" ) {
+        var allowedDegreeMap = {
+            "OD" = "O.D.",
+            "MD" = "M.D.",
+            "BSCOPTOM" = "BSc(Optom)"
+        };
+        var selectedDegrees = [];
+
+        for ( var rawDegree in listToArray(arguments.degrees, ",") ) {
+            var cleanDegree = trim(rawDegree ?: "");
+            var normalizedDegree = reReplace(uCase(cleanDegree), "[^A-Z0-9]", "", "all");
+
+            if (
+                len(normalizedDegree)
+                AND structKeyExists(allowedDegreeMap, normalizedDegree)
+                AND !arrayFindNoCase(selectedDegrees, allowedDegreeMap[normalizedDegree])
+            ) {
+                arrayAppend(selectedDegrees, allowedDegreeMap[normalizedDegree]);
+            }
+        }
+
+        return arrayToList(selectedDegrees, ", ");
     }
 
     private string function buildFullName( required struct user ) {

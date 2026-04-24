@@ -573,7 +573,7 @@
 
     <cfset html = "
         <div class='btn-group btn-group-sm users-edit-tab-action-group' role='group' aria-label='Tab actions'>
-            <a href='/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
+            <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-outline-secondary'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
             <a href='" & viewUserUrl & "' class='btn btn-sm btn-outline-secondary'><i class='bi bi-eye-fill me-1'></i>View User Profile</a>
             <button type='button' class='btn btn-sm btn-outline-secondary' id='" & arguments.refreshButtonId & "'><i class='bi bi-arrow-clockwise me-1'></i>Refresh Data</button>
             " & uhSyncButtonHtml & "
@@ -631,8 +631,8 @@
         <li class='nav-item' role='presentation'>
             <button class='nav-link' id='extids-tab' data-bs-toggle='tab' data-bs-target='##extids-pane' type='button' role='tab' aria-controls='extids-pane' aria-selected='false'>External IDs</button>
         </li>
-        <li class='nav-item" & (isSuperAdmin ? "" : " d-none") & "' role='presentation'>
-            <button class='nav-link' id='address-tab' data-bs-toggle='tab' data-bs-target='##address-pane' type='button' role='tab' aria-controls='address-pane' aria-selected='false'>UH</button>
+        <li class='nav-item" & (isSuperAdmin ? " ms-auto" : " d-none") & "' role='presentation'>
+            <button class='nav-link' id='address-tab' data-bs-toggle='tab' data-bs-target='##address-pane' type='button' role='tab' aria-controls='address-pane' aria-selected='false'>Administrative</button>
         </li>
         <li class='nav-item d-none' id='student-profile-tab-li' role='presentation'>
             <button class='nav-link' id='student-profile-tab' data-bs-toggle='tab' data-bs-target='##student-profile-pane' type='button' role='tab' aria-controls='student-profile-pane' aria-selected='false'>Student Profile</button>
@@ -1060,6 +1060,11 @@
                 </div>
             </div>
             <div class='row mb-3'>
+                <div class='row pt-3'>
+                    <div class='col-12'>
+                    <h5>UH Sync Data</h5>
+                    </div>
+                </div>
                 <div class='col-md-6'>
                     <label class='form-label text-muted'>@UH Primary Email</label>
                     <input class='form-control form-control-sm' id='emailPrimary' name='EmailPrimary' value='#user.EMAILPRIMARY#' type='email'>
@@ -1105,19 +1110,7 @@
                 </div>
                 <div class='col-md-4'></div>
             </div>
-            <div class='row mb-3'>
-                <div class='col-md-4'>
-                    <label class='form-label text-muted'>Hometown City</label>
-                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownCity)#' readonly>
-                </div>
-                <div class='col-md-4'>
-                    <label class='form-label text-muted'>Hometown State</label>
-                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownState)#' readonly>
-                </div>
-                <div class='col-md-4 d-flex align-items-end'>
-                    <small class='text-muted'>Mirrored from the user's Hometown address for Alumni and Current Student records.</small>
-                </div>
-            </div>
+            
             <div class='row mb-3'>
                 <div class='col-md-8'>
                     <label class='form-label'>Office Mailing Address</label>
@@ -1132,6 +1125,33 @@
                 <div class='col-md-4'>
                     <label class='form-label'>Mailcode</label>
                     <input class='form-control' name='Mailcode' value='#(user.MAILCODE ?: "")#'>
+                </div>
+            </div>
+            <div class='row mt-5 border-top pt-3 mb-3'>
+                <div class='col-12'>
+                <h5>Mirrored Data</h5>
+                <small class='text-muted'>Mirrored from various tables and used for quick access via API.</small>
+                </div>
+            </div>
+            <div class='row mb-3'>
+                <div class='col-md-4'>
+                    
+                    <label class='form-label text-muted'>Hometown City</label>
+                    <div class='input-group mb-3'>
+                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownCity)#' readonly>
+                    <span class='input-group-text' id='basic-addon2'>Hometown City from userAddress</span>
+                    </div>
+                </div>
+                <div class='col-md-4'>
+                    
+                    <label class='form-label text-muted'>Hometown State</label>
+                    <div class='input-group mb-3'>
+                    <input class='form-control' value='#EncodeForHTMLAttribute(spHometownState)#' readonly>
+                    <span class='input-group-text' id='basic-addon2'>Hometown State from userAddress</span>
+                    </div>
+                </div>
+                <div class='col-md-4 d-flex align-items-end'>
+                    
                 </div>
             </div>
         </div>

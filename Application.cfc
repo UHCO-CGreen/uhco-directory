@@ -19,7 +19,6 @@ component output="false" {
 
         // Per-context datasources — selected in onRequestStart()
         application.datasources = {
-            api   : "UHCO_Identity_API",
             admin : "UHCO_Identity_Admin"
         };
 
@@ -63,13 +62,7 @@ component output="false" {
         var path = lCase(arguments.targetPage);
 
         // ── Determine request context ──────────────────────────────────
-        if (findNoCase("/api/", path) EQ 1) {
-            request.context    = "api";
-            request.datasource = application.datasources.api;
-
-            // API: no debug output, no session cookies
-            cfsetting(showDebugOutput = false);
-        } else if (findNoCase("/userreview/", path) EQ 1) {
+        if (findNoCase("/userreview/", path) EQ 1) {
             request.context    = "userreview";
             request.datasource = application.datasources.admin;
             request.userReviewAuth = application.userReviewAuthService;
@@ -169,15 +162,7 @@ component output="false" {
 
     // ── Error handling ─────────────────────────────────────────────────
     public void function onError(required any exception, required string eventName) {
-        // API: return JSON error
-        if (structKeyExists(request, "context") AND request.context EQ "api") {
-            cfheader(statusCode = "500");
-            cfheader(name = "Content-Type", value = "application/json; charset=utf-8");
-            writeOutput(serializeJSON({ "error": "Internal server error" }));
-            abort;
-        }
-
-        // Admin: display the error (re-throwing from onError produces a bare 500)
+        // Admin/userreview: display the error (re-throwing from onError produces a bare 500)
         cfheader(statusCode = "500");
         writeOutput("<h2>Error: " & encodeForHTML(arguments.exception.message) & "</h2>");
         writeOutput("<p><strong>Detail:</strong> " & encodeForHTML(arguments.exception.detail ?: "") & "</p>");

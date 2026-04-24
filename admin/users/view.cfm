@@ -1,5 +1,6 @@
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset profile = directoryService.getFullProfile(url.userID)>
+<cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER)) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
 <cfparam name="form.quickApiMatch" default="0">
 <cfparam name="form.saveMatchedApiId" default="0">
 <cfparam name="form.matchedApiId" default="">
@@ -349,7 +350,8 @@
 
 <cfset flagsRowHtml = "">
 <cfif arrayLen(profile.flags) GT 0>
-    <cfset flagsRowHtml = "<div class='users-view-pill-stack mt-1 mb-2'>">
+    <cfset flagsRowHtml = "<div class='users-view-pill-stack align-items-center mt-1 mb-2'>">
+    <cfset flagsRowHtml &= "<span class='users-view-badge-flags-header fw-bold'>Flags:</span>">
     <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
         <cfset flag = profile.flags[f]>
         <cfset flagsRowHtml &= "<span class='badge rounded-pill users-view-badge users-view-badge-flag'>" & EncodeForHTML(flag.FLAGNAME) & "</span>">
@@ -386,7 +388,7 @@
 <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
 <h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
 <div class='users-view-subtitle'>#SubTitle#</div>
-#flagsRowHtml#
+ #flagsRowHtml#
 </div>
 
 
@@ -722,8 +724,8 @@
 <cfset content &= "
 <div class='mt-4'>
     " & (uhApiId != "" ? "<a href='/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2 users-view-badge'>UH Sync</a>" : "") & "
-    <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#' class='btn btn-primary'>Edit</a>
-    <a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
+    <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#&returnTo=#urlEncodedFormat(returnTo)#' class='btn btn-primary'>Edit</a>
+    <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-secondary'>Back to Users</a>
 </div>
 </div>
 " />
