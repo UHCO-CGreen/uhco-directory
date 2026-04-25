@@ -1,6 +1,138 @@
+.users-list-toolbar {
+  top: 0;
+  z-index: 1020;
+  overflow: visible;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.users-list-toolbar-shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.users-list-toolbar-primary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.users-list-toolbar-brand {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.users-list-view-selector-toggle {
+  padding: 0;
+  border: 0;
+  text-decoration: none;
+}
+
+.users-list-view-selector-toggle:hover,
+.users-list-view-selector-toggle:focus {
+  color: #fff;
+  text-decoration: none;
+}
+
+.users-list-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.users-list-toolbar-search-form {
+  margin: 0;
+  flex: 1 1 auto;
+  max-width: none;
+  width: 100%;
+  min-width: 0;
+}
+
 .users-list-toolbar-search {
-  min-width: 220px;
-  flex: 1;
+  min-width: 0;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.users-list-toolbar-input-group {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.users-list-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.users-list-toolbar-nav {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.users-list-toolbar-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.users-list-toolbar-account {
+  position: relative;
+}
+
+.users-list-toolbar-account,
+.users-list-toolbar-account .dropdown-menu,
+.users-list-toolbar,
+.users-list-toolbar-shell {
+  overflow: visible;
+}
+
+.users-list-toolbar-account .dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+}
+
+.users-list-toolbar-dropdown {
+  z-index: 1035;
+  margin-top: 0.5rem;
+}
+
+.users-list-toolbar-avatar {
+  width: 3rem;
+  height: 3rem;
+  object-fit: cover;
+  flex: 0 0 3rem;
+  background: #eef2f6;
+}
+
+.users-list-toolbar-account-meta {
+  min-width: 0;
+}
+
+.users-list-toolbar-account-meta h6 {
+  color: #18344d;
+}
+
+.users-list-toolbar-label {
+  font-size: 0.65rem;
+}
+
+.users-list-toolbar-impersonation {
+  border-color: rgba(164, 118, 0, 0.2);
 }
 
 .users-list-page-header h1 {
@@ -16,8 +148,43 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
+.users-list-action-row {
+  position: relative;
+}
+
+.users-list-filter-panel-toggle {
+  font-weight: 600;
+}
+
+.users-list-active-filters {
+  align-items: center;
+}
+
+.users-list-active-chip {
+  color: #30455a;
+  border: 1px solid rgba(79, 101, 122, 0.2);
+}
+
+.users-list-filter-panel {
+  overflow: visible;
+}
+
+.users-list-filter-section {
+  min-width: 0;
+}
+
+.users-list-filter-section + .users-list-filter-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(31, 41, 55, 0.08);
+}
+
 .users-list-filter-card-body {
   background: linear-gradient(180deg, #fdfefe 0%, #f5f8fb 100%);
+}
+
+.users-list-advanced-filter-form {
+  display: block;
 }
 
 .users-list-filter-form {
@@ -43,23 +210,15 @@
   border-color: #b8c6d4;
   background: #fff;
   color: #35516a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: calc(2.25rem + 2px);
 }
 
 .users-list-help-button:hover,
 .users-list-help-button:focus {
-  border-color: #8aa6c1;
-  background: #edf4fb;
-  color: #16324a;
-}
-
-.users-list-org-filter-toggle.btn-outline-secondary {
-  border-color: #b8c6d4;
-  background: #fff;
-  color: #35516a;
-}
-
-.users-list-org-filter-toggle.btn-outline-secondary:hover,
-.users-list-org-filter-toggle.btn-outline-secondary:focus {
   border-color: #8aa6c1;
   background: #edf4fb;
   color: #16324a;
@@ -88,6 +247,16 @@
 
 .users-list-filter-form .form-control {
   border-color: #c6d0dc;
+}
+
+.users-list-action-row .form-select {
+  width: auto;
+}
+
+.users-list-toolbar-input-group > .btn,
+.users-list-toolbar-input-group > .form-control,
+.users-list-toolbar-input-group > .form-select {
+  min-height: calc(2.25rem + 2px);
 }
 
 .users-list-col-id {
@@ -219,6 +388,54 @@
 
 .users-list-actions {
   justify-content: flex-end;
+}
+
+@media (max-width: 1399.98px) {
+  .users-list-toolbar-shell {
+    flex-wrap: wrap;
+  }
+
+  .users-list-toolbar-primary {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .users-list-toolbar-controls {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .users-list-toolbar-search-form {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  .users-list-toolbar-nav {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .users-list-toolbar {
+    padding: 0.75rem;
+  }
+
+  .users-list-toolbar-brand {
+    white-space: normal;
+  }
+
+  .users-list-toolbar-input-group {
+    flex-wrap: wrap;
+  }
+
+  .users-list-toolbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .users-list-toolbar-nav {
+    gap: 0.25rem !important;
+  }
 }
 
 .users-list-action-button {

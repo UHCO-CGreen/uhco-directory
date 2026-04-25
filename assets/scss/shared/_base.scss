@@ -123,6 +123,10 @@
   --example-violet-border: rgba(113, 44, 249, 0.3);
 }
 
+.bg-slate {
+  background-color: var(--slate) !important;
+}
+
 body {
   background: brand.$app-bg;
 }

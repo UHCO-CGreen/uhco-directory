@@ -72,52 +72,38 @@
                     <span class="sidebar-label">External IDs</span>
                 </a>
             </li>
-            
+            <li class="nav-item">
+                <a href='/admin/users/search_UH_API.cfm' class='nav-link'>
+                    <i class='bi bi-search me-1'></i><span class="sidebar-label">Search UH API</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href='/admin/users/search_UH_LDAP.cfm' class='nav-link'>
+                    <i class='bi bi-person-vcard me-1'></i><span class="sidebar-label">Search UH LDAP</span>
+                </a>
+            </li>
         </ul>
-            <!-- User Info & Logout at Bottom -->
-            <cfif structKeyExists(session, "user") and structKeyExists(session.user, "displayName")>
-            <div class="mt-auto pt-3 pb-1 border-top d-flex align-items-center text-white justify-content-between">
-                <div class="d-flex flex-column text-white" style="font-size:1rem;" id="userInfo">
-                    <div>
-                        <i class="bi bi-person-circle me-2"></i>
-                        <cfoutput>#session.user.displayName#</cfoutput>
-                        <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
-                            <cfset sidebarImpersonation = application.authService.getImpersonationState()>
-                            <div class="mt-2 ms-4">
-                                <span class="badge text-bg-warning text-dark" title="Current effective access">
-                                    <i class="bi bi-person-down me-1"></i><cfoutput>#encodeForHTML(sidebarImpersonation.label ?: "Impersonating")#</cfoutput>
-                                </span>
-                            </div>
-                        </cfif>
-                    </div>
-                </div>
-                    <cfif request.hasPermission("settings.view") OR request.hasAnyPermission([
-                        "settings.app_config.manage",
-                        "settings.media_config.manage",
-                        "settings.api.manage",
-                        "settings.admin_users.manage",
-                        "settings.admin_roles.manage",
-                        "settings.admin_permissions.manage",
-                        "settings.user_review.manage",
-                        "users.approve_user_review",
-                        "settings.import.manage",
-                        "settings.bulk_exclusions.manage",
-                        "settings.migrations.manage",
-                        "settings.uh_sync.view",
-                        "settings.query_builder.use",
-                        "settings.scheduled_tasks.manage",
-                        "settings.workflows.manage"
-                    ])>
-                    <div class="col d-flex gap-1 justify-content-end">
-                        <a href="#request.webRoot#/admin/settings/" class="text-white settings settings-btn" title="Settings" id="settingsGear">
-                            <i class="bi bi-gear-fill"></i> 
-                        </a>
-                        <a href="#request.webRoot#/admin/logout.cfm" class="text-white settings-btn" title="Logout" id="logoutLink">
-                            <i class="bi bi-box-arrow-right me-1"></i> <span></span>
-                        </a>
-                    </div>
-                    </cfif>
-                
+            <cfif request.hasPermission("settings.view") OR request.hasAnyPermission([
+                "settings.app_config.manage",
+                "settings.media_config.manage",
+                "settings.api.manage",
+                "settings.admin_users.manage",
+                "settings.admin_roles.manage",
+                "settings.admin_permissions.manage",
+                "settings.user_review.manage",
+                "users.approve_user_review",
+                "settings.import.manage",
+                "settings.bulk_exclusions.manage",
+                "settings.migrations.manage",
+                "settings.uh_sync.view",
+                "settings.query_builder.use",
+                "settings.scheduled_tasks.manage",
+                "settings.workflows.manage"
+            ])>
+            <div class="mt-auto pt-3 pb-1 border-top d-flex justify-content-start">
+                <a href="#request.webRoot#/admin/settings/" class="text-white settings settings-btn" title="Settings" id="settingsGear">
+                    <i class="bi bi-gear-fill"></i><span class="sidebar-label">Settings</span>
+                </a>
             </div>
             </cfif>
     </nav>
@@ -127,6 +113,7 @@
 
     <!-- Main Content wrapper — offset for fixed sidebar -->
     <div class="main-content d-flex" id="mainContent">
+    
     <script>
         // Sync main content offset immediately to prevent layout shift
         if (localStorage.getItem('sidebarCollapsed') === 'true') {
@@ -134,28 +121,15 @@
         }
     </script>
     <cfset isSettingsSection = structKeyExists(cgi, "script_name") AND findNoCase("/admin/settings/", cgi.script_name) GT 0>
+    <cfparam name="contentWrapperClass" default="py-4 px-4 pt-2">
+    <cfset normalizedContentWrapperClass = trim(contentWrapperClass ?: "")>
 
-    
-
-    <main class="flex-fill py-4 px-4 pt-2<cfif isSettingsSection> admin-main-settings</cfif>" style="min-width:0; overflow-x:hidden;">
-        <cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
-            <cfset impersonationState = application.authService.getImpersonationState()>
-            <cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
-            <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3" role="alert">
-                <div>
-                    <strong>Impersonation active.</strong>
-                    You are currently using <strong><cfoutput>#encodeForHTML(impersonationState.label ?: "")#</cfoutput></strong>.
-                </div>
-                <form method="post" action="<cfoutput>#request.webRoot#</cfoutput>/admin/settings/admin-users/save.cfm" class="mb-0">
-                    <input type="hidden" name="action" value="clearImpersonation">
-                    <input type="hidden" name="returnURL" value="<cfoutput>#encodeForHTMLAttribute(currentRequestUrl)#</cfoutput>">
-                    <button type="submit" class="btn btn-sm btn-outline-dark">
-                        <i class="bi bi-x-octagon me-1"></i>Stop Impersonating
-                    </button>
-                </form>
-            </div>
+    <main class="flex-fill <cfif isSettingsSection> admin-main-settings</cfif>" style="min-width:0; overflow-x:hidden;">
+        <cfif len(normalizedContentWrapperClass)>
+            <cfoutput><div class="#encodeForHTMLAttribute(normalizedContentWrapperClass)#">#content#</div></cfoutput>
+        <cfelse>
+            <cfoutput>#content#</cfoutput>
         </cfif>
-        <cfoutput>#content#</cfoutput>
         
         <cfif isDefined('url.dump')><cfdump var="#session.user#">
 

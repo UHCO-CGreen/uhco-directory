@@ -1,6 +1,7 @@
 <cfif NOT request.hasPermission("users.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
+<cfparam name="url.embedded" default="0">
 
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset allFlagsResult = flagsService.getAllFlags()>
@@ -184,8 +185,8 @@
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
-                .replace(/\"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+                .replace(/\x22/g, '&quot;')
+                .replace(/'/g, '&##39;');
         }
 
         function setLookupStatus(text, isError) {
@@ -198,7 +199,7 @@
         }
 
         function inferUserTypeFromFlags() {
-            var checked = Array.prototype.slice.call(document.querySelectorAll('input[name="Flags"]:checked'));
+            var checked = Array.prototype.slice.call(document.querySelectorAll('input[name=Flags]:checked'));
             var names = checked.map(function (cb) { return (cb.getAttribute('data-flagname') || '').toLowerCase(); });
 
             if (names.some(function (name) { return name === 'current student' || name === 'current-student'; })) {
@@ -220,7 +221,7 @@
                 return;
             }
             if (!rows || !rows.length) {
-                cougarnetResultsBodyEl.innerHTML = '<tr><td colspan="5" class="text-muted p-3">No matches found.</td></tr>';
+                cougarnetResultsBodyEl.innerHTML = '<tr><td colspan=&quot;5&quot; class=&quot;text-muted p-3&quot;>No matches found.</td></tr>';
                 return;
             }
 
@@ -231,7 +232,7 @@
                         '<td><code>' + escHtml(row.samAccountName) + '</code></td>' +
                         '<td>' + escHtml(row.employeeID) + '</td>' +
                         '<td>' + escHtml(row.mail) + '</td>' +
-                        '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary js-newuser-ldap-select" data-idx="' + idx + '">Use</button></td>' +
+                        '<td class=&quot;text-end&quot;><button type=&quot;button&quot; class=&quot;btn btn-sm btn-outline-primary js-newuser-ldap-select&quot; data-idx=&quot;' + idx + '&quot;>Use</button></td>' +
                     '</tr>';
             }).join('');
         }
@@ -287,9 +288,9 @@
                 return;
             }
                 var userType = inferUserTypeFromFlags();
-                var firstNameEl = document.querySelector('[name="FirstName"]');
-                var middleNameEl = document.querySelector('[name="MiddleName"]');
-                var lastNameEl = document.querySelector('[name="LastName"]');
+                var firstNameEl = document.querySelector('[name=FirstName]');
+                var middleNameEl = document.querySelector('[name=MiddleName]');
+                var lastNameEl = document.querySelector('[name=LastName]');
                 var seedTerm = '';
 
                 if (seedSourceInputEl && seedSourceInputEl.value.trim().length) {
@@ -393,4 +394,29 @@
 </form>
 " />
 
-<cfinclude template="/admin/layout.cfm">
+<cfif val(url.embedded) EQ 1>
+    <cfoutput>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quick Add User</title>
+    <link rel="stylesheet" href="/assets/css/admin.css">
+    <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/bootstrap-icons.css">
+    <style>
+    .cfdebug {
+        margin-left: 0px !important;
+    }
+    </style>
+</head>
+<body class="p-3">
+    #content#
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</body>
+</html>
+    </cfoutput>
+<cfelse>
+    <cfinclude template="/admin/layout.cfm">
+</cfif>

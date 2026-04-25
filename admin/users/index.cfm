@@ -50,6 +50,18 @@
 
 <cfset pageMessage = "">
 <cfset pageMessageClass = "alert-info">
+<cfset currentAdminUser = structKeyExists(session, "user") AND isStruct(session.user) ? session.user : {}>
+<cfset currentUserDisplayName = encodeForHTML(trim(currentAdminUser.displayName ?: "Admin User"))>
+<cfset currentUserEmail = encodeForHTML(trim(currentAdminUser.email ?: ""))>
+<cfset currentUserUsername = encodeForHTML(trim(currentAdminUser.username ?: ""))>
+<cfset currentUserRoleLabel = "">
+<cfset currentUserImageSrc = "">
+<cfset impersonationState = {}>
+<cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
+
+<cfif structKeyExists(currentAdminUser, "roles") AND isArray(currentAdminUser.roles) AND arrayLen(currentAdminUser.roles)>
+    <cfset currentUserRoleLabel = encodeForHTML(replace(currentAdminUser.roles[1], "_", " ", "all"))>
+</cfif>
 
 <!--- Load all users --->
 <cftry>
@@ -74,6 +86,23 @@
 </cfif>
 <cfset emailsService  = createObject("component", "cfc.emails_service").init()>
 <cfset allUserEmailMap = emailsService.getAllEmailsMap()>
+
+<cfif structKeyExists(currentAdminUser, "adminUserID") AND val(currentAdminUser.adminUserID) GT 0 AND structKeyExists(variables, "webThumbMap") AND isStruct(webThumbMap)>
+    <cfset currentUserImageSrc = trim(webThumbMap[toString(val(currentAdminUser.adminUserID))] ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "image")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.image ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "avatar")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.avatar ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc)>
+    <cfset currentUserImageSrc = request.webRoot & "/assets/images/uh.png">
+</cfif>
+
+<cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+    <cfset impersonationState = application.authService.getImpersonationState()>
+</cfif>
 
 <!--- Load top-level orgs for filter dropdown --->
 <cfif showOrgFilter>
@@ -148,6 +177,23 @@
 </cfif>
 <cfset selectedOrgFilterCount = arrayLen(selectedOrgFilterIDs) + (includeNoOrgFilter ? 1 : 0)>
 <cfset orgFilterHasSelection = selectedOrgFilterCount GT 0>
+<cfset requestedFilterPanel = structKeyExists(url, "filterPanel") ? lcase(trim(url.filterPanel)) : "">
+<cfset activeFilterPanel = "">
+<cfif requestedFilterPanel EQ "flags">
+    <cfset activeFilterPanel = "flags">
+<cfelseif requestedFilterPanel EQ "grad" AND showGradFilter>
+    <cfset activeFilterPanel = "grad">
+<cfelseif requestedFilterPanel EQ "orgs" AND showOrgFilter>
+    <cfset activeFilterPanel = "orgs">
+<cfelseif len(selectedFlagFilter)>
+    <cfset activeFilterPanel = "flags">
+<cfelseif showGradFilter AND len(selectedGradYear)>
+    <cfset activeFilterPanel = "grad">
+<cfelseif showOrgFilter AND orgFilterHasSelection>
+    <cfset activeFilterPanel = "orgs">
+</cfif>
+<cfset flagFilterCount = len(selectedFlagFilter) ? 1 : 0>
+<cfset gradFilterCount = (showGradFilter AND len(selectedGradYear)) ? 1 : 0>
 <cfset currentListUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & trim(cgi.query_string) : "?list=" & urlEncodedFormat(listType))>
 <cfparam name="pageMessage" default="">
 <cfparam name="pageMessageClass" default="alert-info">
@@ -390,33 +436,47 @@
 <cfif showTitle><cfset colCount = colCount + 1></cfif>
 
 <!--- Precompute clear-filters link --->
-<cfset hasActiveFilters = (selectedFlagFilter NEQ "" OR selectedOrgFilter NEQ "" OR selectedGradYear NEQ "" OR searchTerm NEQ "" OR selectedLetter NEQ "")>
+<cfset hasActiveFilters = (selectedFlagFilter NEQ "" OR selectedOrgFilter NEQ "" OR selectedGradYear NEQ "" OR selectedLetter NEQ "" OR len(searchTerm))>
 <cfset clearLink = "?list=" & listType & "&sortCol=" & sortColumn & "&sortDir=" & sortDirection & "&perPage=" & perPage>
-<cfset orgFilterToggleButtonClass = orgFilterHasSelection ? "btn-primary" : "btn-outline-secondary">
-<cfset orgFilterToggleButtonHTML = "">
+<cfset selectedFlagLabel = "">
+<cfif selectedFlagFilter EQ "NOFLAGS">
+    <cfset selectedFlagLabel = "No Flags">
+<cfelseif len(selectedFlagFilter) AND isNumeric(selectedFlagFilter)>
+    <cfloop array="#allFlags#" index="flagOption">
+        <cfif toString(flagOption.FLAGID) EQ toString(selectedFlagFilter)>
+            <cfset selectedFlagLabel = flagOption.FLAGNAME>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+</cfif>
+<cfset activeFilterChipsHTML = "">
+<cfif len(selectedFlagLabel)>
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-flag me-1'></i>Flag: " & encodeForHTML(selectedFlagLabel) & "</span>">
+</cfif>
+<cfif showGradFilter AND len(selectedGradYear)>
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-mortarboard me-1'></i>Grad Year: " & encodeForHTML(selectedGradYear) & "</span>">
+</cfif>
+<cfif showOrgFilter AND orgFilterHasSelection>
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-diagram-3 me-1'></i>Organizations: " & selectedOrgFilterCount & "</span>">
+</cfif>
+<cfif len(selectedLetter)>
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-type me-1'></i>Last Name: " & encodeForHTML(selectedLetter) & "</span>">
+</cfif>
 <cfset orgFilterPanelHTML = "">
 <cfif showOrgFilter>
-    <cfset orgFilterToggleButtonHTML = "
-            <button type='button' class='btn btn-sm users-list-org-filter-toggle #orgFilterToggleButtonClass#' data-bs-toggle='collapse' data-bs-target='##orgFilterPanel' aria-expanded='#(orgFilterHasSelection ? "true" : "false")#' aria-controls='orgFilterPanel'>
-                <i class='bi bi-diagram-3 me-1'></i>Org Filters#(selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "")#
-            </button>
-    ">
     <cfset orgFilterPanelHTML = "
-            <div class='w-100 users-list-org-filter-wrap'>
-                <div id='orgFilterPanel' class='collapse#(orgFilterHasSelection ? " show" : "")# mt-2'>
-                    <div class='card border-light-subtle shadow-sm users-list-org-filter-panel'>
-                        <div class='card-body p-3 users-list-org-filter-panel-body'>
-                            <div class='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3'>
-                                <div>
-                                    <div class='fw-semibold users-list-org-filter-title'>Organization Filters</div>
-                                    <div class='text-muted small users-list-org-filter-note'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
-                                </div>
-                            </div>
-                            <div class='form-check mb-3'>
-                                <input class='form-check-input' type='checkbox' name='filterOrg' value='NOORGS' id='filterOrgNoOrg'#(includeNoOrgFilter ? " checked" : "")#>
-                                <label class='form-check-label' for='filterOrgNoOrg'>No Org</label>
-                            </div>
-                            <div class='row row-cols-1 row-cols-xl-2 g-3 users-list-org-filter-grid'>
+            <div class='users-list-org-filter-wrap'>
+                <div class='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3'>
+                    <div>
+                        <div class='fw-semibold users-list-org-filter-title'>Organization Filters</div>
+                        <div class='text-muted small users-list-org-filter-note'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
+                    </div>
+                </div>
+                <div class='form-check mb-3'>
+                    <input class='form-check-input' type='checkbox' name='filterOrg' value='NOORGS' id='filterOrgNoOrg'#(includeNoOrgFilter ? " checked" : "")#>
+                    <label class='form-check-label' for='filterOrgNoOrg'>No Org</label>
+                </div>
+                <div class='row row-cols-1 row-cols-xl-2 g-3 users-list-org-filter-grid'>
     ">
     <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
         <cfset rootOrg = rootOrgs[iRoot]>
@@ -468,18 +528,15 @@
         ">
     </cfloop>
     <cfset orgFilterPanelHTML &= "
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
     ">
 </cfif>
 
 <cfset usersListMenuHTML = "
-            <div class='dropdown'>
-                <button class='btn btn-sm btn-secondary text-dark dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                    <i class='bi bi-person-fill me-1'></i>Change User Type
+            <div class='dropdown users-list-view-selector'>
+                <button class='btn btn-link navbar-brand text-white users-list-toolbar-brand users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                    <i class='bi bi-people-fill me-2'></i>Users: #pageTitle#
                 </button>
                 <ul class='dropdown-menu dropdown-menu-end'>
                     <li><a class='dropdown-item#(listType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
@@ -493,42 +550,122 @@
             </div>
 ">
 
-<!--- ======================== BUILD PAGE CONTENT ======================== --->
-<cfset content = "
-<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
-    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-secondary text-dark'>
-        <i class='bi bi-search me-1'></i>Search The UH API
-    </a>
-    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-secondary text-dark'>
-        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
-    </a>
-</div>
-
-<div class='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 users-list-page-header'>
-    <div class='d-flex align-items-center gap-2 flex-wrap'>
-        <h1 class='mb-0'><i class='bi bi-people-fill me-2'></i>#pageTitle# </h1>
-        #usersListMenuHTML#
-    </div>
-    <div class='d-flex gap-2'>
-        <a href='/admin/users/new.cfm' class='btn btn-lg btn-primary'><i class='bi bi-plus me-1'></i>New User</a>
-    </div>
-</div>
-
-<div class='card mb-4 users-list-filter-card'>
-    <div class='card-body users-list-filter-card-body'>
-        <form method='get' class='d-flex flex-wrap align-items-center gap-2 my-0 users-list-filter-form'>
-            <input type='hidden' name='list'    value='#listType#'>
-            <input type='hidden' name='sortCol' value='#sortColumn#'>
-            <input type='hidden' name='sortDir' value='#sortDirection#'>
-            <input type='hidden' name='page'    value='1'>
-            <div class='input-group users-list-toolbar-search'>
-                <button type='button' class='btn btn-sm btn-outline-secondary users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
-                <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
+<cfset usersTopToolBar = "
+    <nav class='navbar sticky-top bg-slate text-white users-list-toolbar'>
+        <div class='container-fluid users-list-toolbar-shell'>
+            <div class='users-list-toolbar-primary'>
+                #usersListMenuHTML#
+                <div class='users-list-toolbar-controls'>
+                    <form method='get' class='users-list-toolbar-search-form'>
+                        <input type='hidden' name='list'    value='#listType#'>
+                        <input type='hidden' name='sortCol' value='#sortColumn#'>
+                        <input type='hidden' name='sortDir' value='#sortDirection#'>
+                        <input type='hidden' name='filterFlag' value='#encodeForHTMLAttribute(selectedFlagFilter)#'>
+                        <input type='hidden' name='filterGradYear' value='#encodeForHTMLAttribute(selectedGradYear)#'>
+                        <input type='hidden' name='filterOrg' value='#encodeForHTMLAttribute(selectedOrgFilter)#'>
+                        <input type='hidden' name='perPage' value='#perPage#'>
+                        <input type='hidden' name='letter' value='#encodeForHTMLAttribute(selectedLetter)#'>
+                        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanel)#'>
+                        <input type='hidden' name='page'    value='1'>
+                        <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
+                            <button type='button' class='btn btn-sm btn-secondary users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
+                            <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
+                            <button class='btn btn-secondary' type='submit'><i class='bi bi-search me-1'></i>Search</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <label for='flagFilter' class='mb-0 users-list-filter-label'>Flag:</label>
-            <select name='filterFlag' id='flagFilter' class='form-select users-list-select-auto'>
-                <option value=''>All</option>
-                <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
+        
+            <ul class='navbar-nav d-flex flex-row align-items-center gap-2 ms-auto users-list-toolbar-nav'>
+                
+                <li class='nav-item dropdown ms-3 users-list-toolbar-account'>
+                    <a class='nav-link dropdown-toggle d-flex align-items-center text-white' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                    <i class='bi bi-person-circle me-2'></i>
+                    #currentUserDisplayName#
+                    </a>
+                    
+                    <div class='dropdown-menu dropdown-menu-end p-3 users-list-toolbar-dropdown' style='min-width: 320px;'>
+                    <div class='d-flex align-items-center gap-3 mb-3 users-list-toolbar-account-header'>
+                        <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='users-list-toolbar-avatar rounded-circle'>
+                        <div class='users-list-toolbar-account-meta'>
+                        <h6 class='mb-1'>#currentUserDisplayName#</h6>
+                        #(len(currentUserEmail) ? "<div class='small text-muted'>" & currentUserEmail & "</div>" : "")#
+                        #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
+                        </div>
+                    </div>
+                    
+                    #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge text-bg-primary'>" & currentUserRoleLabel & "</span></div>" : "")#
+
+                    #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
+
+                    <div class='d-grid'>
+                        <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-outline-primary btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
+                    </div>
+                    </div>
+                </li>
+                
+                
+            </ul>
+        
+        </div>
+    </nav>
+">
+
+<!--- ======================== BUILD PAGE CONTENT ======================== --->
+
+<!---
+<div class='d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 users-list-page-header'>
+        <div class='d-flex align-items-center gap-2 flex-wrap'>
+            <h1 class='mb-0'><i class='bi bi-people-fill me-2'></i>#pageTitle# </h1>
+            #usersListMenuHTML#
+        </div>
+        <div class='d-flex gap-2'>
+            <a href='/admin/users/new.cfm' class='btn btn-lg btn-primary'><i class='bi bi-plus me-1'></i>New User</a>
+        </div>
+    </div>
+<div class='input-group users-list-toolbar-search'>
+                    #usersListMenuHTML#
+                    <button type='button' class='btn btn-sm btn-outline-secondary users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
+                    <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#searchTerm#'>
+                </div>#usersListMenuHTML#
+--->
+<cfset content = "
+#usersTopToolBar#
+<div class='py-4 px-4 pt-2'>
+    <form method='get' class='users-list-advanced-filter-form'>
+        <input type='hidden' name='list' value='#listType#'>
+        <input type='hidden' name='sortCol' value='#sortColumn#'>
+        <input type='hidden' name='sortDir' value='#sortDirection#'>
+        <input type='hidden' name='search' value='#encodeForHTMLAttribute(searchTerm)#'>
+        <input type='hidden' name='letter' value='#encodeForHTMLAttribute(selectedLetter)#'>
+        <input type='hidden' name='page' value='1'>
+        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanel)#' id='usersListFilterPanelInput'>
+        <div class='d-flex flex-wrap gap-2 mb-3 align-items-center users-list-action-row'>
+            #(request.hasPermission("users.edit") ? "<button type='button' class='btn btn-sm btn-secondary text-dark' data-bs-toggle='modal' data-bs-target='##quickAddUserModal'><i class='bi bi-plus me-1'></i>Add A New User</button>" : "")#
+            <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(activeFilterPanel EQ "flags" ? "btn-primary text-white" : "btn-secondary text-dark")#' data-filter-panel-trigger='flags' aria-expanded='#(activeFilterPanel EQ "flags" ? "true" : "false")#' aria-controls='usersListFilterPanel'>
+                <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & flagFilterCount & "</span>" : "")#
+            </button>
+            #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "grad" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='grad' aria-expanded='" & (activeFilterPanel EQ "grad" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
+            #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "orgs" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (activeFilterPanel EQ "orgs" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
+            <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per Page:</label>
+            <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
+                <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
+                <option value='25'  #(perPage == 25  ? 'selected' : '')#>25</option>
+                <option value='50'  #(perPage == 50  ? 'selected' : '')#>50</option>
+                <option value='100' #(perPage == 100 ? 'selected' : '')#>100</option>
+            </select>
+            <button type='submit' class='btn btn-sm btn-secondary users-list-apply-button'><i class='bi bi-funnel me-1'></i>Apply</button>
+            " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning users-list-clear-button'>Clear Filters</a>" : "") & "
+        </div>
+        #(len(activeFilterChipsHTML) ? "<div class='d-flex flex-wrap gap-2 mb-3 users-list-active-filters'>" & activeFilterChipsHTML & "</div>" : "")#
+        <div class='card mb-4 users-list-filter-card users-list-filter-panel#(len(activeFilterPanel) ? "" : " d-none")#' id='usersListFilterPanel'>
+            <div class='card-body users-list-filter-card-body'>
+                <div class='users-list-filter-section#(activeFilterPanel EQ "flags" ? "" : " d-none")#' data-filter-panel='flags'>
+                    <div class='d-flex flex-wrap align-items-center gap-2'>
+                        <label for='flagFilter' class='mb-0 users-list-filter-label'>Flag:</label>
+                        <select name='filterFlag' id='flagFilter' class='form-select users-list-select-auto'>
+                            <option value=''>All</option>
+                            <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
 ">
 
 <!--- Flag dropdown options --->
@@ -538,49 +675,49 @@
 </cfloop>
 
 <cfset content &= "
-            </select>
-            #orgFilterToggleButtonHTML#
+                        </select>
+                    </div>
+                </div>
 ">
 
 <!--- Grad year filter (conditional) --->
 <cfif showGradFilter>
     <cfset content &= "
-            <label for='gradYearFilter' class='mb-0 users-list-filter-label'>Grad Year:</label>
-            <select name='filterGradYear' id='gradYearFilter' class='form-select users-list-select-auto'>
-                <option value=''>All Years</option>
+                <div class='users-list-filter-section#(activeFilterPanel EQ "grad" ? "" : " d-none")#' data-filter-panel='grad'>
+                    <div class='d-flex flex-wrap align-items-center gap-2'>
+                        <label for='gradYearFilter' class='mb-0 users-list-filter-label'>Grad Year:</label>
+                        <select name='filterGradYear' id='gradYearFilter' class='form-select users-list-select-auto'>
+                            <option value=''>All Years</option>
     ">
     <cfloop from="1" to="#arrayLen(allGradYears)#" index="i">
         <cfset gy = allGradYears[i]>
         <cfset content &= "<option value='#gy#'" & (selectedGradYear == toString(gy) ? " selected" : "") & ">#gy#</option>">
     </cfloop>
     <cfset content &= "
-            </select>
+                        </select>
+                    </div>
+                </div>
     ">
 </cfif>
 
-<!--- Per page + buttons --->
+<!--- Organization filter panel --->
+<cfif showOrgFilter>
+    <cfset content &= "
+                <div class='users-list-filter-section#(activeFilterPanel EQ "orgs" ? "" : " d-none")#' data-filter-panel='orgs'>
+                    #orgFilterPanelHTML#
+                </div>
+    ">
+</cfif>
+
 <cfset content &= "
-            <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per page:</label>
-            <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
-                <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
-                <option value='25'  #(perPage == 25  ? 'selected' : '')#>25</option>
-                <option value='50'  #(perPage == 50  ? 'selected' : '')#>50</option>
-                <option value='100' #(perPage == 100 ? 'selected' : '')#>100</option>
-            </select>
-            <button type='submit' class='btn btn-sm btn-secondary users-list-apply-button'>Apply Filter</button>
-            " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-warning users-list-clear-button'>Clear Filters</a>" : "") & "
-            #orgFilterPanelHTML#
-        </form>
-    </div>
-</div>
+            </div>
+        </div>
+    </form>
 
 " & (pageMessage != "" ? "<div class='alert " & pageMessageClass & "'>" & EncodeForHTML(pageMessage) & "</div>" : "") & "
 ">
 
 <!--- Top pagination --->
-<cfinclude template="/includes/pagination.cfm">
-
-<!--- Table header --->
 <cfset content &= "
 <div class='table-responsive users-list-table-shell'>
 <table class='table table-striped table-hover align-middle users-list-table'>
@@ -756,19 +893,82 @@
 <!--- Bottom pagination --->
 <cfinclude template="/includes/pagination.cfm">
 
+<cfif request.hasPermission("users.edit")>
+    <cfset content &= "
+<div class='modal fade' id='quickAddUserModal' tabindex='-1' aria-labelledby='quickAddUserModalLabel' aria-hidden='true'>
+    <div class='modal-dialog modal-xl modal-dialog-scrollable'>
+        <div class='modal-content'>
+            <div class='modal-header'>
+                <h5 class='modal-title' id='quickAddUserModalLabel'><i class='bi bi-person-plus me-2'></i>Quick Add User</h5>
+                <button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Close'></button>
+            </div>
+            <div class='modal-body p-0'>
+                <iframe id='quickAddUserFrame' src='/admin/users/new.cfm?embedded=1' class='w-100 border-0' style='min-height: 74vh;' loading='lazy'></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+">
+</cfif>
+
+<cfset content &= "</div>">
 <cfset pageScripts = "">
 <cfsavecontent variable="pageScripts">
 <script>
 (function () {
-    var filterForm = document.querySelector('.users-list-filter-form');
-    if (!filterForm) return;
+    var advancedForm = document.querySelector('.users-list-advanced-filter-form');
+    if (!advancedForm) return;
 
-    var currentUrl = window.location.href;
-    history.replaceState({ usersListUrl: currentUrl }, '', currentUrl);
+    var filterPanelInput = document.getElementById('usersListFilterPanelInput');
+    var filterPanelCard = document.getElementById('usersListFilterPanel');
+    var filterPanelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-filter-panel-trigger]'));
+    var filterPanelSections = Array.prototype.slice.call(document.querySelectorAll('[data-filter-panel]'));
+    var toolbarSearchForm = document.querySelector('.users-list-toolbar-search-form');
+    var toolbarFilterPanelInput = toolbarSearchForm ? toolbarSearchForm.querySelector('input[name="filterPanel"]') : null;
 
-    filterForm.addEventListener('submit', function () {
+    function setActiveFilterPanel(panelName) {
+        var activePanel = panelName || '';
+
+        if (filterPanelInput) {
+            filterPanelInput.value = activePanel;
+        }
+        if (toolbarFilterPanelInput) {
+            toolbarFilterPanelInput.value = activePanel;
+        }
+        if (filterPanelCard) {
+            filterPanelCard.classList.toggle('d-none', !activePanel);
+        }
+
+        filterPanelButtons.forEach(function (button) {
+            var isActive = button.getAttribute('data-filter-panel-trigger') === activePanel;
+            button.classList.toggle('btn-primary', isActive);
+            button.classList.toggle('text-white', isActive);
+            button.classList.toggle('btn-secondary', !isActive);
+            button.classList.toggle('text-dark', !isActive);
+            button.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+        });
+
+        filterPanelSections.forEach(function (section) {
+            var isActive = section.getAttribute('data-filter-panel') === activePanel;
+            section.classList.toggle('d-none', !isActive);
+        });
+    }
+
+    filterPanelButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            var panelName = button.getAttribute('data-filter-panel-trigger') || '';
+            var nextPanel = filterPanelInput && filterPanelInput.value === panelName ? '' : panelName;
+            setActiveFilterPanel(nextPanel);
+        });
+    });
+
+    setActiveFilterPanel(filterPanelInput ? filterPanelInput.value : '');
+
+    advancedForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+
         var params = new URLSearchParams();
-        filterForm.querySelectorAll('input, select, textarea').forEach(function (el) {
+        advancedForm.querySelectorAll('input, select, textarea').forEach(function (el) {
             if (!el.name || el.disabled) return;
             if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
             params.append(el.name, el.value);
@@ -776,7 +976,7 @@
 
         // Collapse multiple filterOrg values into a single comma-joined param
         var orgValues = [];
-        filterForm.querySelectorAll('input[name="filterOrg"]:checked').forEach(function (cb) {
+        advancedForm.querySelectorAll('input[name="filterOrg"]:checked').forEach(function (cb) {
             orgValues.push(cb.value);
         });
         params.delete('filterOrg');
@@ -784,17 +984,11 @@
             params.set('filterOrg', orgValues.join(','));
         }
 
-        var newUrl = window.location.pathname + '?' + params.toString();
-        history.pushState({ usersListUrl: newUrl }, '', newUrl);
-    });
-
-    window.addEventListener('popstate', function (e) {
-        if (e.state && e.state.usersListUrl) {
-            window.location.href = e.state.usersListUrl;
-        }
+        window.location.href = window.location.pathname + '?' + params.toString();
     });
 })();
 </script>
 </cfsavecontent>
 
+<cfset contentWrapperClass = "">
 <cfinclude template="/admin/layout.cfm">

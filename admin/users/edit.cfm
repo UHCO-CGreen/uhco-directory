@@ -16,6 +16,112 @@
 <cfset allFlags = allFlagsResult.data />
 <cfset allOrganizationsResult = organizationsService.getAllOrgs()>
 <cfset allOrganizations = allOrganizationsResult.data />
+<cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER)) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
+<cfset contentWrapperClass = "">
+<cfset toolbarListType = "all">
+<cfset toolbarSearchTerm = structKeyExists(url, "search") ? trim(url.search) : "">
+<cfset currentAdminUser = structKeyExists(session, "user") AND isStruct(session.user) ? session.user : {}>
+<cfset currentUserDisplayName = encodeForHTML(trim(currentAdminUser.displayName ?: "Admin User"))>
+<cfset currentUserEmail = encodeForHTML(trim(currentAdminUser.email ?: ""))>
+<cfset currentUserUsername = encodeForHTML(trim(currentAdminUser.username ?: ""))>
+<cfset currentUserRoleLabel = "">
+<cfset currentUserImageSrc = "">
+<cfset impersonationState = {}>
+<cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
+<cfset toolbarReturnToMatch = reFindNoCase("(?:\?|&)list=([^&]+)", returnTo, 1, true)>
+
+<cfif isStruct(toolbarReturnToMatch) AND arrayLen(toolbarReturnToMatch.len) GTE 2 AND toolbarReturnToMatch.len[2] GT 0>
+    <cfset toolbarListType = lCase(urlDecode(mid(returnTo, toolbarReturnToMatch.pos[2], toolbarReturnToMatch.len[2])))>
+</cfif>
+<cfif NOT listFindNoCase("problems,all,alumni,current-students,faculty,staff,inactive", toolbarListType)>
+    <cfset toolbarListType = "all">
+</cfif>
+<cfif structKeyExists(currentAdminUser, "roles") AND isArray(currentAdminUser.roles) AND arrayLen(currentAdminUser.roles)>
+    <cfset currentUserRoleLabel = encodeForHTML(replace(currentAdminUser.roles[1], "_", " ", "all"))>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "image")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.image ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "avatar")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.avatar ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc)>
+    <cfset currentUserImageSrc = request.webRoot & "/assets/images/uh.png">
+</cfif>
+<cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+    <cfset impersonationState = application.authService.getImpersonationState()>
+</cfif>
+
+<cfswitch expression="#toolbarListType#">
+    <cfcase value="problems"><cfset toolbarListLabel = "Problem Records"></cfcase>
+    <cfcase value="faculty"><cfset toolbarListLabel = "Faculty"></cfcase>
+    <cfcase value="staff"><cfset toolbarListLabel = "Staff"></cfcase>
+    <cfcase value="current-students"><cfset toolbarListLabel = "Current Students"></cfcase>
+    <cfcase value="alumni"><cfset toolbarListLabel = "Alumni"></cfcase>
+    <cfcase value="inactive"><cfset toolbarListLabel = "Inactive Records"></cfcase>
+    <cfdefaultcase><cfset toolbarListLabel = "All Records"></cfdefaultcase>
+</cfswitch>
+
+<cfset usersListMenuHTML = "
+            <div class='dropdown users-list-view-selector'>
+                <button class='btn btn-link navbar-brand text-white users-list-toolbar-brand users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                    <i class='bi bi-people-fill me-2'></i>Users: #toolbarListLabel#
+                </button>
+                <ul class='dropdown-menu dropdown-menu-end'>
+                    <li><a class='dropdown-item#(toolbarListType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "faculty" ? " active" : "")#' href='/admin/users/index.cfm?list=faculty'><i class='bi bi-people-fill me-2'></i>Faculty</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "staff" ? " active" : "")#' href='/admin/users/index.cfm?list=staff'><i class='bi bi-people-fill me-2'></i>Staff</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "current-students" ? " active" : "")#' href='/admin/users/index.cfm?list=current-students'><i class='bi bi-people-fill me-2'></i>Current Students</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "alumni" ? " active" : "")#' href='/admin/users/index.cfm?list=alumni'><i class='bi bi-mortarboard me-2'></i>Alumni</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "inactive" ? " active" : "")#' href='/admin/users/index.cfm?list=inactive'><i class='bi bi-person-dash me-2'></i>Inactive Records</a></li>
+                    <li><a class='dropdown-item#(toolbarListType EQ "all" ? " active" : "")#' href='/admin/users/index.cfm?list=all'><i class='bi bi-list me-2'></i>All Records</a></li>
+                </ul>
+            </div>
+">
+
+<cfset usersTopToolBar = "
+    <nav class='navbar sticky-top bg-slate text-white users-list-toolbar'>
+        <div class='container-fluid users-list-toolbar-shell'>
+            <div class='users-list-toolbar-primary'>
+                #usersListMenuHTML#
+                <div class='users-list-toolbar-controls'>
+                    <form method='get' action='/admin/users/index.cfm' class='users-list-toolbar-search-form'>
+                        <input type='hidden' name='list' value='#toolbarListType#'>
+                        <input type='hidden' name='page' value='1'>
+                        <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
+                            <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(toolbarSearchTerm)#'>
+                            <button class='btn btn-secondary' type='submit'><i class='bi bi-search me-1'></i>Search</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        
+            <ul class='navbar-nav d-flex flex-row align-items-center gap-2 ms-auto users-list-toolbar-nav'>
+                <li class='nav-item dropdown ms-3 users-list-toolbar-account'>
+                    <a class='nav-link dropdown-toggle d-flex align-items-center text-white' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false'>
+                        <i class='bi bi-person-circle me-2'></i>
+                        #currentUserDisplayName#
+                    </a>
+                    <div class='dropdown-menu dropdown-menu-end p-3 users-list-toolbar-dropdown' style='min-width: 320px;'>
+                        <div class='d-flex align-items-center gap-3 mb-3 users-list-toolbar-account-header'>
+                            <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='users-list-toolbar-avatar rounded-circle'>
+                            <div class='users-list-toolbar-account-meta'>
+                                <h6 class='mb-1'>#currentUserDisplayName#</h6>
+                                #(len(currentUserEmail) ? "<div class='small text-muted'>" & currentUserEmail & "</div>" : "")#
+                                #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
+                            </div>
+                        </div>
+                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge text-bg-primary'>" & currentUserRoleLabel & "</span></div>" : "")#
+                        #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
+                        <div class='d-grid'>
+                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-outline-primary btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </nav>
+">
 
 
 <cfset userFlagIDs = []>
@@ -446,8 +552,6 @@
     { code="missing_grad_year",        label="Missing Grad Year (Students Only)" }
 ]>
 
-<cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER)) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
-
 <!--- ── UH Sync pending diffs for this user ── --->
 <cfset uhSyncPendingDiffs = []>
 <cfset uhSyncPanelHtml    = "">
@@ -584,6 +688,8 @@
 </cffunction>
 
 <cfset content = "
+#usersTopToolBar#
+<div class='py-4 px-4 pt-2'>
 <div class='container-fluid users-edit-page'>
 
 " & uhSyncPanelHtml & " 
@@ -707,6 +813,7 @@
                 <small class='text-muted d-block mb-2'>Name Aliases are alternate names associated with a users record, such as maiden names or preferred names. One alias can be designated as the Primary name, which is used for display purposes across this directory as well as the UH API. Aliases can also be marked Active or Inactive to control whether they are considered in search results and other features.</small>
                 <div id='aliasesContainer'>
 ">
+
 <cfloop from="1" to="#arrayLen(userAliases)#" index="local.ai">
     <cfset local.al = userAliases[local.ai]>
     <cfset local.alDisplay = "">
@@ -2348,6 +2455,7 @@
 </cfoutput>
 </cfsavecontent>
 <cfset content &= local.dqPanel>
+<cfset content &= "</div></div>">
 
 <cfset ViewContent = "">
 <cfset ViewContent &= "

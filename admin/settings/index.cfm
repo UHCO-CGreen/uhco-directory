@@ -117,6 +117,19 @@
         </a>
     </div>
 
+    <!--- Migrations --->
+    <div class="col-md-6 col-lg-4">
+        <a href="/admin/settings/migrations/" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm settings-hub-card">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-mortarboard display-4 mb-3 settings-hub-icon"></i>
+                    <h5 class="card-title text-dark">Migrations</h5>
+                    <p class="card-text text-muted small">Graduation migration and future migration tools</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
     <!--- Scheduled Tasks --->
     <div class="col-md-6 col-lg-4">
         <a href="/admin/settings/scheduled-tasks/" class="text-decoration-none">
@@ -156,18 +169,7 @@
         </a>
     </div>
 
-    <!--- Migrations --->
-    <div class="col-md-6 col-lg-4">
-        <a href="/admin/settings/migrations/" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm settings-hub-card">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-mortarboard display-4 mb-3 settings-hub-icon"></i>
-                    <h5 class="card-title text-dark">Migrations <span class="badge settings-status-badge settings-status-badge--alpha">Alpha</span></h5>
-                    <p class="card-text text-muted small">Graduation migration and future migration tools</p>
-                </div>
-            </div>
-        </a>
-    </div>
+    
 
     <!--- UH Sync --->
     <div class="col-md-6 col-lg-4">
