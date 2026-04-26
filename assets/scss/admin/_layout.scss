@@ -30,6 +30,16 @@ body {
   transition: margin-left 0.3s ease;
 }
 
+.main-content .table > thead > tr > th,
+.main-content .table > :not(caption) > thead > tr > th,
+.main-content .table-dark > :not(caption) > tr > th,
+.main-content thead.table-dark > tr > th {
+  background: linear-gradient(180deg, #ffffff 0%, #f2f5f8 52%, #e9eff5 100%);
+  border-bottom-color: rgba(49, 70, 90, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(49, 70, 90, 0.14);
+  color: #31465a;
+}
+
 .main-content.sidebar-collapsed {
   margin-left: 80px;
 }

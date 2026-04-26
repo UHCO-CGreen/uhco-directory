@@ -182,14 +182,14 @@
                         </td>
                         <td class="text-end">
                             <div class="settings-action-group">
-                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Edit Role" data-bs-toggle="tooltip" data-bs-title="Edit Role" aria-label="Edit Role">
+                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit Role" data-bs-toggle="tooltip" data-bs-title="Edit Role" aria-label="Edit Role">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif r.ROLE_NAME NEQ "SUPER_ADMIN">
                                 <form method="post" action="/admin/settings/admin-roles/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deleteRole">
                                     <input type="hidden" name="roleID" value="#r.ROLE_ID#">
-                                    <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Delete Role" data-bs-toggle="tooltip" data-bs-title="Delete Role" aria-label="Delete Role"
+                                    <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Delete Role" data-bs-toggle="tooltip" data-bs-title="Delete Role" aria-label="Delete Role"
                                             onclick="return confirm('Delete role #encodeForJavaScript(r.ROLE_NAME)#? This will remove it from all users.')">
                                         <i class="bi bi-trash"></i>
                                     </button>

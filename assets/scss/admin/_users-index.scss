@@ -299,13 +299,13 @@
 }
 
 .users-list-sort-link {
-  color: #f8fbff;
+  color: #31465a;
   text-decoration: none;
 }
 
 .users-list-sort-link:hover,
 .users-list-sort-link:focus {
-  color: #fff;
+  color: #1f3448;
   text-decoration: underline;
 }
 
@@ -322,13 +322,13 @@
 }
 
 .users-list-table-head {
-  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f2f5f8 52%, #e9eff5 100%);
 }
 
 .users-list-table-head th {
   border-bottom: 0;
   background: transparent;
-  color: #fff;
+  color: #31465a;
   font-size: 0.83rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -338,7 +338,7 @@
 
 .users-list-table > thead.users-list-table-head > tr > th {
   background: transparent;
-  color: #fff;
+  color: #31465a;
 }
 
 .users-list-table tbody tr:nth-of-type(even) {
@@ -353,26 +353,12 @@
   font-size: 0.7rem;
   line-height: 1.15;
   color: #fff;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-org-badge-primary) 82%, #fff 18%) 0%, var(--uhco-user-org-badge-primary) 100%) !important;
-}
-
-.users-list-pill-stack .users-list-badge-org:nth-child(even) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-org-badge-secondary) 82%, #fff 18%) 0%, var(--uhco-user-org-badge-secondary) 100%) !important;
 }
 
 .users-list-badge-flag {
   font-size: 0.68rem;
   line-height: 1.15;
   color: #fff;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-flag-badge-primary) 82%, #fff 18%) 0%, var(--uhco-user-flag-badge-primary) 100%) !important;
-}
-
-.users-list-pill-stack .users-list-badge-flag:nth-child(even) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-flag-badge-secondary) 82%, #fff 18%) 0%, var(--uhco-user-flag-badge-secondary) 100%) !important;
-}
-
-.users-list-pill-stack .users-list-badge-flag.bg-danger {
-  background: linear-gradient(180deg, #c65261 0%, #a83445 100%) !important;
 }
 
 .users-list-thumb {
@@ -389,7 +375,6 @@
 
 .users-list-external-badge {
   margin-left: 0.35rem;
-  background: #f3ca75;
 }
 
 .users-list-actions {
@@ -467,8 +452,15 @@
 }
 
 .users-list-action-button-delete {
-  background: #b72c43;
-  border-color: #a1263b;
+  --bs-btn-color: #8d2337;
+  --bs-btn-bg: #fff2f4;
+  --bs-btn-border-color: #b03a4b;
+  --bs-btn-hover-color: #771d2d;
+  --bs-btn-hover-bg: #ffe7eb;
+  --bs-btn-hover-border-color: #98293c;
+  --bs-btn-active-color: #671828;
+  --bs-btn-active-bg: #ffdde3;
+  --bs-btn-active-border-color: #862437;
 }
 
 .users-list-action-button:hover,

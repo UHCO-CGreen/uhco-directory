@@ -105,9 +105,9 @@
         <cfset pDeptName   = EncodeForHTML(trim(person.department_name ?: person.departmentName ?: ""))>
 
         <cfset typeFlags = []>
-        <cfif structKeyExists(person, "student")  AND person.student>  <cfset arrayAppend(typeFlags, "<span class='badge bg-primary'>student</span>")>  </cfif>
-        <cfif structKeyExists(person, "staff")    AND person.staff>    <cfset arrayAppend(typeFlags, "<span class='badge bg-warning text-dark'>staff</span>")>    </cfif>
-        <cfif structKeyExists(person, "faculty")  AND person.faculty>  <cfset arrayAppend(typeFlags, "<span class='badge bg-danger'>faculty</span>")>  </cfif>
+        <cfif structKeyExists(person, "student")  AND person.student>  <cfset arrayAppend(typeFlags, "<span class='badge badge-info'>student</span>")>  </cfif>
+        <cfif structKeyExists(person, "staff")    AND person.staff>    <cfset arrayAppend(typeFlags, "<span class='badge badge-secondary'>staff</span>")>    </cfif>
+        <cfif structKeyExists(person, "faculty")  AND person.faculty>  <cfset arrayAppend(typeFlags, "<span class='badge badge-dark'>faculty</span>")>  </cfif>
 
         <cfset resultsHtml &= "
         <tr>
@@ -135,12 +135,12 @@
 <cfset authBadge = "">
 <cfif NOT len(apiError)>
     <cfif authStatus.isAuthenticated>
-        <cfset authBadge = "<span class='badge bg-success fs-6 me-2'><i class='bi bi-shield-check'></i> Authenticated</span>">
+        <cfset authBadge = "<span class='badge badge-success fs-6 me-2'><i class='bi bi-shield-check'></i> Authenticated</span>">
     <cfelse>
-        <cfset authBadge = "<span class='badge bg-danger fs-6 me-2'><i class='bi bi-shield-x'></i> NOT Authenticated</span>">
+        <cfset authBadge = "<span class='badge badge-danger fs-6 me-2'><i class='bi bi-shield-x'></i> NOT Authenticated</span>">
     </cfif>
 <cfelse>
-    <cfset authBadge = "<span class='badge bg-danger fs-6 me-2'>Error</span>">
+    <cfset authBadge = "<span class='badge badge-danger fs-6 me-2'>Error</span>">
 </cfif>
 
 <cfset selDept = structNew()>
@@ -216,7 +216,7 @@
 
 <div class='mb-3 d-flex align-items-center flex-wrap gap-2'>
     #authBadge#
-    <span class='badge bg-secondary fs-6'>#arrayLen(apiPeople)# #resultLabel# returned</span>
+    <span class='badge badge-light fs-6'>#arrayLen(apiPeople)# #resultLabel# returned</span>
     <small class='text-muted ms-2'>department=#EncodeForHTML(paramDepartment)##(len(paramQ) ? ', q=' & EncodeForHTML(paramQ) : '')#</small>
 </div>
 

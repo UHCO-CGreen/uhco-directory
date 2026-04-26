@@ -31,8 +31,8 @@
                 <td class='external-system-name'>#EncodeForHTML(s.SYSTEMNAME)#</td>
                 <td>
                     <div class='d-flex flex-wrap gap-1 align-items-start users-list-actions external-actions'>
-                        <a href='/admin/external/edit.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit External System' data-bs-toggle='tooltip' data-bs-title='Edit External System' aria-label='Edit External System'><i class='bi bi-pencil-square'></i></a>
-                        <a href='/admin/external/delete.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete External System' data-bs-toggle='tooltip' data-bs-title='Delete External System' aria-label='Delete External System'><i class='bi bi-trash'></i></a>
+                        <a href='/admin/external/edit.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit External System' data-bs-toggle='tooltip' data-bs-title='Edit External System' aria-label='Edit External System'><i class='bi bi-pencil-square'></i></a>
+                        <a href='/admin/external/delete.cfm?systemID=#s.SYSTEMID#' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete External System' data-bs-toggle='tooltip' data-bs-title='Delete External System' aria-label='Delete External System'><i class='bi bi-trash'></i></a>
                     </div>
                 </td>
             </tr>
@@ -56,7 +56,7 @@
                 <input class='form-control' name='SystemName'>
             </div>
             <div class='col-md-6'>
-                <button class='btn btn-success mt-4'>Add System</button>
+                <button class='btn btn-ui-add mt-4'><i class='bi bi-plus-circle me-1'></i>Add System</button>
             </div>
         </form>
     </div>

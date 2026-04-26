@@ -90,8 +90,8 @@
                     #EncodeForHTML(ro.ORGNAME)##typeHtml##countBadge#
                 </button>
                 <div class='orgs-root-actions d-flex flex-wrap gap-1 align-items-start flex-shrink-0'>
-                    <a href='/admin/orgs/edit.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
-                    <a href='/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
+                    <a href='/admin/orgs/edit.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                    <a href='/admin/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
                 </div>
             </div>
             <div id='#collapseID#' class='accordion-collapse collapse#showClass#'>
@@ -122,8 +122,8 @@
                             <td>#dType#</td>
                             <td class='text-end pe-3'>
                                 <div class='d-flex flex-wrap gap-1 align-items-start justify-content-end'>
-                                    <a href='/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
-                                    <a href='/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
+                                    <a href='/admin/orgs/edit.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                                    <a href='/admin/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
                                 </div>
                             </td>
                         </tr>
@@ -192,7 +192,7 @@
                 <textarea class='form-control' name='OrgDescription' rows='2' placeholder='Optional description shown on user edit/new pages for parent organizations.'></textarea>
             </div>
             <div class='col-12'>
-                <button class='btn btn-success'>Add Organization</button>
+                <button class='btn btn-ui-add'><i class='bi bi-plus-circle me-1'></i>Add Organization</button>
             </div>
         </form>
     </div>

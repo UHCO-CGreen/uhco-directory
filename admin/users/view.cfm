@@ -124,7 +124,7 @@
                                 #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
                             </div>
                         </div>
-                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge text-bg-primary'>" & currentUserRoleLabel & "</span></div>" : "")#
+                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
                         #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
                         <div class='d-grid'>
                             <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-outline-primary btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
@@ -201,26 +201,6 @@
 <cfloop from="1" to="#arrayLen(userExternalIDs)#" index="i">
     <cfset externalBySystem[toString(userExternalIDs[i].SYSTEMID)] = userExternalIDs[i].EXTERNALVALUE>
 </cfloop>
-
-<cfset dqDAO            = createObject("component", "dao.dataQuality_DAO").init()>
-<cfset dqExclusionsList = dqDAO.getExclusionsForUser(val(url.userID))>
-<cfset dqExclusionLabelMap = {
-    "missing_uh_api_id"      : "Missing UH API ID",
-    "missing_primary_alias"  : "Missing Primary Alias",
-    "missing_email_primary"  : "Missing Primary Email",
-    "missing_title1"         : "Missing Title",
-    "missing_room"           : "Missing Room",
-    "missing_building"       : "Missing Building",
-    "missing_phone"          : "Missing Phone",
-    "missing_degrees"        : "Missing Degrees",
-    "no_flags"               : "Zero Flags",
-    "no_orgs"                : "Zero Organizations",
-    "no_images"              : "No Images",
-    "missing_cougarnet"      : "Missing CougarNet ID",
-    "missing_peoplesoft"     : "Missing PeopleSoft ID",
-    "missing_legacy_id"      : "Missing Legacy ID",
-    "missing_grad_year"      : "Missing Grad Year (Students Only)"
-}>
 
 <!--- ── Addresses ── --->
 <cfset addressesSvc  = createObject("component", "cfc.addresses_service").init()>
@@ -401,14 +381,21 @@
 
 <cfset userAliasesHtml = "">
 <cfif arrayLen(userAliases)>
-    <cfset userAliasesHtml = "<div class='mb-2'><strong>Aliases:</strong><ul class='mb-0 users-view-org-list'>">
+    <cfset userAliasesHtml = "<div class='mb-3'><strong>Aliases:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>First</th><th>Middle</th><th>Last</th><th>Type / System</th><th>Status</th></tr></thead><tbody>">
     <cfloop from="1" to="#arrayLen(userAliases)#" index="aliasIndex">
         <cfset aliasItem = userAliases[aliasIndex]>
-        <cfset aliasTypeHtml = len(trim(aliasItem.ALIASTYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(aliasItem.ALIASTYPE) & "</span>" : "">
-        <cfset aliasInactiveHtml = val(aliasItem.ISACTIVE ?: 0) NEQ 1 ? " <span class='badge bg-light text-dark users-view-badge'>Inactive</span>" : "">
-        <cfset userAliasesHtml &= "<li>" & EncodeForHTML(aliasItem.DISPLAYNAME ?: "") & aliasTypeHtml & aliasInactiveHtml & "</li>">
+        <cfset aliasFirst = trim(aliasItem.FIRSTNAME ?: "")>
+        <cfset aliasMiddle = trim(aliasItem.MIDDLENAME ?: "")>
+        <cfset aliasLast = trim(aliasItem.LASTNAME ?: "")>
+        <cfset aliasType = trim(aliasItem.ALIASTYPE ?: "")>
+        <cfset aliasSystem = trim(aliasItem.SOURCESYSTEM ?: "")>
+        <cfset aliasTypeSystem = len(aliasType) AND len(aliasSystem) ? aliasType & " / " & aliasSystem : (len(aliasType) ? aliasType : aliasSystem)>
+        <cfset aliasIsActive = val(aliasItem.ISACTIVE ?: 0) EQ 1>
+        <cfset aliasIsPrimary = val(aliasItem.ISPRIMARY ?: 0) EQ 1>
+        <cfset aliasStatusHtml = (aliasIsActive ? "<span class='badge badge-success users-view-badge'>Active</span>" : "<span class='badge badge-danger users-view-badge'>Inactive</span>") & (aliasIsPrimary ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "")>
+        <cfset userAliasesHtml &= "<tr><td>" & (len(aliasFirst) ? EncodeForHTML(aliasFirst) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasMiddle) ? EncodeForHTML(aliasMiddle) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasLast) ? EncodeForHTML(aliasLast) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasTypeSystem) ? EncodeForHTML(aliasTypeSystem) : "<span class='text-muted'>-</span>") & "</td><td>" & aliasStatusHtml & "</td></tr>">
     </cfloop>
-    <cfset userAliasesHtml &= "</ul></div>">
+    <cfset userAliasesHtml &= "</tbody></table></div></div>">
 </cfif>
 
 <!---
@@ -470,7 +457,7 @@
             <cfset SubTitle = len(title1) ? "<p class='text-muted fs-5'>#title1#</p>" : "">
             <cfbreak>
         <cfelseif listFindNoCase("faculty-fulltime,faculty-adjunct,professor-emeritus", flag)>
-            <cfset SubTitle = len(degrees) ? "<p class='text-muted fs-5'>#degrees#</p>" : "">
+            <cfset SubTitle = len(title1) ? "<p class='text-muted fs-5'>#title1#</p>" : "">
             <cfbreak>
         </cfif>
     </cfloop>
@@ -485,223 +472,208 @@
     <cfset flagsRowHtml &= "<span class='users-view-badge-flags-header fw-bold'>Flags:</span>">
     <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
         <cfset flag = profile.flags[f]>
-        <cfset flagsRowHtml &= "<span class='badge rounded-pill users-view-badge users-view-badge-flag'>" & EncodeForHTML(flag.FLAGNAME) & "</span>">
+        <cfset flagsRowHtml &= "<span class='badge rounded-pill users-view-badge badge-flags'>" & EncodeForHTML(flag.FLAGNAME) & "</span>">
     </cfloop>
     <cfset flagsRowHtml &= "</div>">
 <cfelse>
-    <cfset flagsRowHtml = "<p class='text-muted small mt-1 mb-2'>No flags assigned</p>">
+    <cfset flagsRowHtml = "">
 </cfif>
 
 <!---#quickMatchHtml#--->
 
 <cfif len(trim(profile.user.UH_API_ID ?: ""))>
         <cfset uhSyncUrl = "/admin/users/uh_sync.cfm?userID=" & urlEncodedFormat(profile.user.USERID) & "&uhApiId=" & urlEncodedFormat(profile.user.UH_API_ID)>
-        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-secondary text-dark'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
+        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-ui-neutral'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
     <cfelse>
-        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-secondary text-dark disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
+        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-ui-neutral disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
     </cfif>
 
-<cfset content = "
-#usersTopToolBar#
-<div class='py-4 px-4 pt-2'>
-<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
-    <a href='/admin/users/edit.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-secondary text-dark'>
-        <i class='bi bi-pencil me-1'></i>Edit This User
-    </a>
-    #uhSyncButtonHtml#
-    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-secondary text-dark'>
-        <i class='bi bi-search me-1'></i>Search The UH API
-    </a>
-    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-secondary text-dark'>
-        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
-    </a>
-</div>
-<div class='users-view-page'>
-<div class='users-view-header clearfix'>
-<img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
-<h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
-<div class='users-view-subtitle'>#SubTitle#</div>
- #flagsRowHtml#
-</div>
+<cfset generalInfoHtml = "">
+<cfset contactInfoHtml = "">
+<cfset bioInfoHtml = "">
+<cfset flagsHtml = "">
+<cfset organizationsHtml = "">
+<cfset externalHtml = "">
+<cfset imagesHtml = "">
+<cfset hasPrimaryAdditionalEmail = false>
+<cfloop from="1" to="#arrayLen(userEmails)#" index="emailPrimaryIdx">
+    <cfif val(userEmails[emailPrimaryIdx].ISPRIMARY ?: 0) EQ 1>
+        <cfset hasPrimaryAdditionalEmail = true>
+        <cfbreak>
+    </cfif>
+</cfloop>
+<cfset hasGeneralInfo = len(trim(preferredName)) OR len(trim(maidenName)) OR arrayLen(userAliases) GT 0 OR len(trim(pronouns)) OR len(trim(cougarnetid)) OR len(trim(title1)) OR len(trim(title2)) OR len(trim(title3))>
+<cfset hasContactInfo = arrayLen(userEmails) GT 0 OR arrayLen(userPhones) GT 0 OR arrayLen(userAddresses) GT 0>
+<cfset hasBioInfo = isDate(userDOB) OR len(trim(userGender)) OR arrayLen(userDegrees) GT 0 OR arrayLen(spAwards) GT 0 OR len(trim(bioContent))>
+<cfset hasFlags = arrayLen(profile.flags) GT 0>
+<cfset hasOrganizations = arrayLen(profile.organizations) GT 0>
+<cfset hasExternal = arrayLen(allSystems) GT 0>
+<cfset hasImages = arrayLen(profile.images) GT 0>
+<cfset generalSectionClass = hasGeneralInfo ? "" : " d-none">
+<cfset contactSectionClass = hasContactInfo ? "" : " d-none">
+<cfset bioSectionClass = hasBioInfo ? "" : " d-none">
+<cfset orgSectionClass = hasOrganizations ? "" : " d-none">
+<cfset flagsSectionClass = " d-none">
+<cfset externalSectionClass = hasExternal ? "" : " d-none">
+<cfset imagesSectionClass = hasImages ? "" : " d-none">
 
+<cfset generalInfoHtml &= "<div class='users-view-panel-grid'>">
+<cfif len(preferredName)>
+    <cfset generalInfoHtml &= "<p><strong>Preferred Name:</strong> " & EncodeForHTML(preferredName) & " <span class='text-muted small'>(legacy)</span></p>">
+</cfif>
+<cfif len(maidenName)>
+    <cfset generalInfoHtml &= "<p><strong>Maiden Name:</strong> " & EncodeForHTML(maidenName) & " <span class='text-muted small'>(legacy)</span></p>">
+</cfif>
+<cfset generalInfoHtml &= userAliasesHtml>
+<cfif len(pronouns)>
+    <cfset generalInfoHtml &= "<p><strong>Pronouns:</strong> " & EncodeForHTML(pronouns) & "</p>">
+</cfif>
+<cfif len(cougarnetid)>
+    <cfset generalInfoHtml &= "<p><strong>CougarNet ID:</strong> " & EncodeForHTML(cougarnetid) & "</p>">
+</cfif>
+<cfif len(title1)>
+    <cfset generalInfoHtml &= "<p><strong>Title 1:</strong> " & EncodeForHTML(title1) & "</p>">
+</cfif>
+<cfif len(title2)>
+    <cfset generalInfoHtml &= "<p><strong>Title 2:</strong> " & EncodeForHTML(title2) & "</p>">
+</cfif>
+<cfif len(title3)>
+    <cfset generalInfoHtml &= "<p><strong>Title 3:</strong> " & EncodeForHTML(title3) & "</p>">
+</cfif>
+<cfset generalInfoHtml &= "</div>">
 
+<cfset contactInfoHtml &= "<div class='users-view-panel-grid'><div class='mb-3'><h6 class='mb-2'>Emails</h6>">
+<cfif len(trim(emailPrimary ?: ""))>
+    <cfset contactInfoHtml &= "<ul class='mb-2 users-view-org-list'>">
+    <cfset contactInfoHtml &= "<li>" & EncodeForHTML(emailPrimary) & " <span class='badge badge-uh users-view-badge'>@UH</span>" & (NOT hasPrimaryAdditionalEmail ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "") & "</li>">
+    <cfset contactInfoHtml &= "</ul>">
+</cfif>
+<cfif arrayLen(userEmails) GT 0>
+    <cfset contactInfoHtml &= "<ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userEmails)#" index="emIdx">
+        <cfset em = userEmails[emIdx]>
+        <cfset emType = len(trim(em.EMAILTYPE ?: "")) ? " <span class='badge badge-secondary users-view-badge'>" & EncodeForHTML(em.EMAILTYPE) & "</span>" : "">
+        <cfset emPrimary = val(em.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "">
+        <cfset contactInfoHtml &= "<li>" & EncodeForHTML(em.EMAILADDRESS ?: "") & emType & emPrimary & "</li>">
+    </cfloop>
+    <cfset contactInfoHtml &= "</ul>">
+<cfelse>
+    <cfset contactInfoHtml &= "<p class='text-muted mb-0'>No email records.</p>">
+</cfif>
+<cfset contactInfoHtml &= "</div><div class='mb-3'><h6 class='mb-2'>Phones</h6>">
+<cfif arrayLen(userPhones) GT 0>
+    <cfset contactInfoHtml &= "<ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userPhones)#" index="phIdx">
+        <cfset ph = userPhones[phIdx]>
+        <cfset phType = len(trim(ph.PHONETYPE ?: "")) ? " <span class='badge badge-secondary users-view-badge'>" & EncodeForHTML(ph.PHONETYPE) & "</span>" : "">
+        <cfset phPrimary = val(ph.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "">
+        <cfset contactInfoHtml &= "<li>" & EncodeForHTML(ph.PHONENUMBER ?: "") & phType & phPrimary & "</li>">
+    </cfloop>
+    <cfset contactInfoHtml &= "</ul>">
+<cfelse>
+    <cfset contactInfoHtml &= "<p class='text-muted mb-0'>No phone records.</p>">
+</cfif>
+<cfset contactInfoHtml &= "</div><div><h6 class='mb-2'>Addresses</h6>">
+<cfif arrayLen(userAddresses) GT 0>
+    <cfset contactInfoHtml &= "<ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(userAddresses)#" index="adI">
+        <cfset addrItem = userAddresses[adI]>
+        <cfset addrLine = "<strong>" & EncodeForHTML(addrItem.ADDRESSTYPE ?: "Address") & "</strong>">
+        <cfif val(addrItem.ISPRIMARY ?: 0)>
+            <cfset addrLine &= " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>">
+        </cfif>
+        <cfset addrLine &= "<br><small class='text-muted'>">
+        <cfif len(trim(addrItem.ADDRESS1 ?: ""))>
+            <cfset addrLine &= EncodeForHTML(addrItem.ADDRESS1)>
+        </cfif>
+        <cfif len(trim(addrItem.ADDRESS2 ?: ""))>
+            <cfset addrLine &= ", " & EncodeForHTML(addrItem.ADDRESS2)>
+        </cfif>
+        <cfif len(trim(addrItem.CITY ?: "")) OR len(trim(addrItem.STATE ?: "")) OR len(trim(addrItem.ZIPCODE ?: ""))>
+            <cfset addrLine &= "<br>" & EncodeForHTML(addrItem.CITY ?: "")>
+            <cfif len(trim(addrItem.STATE ?: ""))>
+                <cfset addrLine &= ", " & EncodeForHTML(addrItem.STATE)>
+            </cfif>
+            <cfset addrLine &= " " & EncodeForHTML(addrItem.ZIPCODE ?: "")>
+        </cfif>
+        <cfset addrLine &= "</small>">
+        <cfset contactInfoHtml &= "<li>" & addrLine & "</li>">
+    </cfloop>
+    <cfset contactInfoHtml &= "</ul>">
+<cfelse>
+    <cfset contactInfoHtml &= "<p class='text-muted mb-0'>No address records.</p>">
+</cfif>
+<cfset contactInfoHtml &= "</div></div>">
 
+<cfset bioInfoHtml &= "<div class='users-view-panel-grid'>">
+<cfif isDate(userDOB)>
+    <cfset bioInfoHtml &= "<p><strong>Date of Birth:</strong> " & dateFormat(userDOB, "mmmm d, yyyy") & "</p>">
+</cfif>
+<cfif len(userGender)>
+    <cfset bioInfoHtml &= "<p><strong>Gender:</strong> " & EncodeForHTML(userGender) & "</p>">
+</cfif>
+<cfif arrayLen(userDegrees) GT 0>
+    <cfset bioInfoHtml &= "<div class='mb-3'><strong>Degrees:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>Degree</th><th>University</th><th>Year</th></tr></thead><tbody>">
+    <cfloop from="1" to="#arrayLen(userDegrees)#" index="degIdx">
+        <cfset deg = userDegrees[degIdx]>
+        <cfset degName = trim((deg.DEGREENAME ?: deg.DEGREE ?: deg.DEGREEDESCRIPTION ?: "Degree") & "")>
+        <cfset degUniversity = trim((deg.UNIVERSITY ?: "") & "")>
+        <cfset degYear = trim((deg.DEGREEYEAR ?: "") & "")>
+        <cfset bioInfoHtml &= "<tr><td>" & EncodeForHTML(degName) & "</td><td>" & (len(degUniversity) ? EncodeForHTML(degUniversity) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(degYear) ? EncodeForHTML(degYear) : "<span class='text-muted'>-</span>") & "</td></tr>">
+    </cfloop>
+    <cfset bioInfoHtml &= "</tbody></table></div></div>">
+</cfif>
+<cfif arrayLen(spAwards) GT 0>
+    <cfset bioInfoHtml &= "<div class='mb-2'><strong>Awards:</strong><ul class='mb-0 users-view-org-list'>">
+    <cfloop from="1" to="#arrayLen(spAwards)#" index="awIdx">
+        <cfset award = spAwards[awIdx]>
+        <cfset bioInfoHtml &= "<li>" & EncodeForHTML(award.AWARDNAME ?: "") & (len(trim(award.AWARDTYPE ?: "")) ? " <span class='badge badge-secondary users-view-badge'>" & EncodeForHTML(award.AWARDTYPE) & "</span>" : "") & "</li>">
+    </cfloop>
+    <cfset bioInfoHtml &= "</ul></div>">
+</cfif>
+<cfset bioInfoHtml &= "<div><strong>Bio / About Me:</strong>" & (len(trim(bioContent)) ? "<div class='mt-2'>" & bioContent & "</div>" : "<p class='text-muted mb-0 mt-2'>No bio content.</p>") & "</div></div>">
 
-<div class='row mt-4'>
-    <div class='col-md-6'>
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>General Information</div>
-            <div class='card-body'>
-                #(len(preferredName) ? '<p><strong>Preferred Name:</strong> ' & EncodeForHTML(preferredName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
-                #(len(maidenName)    ? '<p><strong>Maiden Name:</strong> '    & EncodeForHTML(maidenName) & ' <span class="text-muted small">(legacy)</span></p>' : '')#
-    #userAliasesHtml#
-                #(len(pronouns)      ? '<p><strong>Pronouns:</strong> '        & EncodeForHTML(pronouns)      & '</p>' : '')#
-                #(len(emailPrimary)  ? '<p><strong>Email (@uh):</strong> '      & EncodeForHTML(emailPrimary)  & '</p>' : '')#
-                #(len(phone)         ? '<p><strong>Phone:</strong> '            & EncodeForHTML(phone)         & '</p>' : '')#
-                #(len(cougarnetid)   ? '<p><strong>CougarNet ID:</strong> '     & EncodeForHTML(cougarnetid)   & '</p>' : '')#
-                #(len(title1)        ? '<p><strong>Title 1:</strong> '          & EncodeForHTML(title1)        & '</p>' : '')#
-                #(len(title2)        ? '<p><strong>Title 2:</strong> '          & EncodeForHTML(title2)        & '</p>' : '')#
-                #(len(title3)        ? '<p><strong>Title 3:</strong> '          & EncodeForHTML(title3)        & '</p>' : '')#
-            </div>
-        </div>
-        #( hasAddress ? "
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Address</div>
-            <div class='card-body'>
-                #(len(room)          ? '<p><strong>Room:</strong> '                  & EncodeForHTML(room)          & '</p>' : '')#
-                #(len(building)      ? '<p><strong>Building:</strong> '              & EncodeForHTML(building)      & '</p>' : '')#
-                #(len(campus)        ? '<p><strong>Campus:</strong> '               & EncodeForHTML(campus)        & '</p>' : '')#
-                #(len(division)       ? '<p><strong>Division:</strong> '      & EncodeForHTML(division)       & (len(divisionName)   ? ' <span class="text-muted">(' & EncodeForHTML(divisionName)   & ')</span>' : '') & '</p>' : '')#
-                #(len(department)     ? '<p><strong>Department:</strong> '    & EncodeForHTML(department)     & (len(departmentName) ? ' <span class="text-muted">(' & EncodeForHTML(departmentName) & ')</span>' : '') & '</p>' : '')#
-                #(len(officeMailAddr)? '<p><strong>Office Mailing Address:</strong> '& EncodeForHTML(officeMailAddr)& '</p>' : '')#
-                #(len(mailcode)      ? '<p><strong>Mailcode:</strong> '             & EncodeForHTML(mailcode)      & '</p>' : '')#
-            </div>
-        </div>" : "" )#
-    </div>
+<cfset flagsHtml = "<div class='users-view-pill-stack'>">
+<cfif arrayLen(profile.flags) GT 0>
+    <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
+        <cfset flagsHtml &= "<span class='badge rounded-pill users-view-badge badge-flags'>" & EncodeForHTML(profile.flags[f].FLAGNAME ?: "") & "</span>">
+    </cfloop>
+<cfelse>
+    <cfset flagsHtml &= "<p class='text-muted mb-0'>No flags assigned.</p>">
+</cfif>
+<cfset flagsHtml &= "</div>">
 
-    <div class='col-md-6'>
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Organizations</div>
-            <div class='card-body'>
-            <ul class='list-unstyled mb-0 users-view-org-list'>
-" />
-
-<cfif arrayLen(profile.organizations) gt 0>
+<cfset organizationsHtml = "<ul class='mb-0 users-view-org-list'>">
+<cfif arrayLen(profile.organizations) GT 0>
     <cfloop from="1" to="#arrayLen(profile.organizations)#" index="o">
         <cfset org = profile.organizations[o]>
-        <cfset orgLine = "<span class='badge rounded-pill users-view-badge users-view-badge-org'>" & EncodeForHTML(org.ORGNAME) & "</span>">
+        <cfset orgBadgeClass = findNoCase("clinic", org.ORGNAME ?: "") ? "badge-orgs-clinic" : "badge-orgs-college">
+        <cfset orgLine = "<span class='badge rounded-pill users-view-badge " & orgBadgeClass & "'>" & EncodeForHTML(org.ORGNAME ?: "") & "</span>">
         <cfif len(trim(org.ROLETITLE ?: ""))>
             <cfset orgLine &= "<span class='text-muted small users-view-org-role'>(&nbsp;" & EncodeForHTML(org.ROLETITLE) & "&nbsp;)</span>">
         </cfif>
-        <cfset content &= "<li>#orgLine#</li>">
+        <cfset organizationsHtml &= "<li>" & orgLine & "</li>">
     </cfloop>
 <cfelse>
-    <cfset content &= "<li class='text-muted'>No organizations assigned</li>">
+    <cfset organizationsHtml &= "<li class='text-muted'>No organizations assigned.</li>">
 </cfif>
+<cfset organizationsHtml &= "</ul>">
 
-<cfset content &= "
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class='row'>
-    <div class='col-md-6'>
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Contact Details</div>
-            <div class='card-body'>
-                <p class='mb-2'><strong>Emails</strong></p>
-">
-
-<cfif arrayLen(userEmails) GT 0>
-    <cfset content &= "<ul class='mb-3 users-view-org-list'>">
-    <cfloop from="1" to="#arrayLen(userEmails)#" index="emIdx">
-        <cfset em = userEmails[emIdx]>
-        <cfset emType = len(trim(em.EMAILTYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(em.EMAILTYPE) & "</span>" : "">
-        <cfset emPrimary = val(em.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge bg-success users-view-badge'>Primary</span>" : "">
-        <cfset content &= "<li>" & EncodeForHTML(em.EMAILADDRESS ?: "") & emType & emPrimary & "</li>">
-    </cfloop>
-    <cfset content &= "</ul>">
-<cfelse>
-    <cfset content &= "<p class='text-muted small mb-3'>No email records.</p>">
-</cfif>
-
-<cfset content &= "<p class='mb-2'><strong>Phones</strong></p>">
-
-<cfif arrayLen(userPhones) GT 0>
-    <cfset content &= "<ul class='mb-0 users-view-org-list'>">
-    <cfloop from="1" to="#arrayLen(userPhones)#" index="phIdx">
-        <cfset ph = userPhones[phIdx]>
-        <cfset phType = len(trim(ph.PHONETYPE ?: "")) ? " <span class='badge bg-secondary text-dark users-view-badge'>" & EncodeForHTML(ph.PHONETYPE) & "</span>" : "">
-        <cfset phPrimary = val(ph.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge bg-success users-view-badge'>Primary</span>" : "">
-        <cfset content &= "<li>" & EncodeForHTML(ph.PHONENUMBER ?: "") & phType & phPrimary & "</li>">
-    </cfloop>
-    <cfset content &= "</ul>">
-<cfelse>
-    <cfset content &= "<p class='text-muted small mb-0'>No phone records.</p>">
-</cfif>
-
-<cfset content &= "
-            </div>
-        </div>
-
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>External IDs</div>
-            <div class='card-body'>
-                <ul class='mb-0 users-view-org-list'>
-">
-
+<cfset externalHtml = "<ul class='mb-0 users-view-org-list'>">
 <cfif arrayLen(allSystems) GT 0>
     <cfloop from="1" to="#arrayLen(allSystems)#" index="sysIdx">
         <cfset sys = allSystems[sysIdx]>
         <cfset sysVal = structKeyExists(externalBySystem, toString(sys.SYSTEMID)) ? externalBySystem[toString(sys.SYSTEMID)] : "">
-        <cfset content &= "<li><strong>" & EncodeForHTML(sys.SYSTEMNAME ?: "System") & ":</strong> " & (len(trim(sysVal)) ? EncodeForHTML(sysVal) : "<span class='text-muted'>Not set</span>") & "</li>">
+        <cfset externalHtml &= "<li><strong>" & EncodeForHTML(sys.SYSTEMNAME ?: "System") & ":</strong> " & (len(trim(sysVal)) ? EncodeForHTML(sysVal) : "<span class='text-muted'>Not set</span>") & "</li>">
     </cfloop>
 <cfelse>
-    <cfset content &= "<li class='text-muted'>No external systems configured.</li>">
+    <cfset externalHtml &= "<li class='text-muted'>No external systems configured.</li>">
 </cfif>
-
-<cfset content &= "
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <div class='col-md-6'>
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Bio / About Me</div>
-            <div class='card-body'>
-                " & (len(trim(bioContent)) ? bioContent : "<p class='text-muted mb-0'>No bio content.</p>") & "
-            </div>
-        </div>
-
-        <div class='card mb-3 users-view-card'>
-            <div class='card-header fw-semibold'>Data Quality Exclusions</div>
-            <div class='card-body'>
-">
-
-<cfif arrayLen(dqExclusionsList) GT 0>
-    <cfset content &= "<ul class='mb-0 users-view-org-list'>">
-    <cfloop from="1" to="#arrayLen(dqExclusionsList)#" index="dqIdx">
-        <cfset dqCode = dqExclusionsList[dqIdx]>
-        <cfset dqLabel = structKeyExists(dqExclusionLabelMap, dqCode) ? dqExclusionLabelMap[dqCode] : dqCode>
-        <cfset content &= "<li>" & EncodeForHTML(dqLabel) & "</li>">
-    </cfloop>
-    <cfset content &= "</ul>">
-<cfelse>
-    <cfset content &= "<p class='text-muted mb-0'>No exclusions; all checks are included.</p>">
-</cfif>
-
-<cfset content &= "
-            </div>
-        </div>
-    </div>
-</div>
-
-<hr>
-
-<h3 class='d-flex justify-content-between align-items-center users-view-images-header users-view-section-title'>
-    Images
-">
-
-<cfif request.hasPermission("media.edit")>
-    <cfset content &= "
-    <a href='/admin/user-media/sources.cfm?userid=#url.userID#'
-       class='btn btn-sm btn-outline-primary'>
-        <i class='bi bi-pencil-square me-1'></i> Manage Images
-    </a>
-    ">
-</cfif>
-
-<cfset content &= "
-</h3>
-">
+<cfset externalHtml &= "</ul>">
 
 <cfif arrayLen(profile.images) GT 0>
-    <!--- Group images by ImageVariant --->
     <cfset variantGroups = {}>
-    <cfset variantOrder  = []>
+    <cfset variantOrder = []>
     <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
         <cfset img = profile.images[i]>
         <cfset vKey = lCase(trim(img.IMAGEVARIANT ?: "unknown"))>
@@ -712,154 +684,174 @@
         <cfset arrayAppend(variantGroups[vKey], img)>
     </cfloop>
 
-    <cfset content &= "<div class='accordion users-view-images-accordion' id='imagesAccordion'>">
-
+    <cfset imagesHtml &= "<div class='accordion users-view-images-accordion accordion-flat' id='imagesAccordion'>">
     <cfloop from="1" to="#arrayLen(variantOrder)#" index="gi">
-        <cfset gKey   = variantOrder[gi]>
+        <cfset gKey = variantOrder[gi]>
         <cfset gItems = variantGroups[gKey]>
         <cfset gLabel = encodeForHTML(uCase(gKey))>
         <cfset gCount = arrayLen(gItems)>
-        <!--- Use the first image's dimensions as the group dimension hint --->
         <cfset gDim = "">
         <cfif len(gItems[1].IMAGEDIMENSIONS ?: "")>
             <cfset gDim = encodeForHTML(gItems[1].IMAGEDIMENSIONS)>
         </cfif>
         <cfset collapseID = "imgGroup_#gi#">
-
-        <cfset content &= "
+        <cfset imagesHtml &= "
         <div class='accordion-item'>
             <h2 class='accordion-header' id='heading_#collapseID#'>
-                <button class='accordion-button #gi GT 1 ? "collapsed" : ""#' type='button'
-                        data-bs-toggle='collapse' data-bs-target='###collapseID#'
-                        aria-expanded='#gi EQ 1 ? "true" : "false"#'
-                        aria-controls='#collapseID#'>
+                <button class='accordion-button #gi GT 1 ? "collapsed" : ""#' type='button' data-bs-toggle='collapse' data-bs-target='###collapseID#' aria-expanded='#gi EQ 1 ? "true" : "false"#' aria-controls='#collapseID#'>
                     <span class='fw-semibold'>#gLabel#</span>
-                    <span class='badge users-view-image-count-badge ms-2'>#gCount#</span>
+                    <span class='badge badge-info users-view-image-count-badge ms-2'>#gCount#</span>
                     #len(gDim) ? "<span class='users-view-image-dimension small ms-2'>" & gDim & "</span>" : ""#
                 </button>
             </h2>
-            <div id='#collapseID#' class='accordion-collapse collapse #gi EQ 1 ? "show" : ""#'
-                 aria-labelledby='heading_#collapseID#'
-                 data-bs-parent='##imagesAccordion'>
+            <div id='#collapseID#' class='accordion-collapse collapse #gi EQ 1 ? "show" : ""#' aria-labelledby='heading_#collapseID#' data-bs-parent='##imagesAccordion'>
                 <div class='accordion-body'>
-                    <div class='row'>
-        ">
+                    <div class='row'>">
 
         <cfloop from="1" to="#arrayLen(gItems)#" index="j">
             <cfset img = gItems[j]>
-            <cfset content &= "
+            <cfset imagesHtml &= "
                     <div class='col-md-3 mb-3'>
-                        <img class='img-fluid rounded shadow-sm'
-                             src='#img.IMAGEURL#'
-                             alt='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#'
-                             title='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#'>
+                        <img class='img-fluid rounded shadow-sm' src='#img.IMAGEURL#' alt='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#' title='#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#'>
                         <p class='mt-2 mb-0'>#encodeForHTML(img.IMAGEDESCRIPTION ?: "")#</p>
-                        <cfif len(img.IMAGEDIMENSIONS ?: '')>
+                        <cfif len(img.IMAGEDIMENSIONS ?: "")>
                             <p class='text-muted small mb-0'>#encodeForHTML(img.IMAGEDIMENSIONS)#</p>
                         </cfif>
-                    </div>
-            ">
+                    </div>">
         </cfloop>
 
-        <cfset content &= "
+        <cfset imagesHtml &= "
+                    </div>
+                </div>
+            </div>
+        </div>">
+    </cfloop>
+    <cfset imagesHtml &= "</div>">
+<cfelse>
+    <cfset imagesHtml = "<p class='text-muted mb-0'>No images available.</p>">
+</cfif>
+
+<cfset content = "
+#usersTopToolBar#
+<div class='py-4 px-4 pt-2'>
+<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
+    <a href='/admin/users/edit.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-ui-neutral'>
+        <i class='bi bi-pencil me-1'></i>Edit This User
+    </a>
+    #uhSyncButtonHtml#
+    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-ui-neutral'>
+        <i class='bi bi-search me-1'></i>Search The UH API
+    </a>
+    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-ui-neutral'>
+        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
+    </a>
+</div>
+
+<div class='users-view-page'>
+    <div class='users-view-header clearfix'>
+        <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
+        <h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
+        <div class='users-view-subtitle'>#SubTitle#</div>
+        #flagsRowHtml#
+    </div>
+
+    <div class='users-view-masonry'>
+        <div class='users-view-masonry-item#generalSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionGeneral'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingGeneral'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseGeneral' aria-expanded='true' aria-controls='collapseGeneral'>General Information</button>
+                    </h2>
+                    <div id='collapseGeneral' class='accordion-collapse collapse show' aria-labelledby='headingGeneral'>
+                        <div class='accordion-body'>#generalInfoHtml#</div>
                     </div>
                 </div>
             </div>
         </div>
-        ">
-    </cfloop>
 
-    <cfset content &= "</div>">
-<cfelse>
-    <cfset content &= "<p class='text-muted'>No images</p>">
-</cfif>
+        <div class='users-view-masonry-item#contactSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionContact'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingContact'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseContact' aria-expanded='true' aria-controls='collapseContact'>Contact Information</button>
+                    </h2>
+                    <div id='collapseContact' class='accordion-collapse collapse show' aria-labelledby='headingContact'>
+                        <div class='accordion-body'>#contactInfoHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<cfif showAcademicInfo>
-    <cfset content &= "<hr><h3 class='users-view-section-title'>Academic Info</h3><div>">
+        <div class='users-view-masonry-item#bioSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionBio'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingBio'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseBio' aria-expanded='true' aria-controls='collapseBio'>Biographical Information</button>
+                    </h2>
+                    <div id='collapseBio' class='accordion-collapse collapse show' aria-labelledby='headingBio'>
+                        <div class='accordion-body'>#bioInfoHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <cfif structCount(profile.academic) gt 0>
-        <cfset ac = profile.academic>
-        <cfif isNumeric(ac.CURRENTGRADYEAR ?: "") AND val(ac.CURRENTGRADYEAR) GT 0>
-            <cfset content &= "<p><strong>Current Grad Year:</strong> #val(ac.CURRENTGRADYEAR)#</p>">
-        </cfif>
-        <cfif isNumeric(ac.ORIGINALGRADYEAR ?: "") AND val(ac.ORIGINALGRADYEAR) GT 0>
-            <cfset content &= "<p><strong>Original Grad Year:</strong> #val(ac.ORIGINALGRADYEAR)#</p>">
-        </cfif>
-    <cfelse>
-        <cfset content &= "<p class='text-muted'>No academic information</p>">
-    </cfif>
+        <div class='users-view-masonry-item#orgSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionOrgs'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingOrgs'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseOrgs' aria-expanded='true' aria-controls='collapseOrgs'>Organizations</button>
+                    </h2>
+                    <div id='collapseOrgs' class='accordion-collapse collapse show' aria-labelledby='headingOrgs'>
+                        <div class='accordion-body'>#organizationsHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <cfset content &= "</div>">
-</cfif>
+        <div class='users-view-masonry-item#flagsSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionFlags'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingFlags'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseFlags' aria-expanded='true' aria-controls='collapseFlags'>Flags</button>
+                    </h2>
+                    <div id='collapseFlags' class='accordion-collapse collapse show' aria-labelledby='headingFlags'>
+                        <div class='accordion-body'>#flagsHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<!--- ── Biographical Information card ── --->
-<cfset hasBioInfo = isDate(userDOB) OR len(userGender) OR arrayLen(userAddresses) GT 0>
-<cfif hasBioInfo>
-    <cfset content &= "<hr><h3 class='users-view-section-title'>Biographical Information</h3>">
-    <cfset content &= "<div class='card mb-3 users-view-card'><div class='card-body'>">
-    <cfif isDate(userDOB)>
-        <cfset content &= "<p><strong>Date of Birth:</strong> " & dateFormat(userDOB, 'mmmm d, yyyy') & "</p>">
-    </cfif>
-    <cfif len(userGender)>
-        <cfset content &= "<p><strong>Gender:</strong> " & EncodeForHTML(userGender) & "</p>">
-    </cfif>
-    <cfset content &= "</div></div>">
-</cfif>
-<cfif arrayLen(userAddresses) GT 0>
-    <cfif NOT hasBioInfo><cfset content &= "<hr><h3 class='users-view-section-title'>Biographical Information</h3>"></cfif>
-    <cfset content &= "<div class='card mb-3 users-view-card'><div class='card-header fw-semibold'>Addresses</div><div class='card-body'>">
-</cfif>
-<cfloop from="1" to="#arrayLen(userAddresses)#" index="adI">
-    <cfset addrItem = userAddresses[adI]>
-    <cfset content &= "<div class='mb-2'>">
-    <cfset content &= "<strong>" & EncodeForHTML(addrItem.ADDRESSTYPE ?: "") & "</strong>">
-    <cfif val(addrItem.ISPRIMARY ?: 0)><cfset content &= " <span class='badge bg-success'>Primary</span>"></cfif>
-    <cfset content &= "<br><small class='text-muted'>">
-    <cfif len(trim(addrItem.ADDRESS1 ?: ""))><cfset content &= EncodeForHTML(addrItem.ADDRESS1)></cfif>
-    <cfif len(trim(addrItem.ADDRESS2 ?: ""))><cfset content &= ", " & EncodeForHTML(addrItem.ADDRESS2)></cfif>
-    <cfif len(trim(addrItem.CITY ?: "")) OR len(trim(addrItem.STATE ?: "")) OR len(trim(addrItem.ZIPCODE ?: ""))>
-        <cfset content &= "<br>" & EncodeForHTML(addrItem.CITY ?: "")>
-        <cfif len(trim(addrItem.STATE ?: ""))><cfset content &= ", " & EncodeForHTML(addrItem.STATE)></cfif>
-        <cfset content &= " " & EncodeForHTML(addrItem.ZIPCODE ?: "")>
-    </cfif>
-    <cfif len(trim(addrItem.BUILDING ?: ""))><cfset content &= " | Bldg: " & EncodeForHTML(addrItem.BUILDING)></cfif>
-    <cfif len(trim(addrItem.ROOM ?: ""))><cfset content &= " Rm: " & EncodeForHTML(addrItem.ROOM)></cfif>
-    <cfif len(trim(addrItem.MAILCODE ?: ""))><cfset content &= " | MC: " & EncodeForHTML(addrItem.MAILCODE)></cfif>
-    <cfset content &= "</small></div>">
-</cfloop>
-<cfif arrayLen(userAddresses) GT 0>
-    <cfset content &= "</div></div>">
-</cfif>
+        <div class='users-view-masonry-item#externalSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionExternal'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingExternal'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseExternal' aria-expanded='true' aria-controls='collapseExternal'>External IDs</button>
+                    </h2>
+                    <div id='collapseExternal' class='accordion-collapse collapse show' aria-labelledby='headingExternal'>
+                        <div class='accordion-body'>#externalHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<cfif showStudentProfile>
-    <cfset content &= "<hr><h3 class='users-view-section-title'>Student Profile</h3><div class='row'>">
-    <cfset content &= "<div class='col-md-6'>">
-    <cfif len(spCommAge) AND isNumeric(spCommAge)> <cfset content &= "<p><strong>Commencement Age:</strong> " & int(spCommAge) & "</p>"> </cfif>
-    <cfif len(spFirstExt)>  <cfset content &= "<p><strong>First Externship:</strong> " & EncodeForHTML(spFirstExt)  & "</p>"> </cfif>
-    <cfif len(spSecondExt)> <cfset content &= "<p><strong>Second Externship:</strong> "& EncodeForHTML(spSecondExt) & "</p>"> </cfif>
-    <cfset content &= "</div>">
-    <cfif arrayLen(spAwards) GT 0>
-        <cfset content &= "<div class='col-md-6'><h5>Awards</h5><ul class='list-group list-group-flush'>">
-        <cfloop from="1" to="#arrayLen(spAwards)#" index="aw">
-            <cfset award = spAwards[aw]>
-            <cfset awardLine = "<li class='list-group-item px-0'>" & EncodeForHTML(award.AWARDNAME)>
-            <cfif len(trim(award.AWARDTYPE ?: ""))>
-                <cfset awardLine &= " <span class='badge bg-secondary text-dark ms-1 users-view-badge'>" & EncodeForHTML(award.AWARDTYPE) & "</span>">
-            </cfif>
-            <cfset awardLine &= "</li>">
-            <cfset content &= awardLine>
-        </cfloop>
-        <cfset content &= "</ul></div>">
-    </cfif>
-    <cfset content &= "</div>">
-</cfif>
+        <div class='users-view-masonry-item users-view-images-panel#imagesSectionClass#'>
+            <div class='accordion users-view-accordion accordion-feature' id='usersViewAccordionImages'>
+                <div class='accordion-item users-view-card card-surface'>
+                    <h2 class='accordion-header' id='headingImages'>
+                        <button class='accordion-button' type='button' data-bs-toggle='collapse' data-bs-target='##collapseImages' aria-expanded='true' aria-controls='collapseImages'>Images</button>
+                    </h2>
+                    <div id='collapseImages' class='accordion-collapse collapse show' aria-labelledby='headingImages'>
+                        <div class='accordion-body'>#imagesHtml#</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<cfset content &= "
-<div class='mt-4'>
-    " & (uhApiId != "" ? "<a href='/admin/users/uh_sync.cfm?uhApiId=#urlEncodedFormat(uhApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-info me-2 users-view-badge'>UH Sync</a>" : "") & "
-    <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#&returnTo=#urlEncodedFormat(returnTo)#' class='btn btn-primary'>Edit</a>
-    <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-secondary'>Back to Users</a>
-</div>
+    <div class='mt-4'>
+        <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#&returnTo=#urlEncodedFormat(returnTo)#' class='btn btn-ui-uh'>Edit</a>
+        <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-ui-neutral'>Back to Users</a>
+    </div>
 </div>
 </div>
 " />

@@ -196,7 +196,7 @@
                        pattern="[a-zA-Z0-9_]+" title="Alphanumeric / underscores only">
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add User</button>
+                <button type="submit" class="btn btn-ui-add"><i class="bi bi-plus-lg me-1"></i>Add User</button>
             </div>
         </form>
     </div>

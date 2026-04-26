@@ -356,7 +356,7 @@
             <td>#EncodeForHTML(row.EMAILPRIMARY)#</td>
             <td>#badgesHtml#</td>
             <td class='text-nowrap'>
-                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-info py-0 users-list-action-button users-list-action-button-edit' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User' aria-label='Edit User'><i class='bi bi-pencil-square'></i></a>#syncBtnHtml#
+                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-edit py-0 users-list-action-button users-list-action-button-edit' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User' aria-label='Edit User'><i class='bi bi-pencil-square'></i></a>#syncBtnHtml#
             </td>
         </tr>
         ">

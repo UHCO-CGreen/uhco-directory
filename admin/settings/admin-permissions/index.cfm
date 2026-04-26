@@ -185,14 +185,14 @@
                         </td>
                         <td class="text-end">
                             <div class="settings-action-group">
-                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Edit Permission" data-bs-toggle="tooltip" data-bs-title="Edit Permission" aria-label="Edit Permission">
+                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit Permission" data-bs-toggle="tooltip" data-bs-title="Edit Permission" aria-label="Edit Permission">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif val(permissionRow.IS_SYSTEM) EQ 0>
                                 <form method="post" action="/admin/settings/admin-permissions/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deletePermission">
                                     <input type="hidden" name="permissionID" value="#permissionRow.PERMISSION_ID#">
-                                    <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Delete Permission" data-bs-toggle="tooltip" data-bs-title="Delete Permission" aria-label="Delete Permission" onclick="return confirm('Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?')">
+                                    <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Delete Permission" data-bs-toggle="tooltip" data-bs-title="Delete Permission" aria-label="Delete Permission" onclick="return confirm('Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?')">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>

@@ -109,7 +109,7 @@
                         <input type='hidden' name='page' value='1'>
                         <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
                             <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(toolbarSearchTerm)#'>
-                            <button class='btn btn-secondary' type='submit'><i class='bi bi-search me-1'></i>Search</button>
+                            <button class='btn btn-ui-neutral' type='submit'><i class='bi bi-search me-1'></i>Search</button>
                         </div>
                     </form>
                 </div>
@@ -130,10 +130,10 @@
                                 #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
                             </div>
                         </div>
-                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge text-bg-primary'>" & currentUserRoleLabel & "</span></div>" : "")#
+                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
                         #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
                         <div class='d-grid'>
-                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-outline-primary btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
+                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-ui-outline btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
                         </div>
                     </div>
                 </li>
@@ -371,9 +371,9 @@
         <cfset sys = allSystems[i]>
         <cfset sysVal = structKeyExists(externalBySystem, toString(sys.SYSTEMID)) ? externalBySystem[toString(sys.SYSTEMID)] : "">
         <cfif cougarNetSystemID GT 0 AND val(sys.SYSTEMID) EQ cougarNetSystemID>
-            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-cougarnet-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-outline-secondary js-cougarnet-lookup' type='button' data-target='extid-cougarnet-input'>Lookup</button></div></div>">
+            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-cougarnet-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-ui-outline js-cougarnet-lookup' type='button' data-target='extid-cougarnet-input'>Lookup</button></div></div>">
         <cfelseif peopleSoftSystemID GT 0 AND val(sys.SYSTEMID) EQ peopleSoftSystemID>
-            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-peoplesoft-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-outline-secondary js-cougarnet-lookup' type='button' data-target='extid-peoplesoft-input'>Lookup</button></div></div>">
+            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-peoplesoft-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-ui-outline js-cougarnet-lookup' type='button' data-target='extid-peoplesoft-input'>Lookup</button></div></div>">
         <cfelse>
             <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><input class='form-control form-control-sm' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'></div>">
         </cfif>
@@ -438,7 +438,7 @@
         <cfset isRootChecked = arrayFindNoCase(arguments.selectedOrgIDs, val(ro.ORGID)) GT 0>
         <cfset children     = structKeyExists(orgChildrenByParent, toString(ro.ORGID)) ? orgChildrenByParent[toString(ro.ORGID)] : []>
 
-        <cfset html &= "<div class='col'><div class='card shadow-sm h-100 users-edit-org-card'>">
+        <cfset html &= "<div class='col'><div class='card shadow-sm h-100 users-edit-org-card card-surface'>">
 
         <!--- Card header with parent checkbox --->
         <cfset html &= "<div class='card-header d-flex align-items-center gap-2 py-2 px-3 users-edit-org-card-header'>">
@@ -477,7 +477,7 @@
                 <cfset html &= "<input class='form-check-input flex-shrink-0 org-checkbox' type='checkbox' name='Organizations' value='#child.ORGID#' id='org#child.ORGID#' data-orgid='#child.ORGID#' data-orgname='#EncodeForHTMLAttribute(child.ORGNAME)#' data-parentorgid='#ro.ORGID#' data-additionalroles='#chAdditionalRoles#' #(isChildChecked ? 'checked' : '')#>">
                 <cfset html &= "<label class='form-check-label user-select-none' for='org#child.ORGID#'>#EncodeForHTML(child.ORGNAME)#</label>">
                 <cfif chAdditionalRoles>
-                    <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-link p-0 ms-1 text-secondary#(isChildChecked ? ' is-visible' : '')#' data-orgid='#child.ORGID#' data-orgname='#EncodeForHTMLAttribute(child.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
+                    <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-sm btn-edit ms-1#(isChildChecked ? ' is-visible' : '')#' data-orgid='#child.ORGID#' data-orgname='#EncodeForHTMLAttribute(child.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
                 </cfif>
                 <cfif isChildChecked>
                     <cfset html &= "<input type='hidden' name='roleTitle_#child.ORGID#' id='roleTitle_#child.ORGID#' value='#EncodeForHTMLAttribute(chRoleTitle)#'><input type='hidden' name='roleOrder_#child.ORGID#' id='roleOrder_#child.ORGID#' value='#chRoleOrder#'>">
@@ -494,7 +494,7 @@
                     <cfset html &= "<input class='form-check-input flex-shrink-0 org-checkbox' type='checkbox' name='Organizations' value='#gc.ORGID#' id='org#gc.ORGID#' data-orgid='#gc.ORGID#' data-orgname='#EncodeForHTMLAttribute(gc.ORGNAME)#' data-parentorgid='#child.ORGID#' data-additionalroles='#gcAdditionalRoles#' #(isGcChecked ? 'checked' : '')#>">
                     <cfset html &= "<label class='form-check-label user-select-none small text-muted' for='org#gc.ORGID#'>#EncodeForHTML(gc.ORGNAME)#</label>">
                     <cfif gcAdditionalRoles>
-                        <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-link p-0 ms-1 text-secondary#(isGcChecked ? ' is-visible' : '')#' data-orgid='#gc.ORGID#' data-orgname='#EncodeForHTMLAttribute(gc.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
+                        <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-sm btn-edit ms-1#(isGcChecked ? ' is-visible' : '')#' data-orgid='#gc.ORGID#' data-orgname='#EncodeForHTMLAttribute(gc.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
                     </cfif>
                     <cfif isGcChecked>
                         <cfset html &= "<input type='hidden' name='roleTitle_#gc.ORGID#' id='roleTitle_#gc.ORGID#' value='#EncodeForHTMLAttribute(gcRoleTitle)#'><input type='hidden' name='roleOrder_#gc.ORGID#' id='roleOrder_#gc.ORGID#' value='#gcRoleOrder#'>">
@@ -535,12 +535,12 @@
         <cfset html &= "<div class='col-md-4'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_name_#(local.di-1)#' data-field='deg_name' value='#EncodeForHTMLAttribute(local.dg.DEGREENAME)#' placeholder='Degree (required)' required></div>">
         <cfset html &= "<div class='col-md-4'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_univ_#(local.di-1)#' data-field='deg_univ' value='#EncodeForHTMLAttribute(local.dg.UNIVERSITY ?: "")#' placeholder='University'></div>">
         <cfset html &= "<div class='col-md-2'><input class='form-control form-control-sm' name='#arguments.prefix#_deg_year_#(local.di-1)#' data-field='deg_year' value='#EncodeForHTMLAttribute(local.dg.DEGREEYEAR ?: "")#' placeholder='Year'></div>">
-        <cfset html &= "<div class='col-md-2'><button type='button' class='btn btn-sm btn-outline-danger remove-degree-row w-100'>Remove</button></div>">
+        <cfset html &= "<div class='col-md-2'><button type='button' class='btn btn-sm btn-remove remove-degree-row w-100'><i class='bi bi-trash me-1'></i>Remove</button></div>">
         <cfset html &= "</div>">
     </cfloop>
     <cfset html &= "</div>">
     <cfset html &= "<input type='hidden' name='#arguments.prefix#_degree_count' id='#arguments.prefix#_degreeCount' value='#arrayLen(arguments.degrees)#'>">
-    <cfset html &= "<button type='button' class='btn btn-sm btn-outline-primary mt-2 add-degree-row' data-prefix='#arguments.prefix#'>+ Add Degree</button>">
+    <cfset html &= "<button type='button' class='btn btn-sm btn-ui-add mt-2 add-degree-row' data-prefix='#arguments.prefix#'><i class='bi bi-plus-circle me-1'></i>Add Degree</button>">
     <cfset html &= "</div>">
     <cfreturn html>
 </cffunction>
@@ -602,7 +602,7 @@
     <cfset editReturnTo = "/admin/users/edit.cfm?userID=" & urlEncodedFormat(url.userID)>
 
     <cfset uhSyncPanelHtml = "
-    <div class='alert alert-warning border-warning mb-4 p-0 users-edit-sync-panel'>
+    <div class='alert alert-warning border-warning mb-4 p-0 users-edit-sync-panel panel-info'>
         <div class='d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom users-edit-sync-panel-header'>
             <div>
                 <i class='bi bi-arrow-left-right me-2 text-warning'></i>
@@ -610,10 +610,10 @@
                 <span class='text-muted small ms-2'>from the last sync report run</span>
             </div>
             <div class='d-flex gap-2 users-edit-sync-panel-actions'>
-                <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-outline-secondary py-0 users-edit-secondary-button'>
+                <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-ui-outline py-0 users-edit-secondary-button'>
                     <i class='bi bi-clipboard-data'></i> View Full Report
                 </a>
-                <button class='btn btn-sm btn-outline-warning py-0 users-edit-warning-button' type='button'
+                <button class='btn btn-sm btn-ui-warning py-0 users-edit-warning-button' type='button'
                         data-bs-toggle='collapse' data-bs-target='##uhSyncDiffPanel'>
                     <i class='bi bi-chevron-down'></i> Details
                 </button>
@@ -646,7 +646,7 @@
                                     <input type='hidden' name='diffID'     value='#pd.DIFFID#'>
                                     <input type='hidden' name='resolution' value='synced'>
                                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(editReturnTo)#'>
-                                    <button type='submit' class='btn btn-xs btn-sm btn-success py-0 px-2 users-edit-success-button'>
+                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-success py-0 px-2 users-edit-success-button'>
                                         <i class='bi bi-cloud-download'></i> Sync
                                     </button>
                                 </form>
@@ -654,7 +654,7 @@
                                     <input type='hidden' name='diffID'     value='#pd.DIFFID#'>
                                     <input type='hidden' name='resolution' value='discarded'>
                                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(editReturnTo)#'>
-                                    <button type='submit' class='btn btn-xs btn-sm btn-outline-secondary py-0 px-2 users-edit-secondary-button'>
+                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-outline py-0 px-2 users-edit-secondary-button'>
                                         <i class='bi bi-x'></i> Discard
                                     </button>
                                 </form>
@@ -664,7 +664,7 @@
     </cfloop>
     <cfset uhSyncSyncAllBtn = "">
     <cfif len(trim(user.UH_API_ID ?: ""))>
-        <cfset uhSyncSyncAllBtn = "<a href='/admin/users/uh_sync.cfm?userID=#urlEncodedFormat(url.userID)#&returnTo=#urlEncodedFormat(editReturnTo)#' class='btn btn-sm btn-success'><i class='bi bi-cloud-download me-1'></i>Sync All Fields from UH API</a>">
+        <cfset uhSyncSyncAllBtn = "<a href='/admin/users/uh_sync.cfm?userID=#urlEncodedFormat(url.userID)#&returnTo=#urlEncodedFormat(editReturnTo)#' class='btn btn-sm btn-ui-success'><i class='bi bi-cloud-download me-1'></i>Sync All Fields from UH API</a>">
     </cfif>
     <cfset uhSyncPanelHtml &= "
                     </tbody>
@@ -689,16 +689,16 @@
 
     <cfif len(trim(user.UH_API_ID ?: ""))>
         <cfset uhSyncUrl = "/admin/users/uh_sync.cfm?userID=" & urlEncodedFormat(user.USERID) & "&uhApiId=" & urlEncodedFormat(user.UH_API_ID)>
-        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-outline-secondary'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
+        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-ui-outline'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
     <cfelse>
-        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-outline-secondary disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
+        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-ui-outline disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
     </cfif>
 
     <cfset html = "
         <div class='btn-group btn-group-sm users-edit-tab-action-group' role='group' aria-label='Tab actions'>
-            <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-outline-secondary'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
-            <a href='" & viewUserUrl & "' class='btn btn-sm btn-outline-secondary'><i class='bi bi-eye-fill me-1'></i>View User Profile</a>
-            <button type='button' class='btn btn-sm btn-outline-secondary' id='" & arguments.refreshButtonId & "'><i class='bi bi-arrow-clockwise me-1'></i>Refresh Data</button>
+            <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-ui-outline'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
+            <a href='" & viewUserUrl & "' class='btn btn-sm btn-ui-outline'><i class='bi bi-eye-fill me-1'></i>View User Profile</a>
+            <button type='button' class='btn btn-sm btn-ui-outline' id='" & arguments.refreshButtonId & "'><i class='bi bi-arrow-clockwise me-1'></i>Refresh Data</button>
             " & uhSyncButtonHtml & "
         </div>
     ">
@@ -784,11 +784,11 @@
                 <div class='d-flex align-items-center flex-wrap gap-2'>
                     #renderTabActionButtonGroup("refreshGeneralInfoBtn")#
                     <span class='navbar-text'><strong>Actions:</strong></span>
-                    <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addAliasBtn'><i class='bi bi-person-plus me-1'></i>Add Name Alias</button>
+                    <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addAliasBtn'><i class='bi bi-person-plus me-1'></i>Add Name Alias</button>
                     <span id='aliasesSaveStatus' class='save-status ms-1'></span>
                 </div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-general-btn'><i class='bi bi-floppy me-1'></i>Save General Info</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-general-btn'><i class='bi bi-floppy me-1'></i>Save General Info</button>
                     <span id='save-general-status' class='ms-1'></span>
                 </div>
             </div>
@@ -840,24 +840,24 @@
     <cfif len(trim(local.al.MIDDLENAME ?: ""))><cfset local.alDisplay &= trim(local.al.MIDDLENAME) & " "></cfif>
     <cfif len(trim(local.al.LASTNAME ?: ""))><cfset local.alDisplay &= trim(local.al.LASTNAME)></cfif>
 
-    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <cfset local.aliasTypeBadge = "<span class='badge bg-secondary text-dark'>#EncodeForHTML(local.al.ALIASTYPE)#</span>"><cfelse><cfset local.aliasTypeBadge = ""></cfif>
+    <cfif len(trim(local.al.ALIASTYPE ?: ""))> <cfset local.aliasTypeBadge = "<span class='badge badge-secondary'>#EncodeForHTML(local.al.ALIASTYPE)#</span>"><cfelse><cfset local.aliasTypeBadge = ""></cfif>
     <cfif len(trim(local.al.SOURCESYSTEM ?: ""))> <cfset local.sourceSystemBadge = "<small class='text-muted'>Source: #EncodeForHTML(local.al.SOURCESYSTEM)#</small>"><cfelse><cfset local.sourceSystemBadge = ""></cfif>
 
     <cfif val(local.al.ISPRIMARY ?: 0)>
-        <cfset local.primaryBadge = " <span class='badge bg-success rounded-pill'>Primary</span>">
+        <cfset local.primaryBadge = " <span class='badge badge-isprimary rounded-pill'><i class='bi bi-check2 me-1'></i>Primary</span>">
         <cfset local.setPrimaryButton = "">
     <cfelse>
         <cfset local.primaryBadge = "">
-        <cfset local.setPrimaryButton = "<button type='button' class='btn btn-sm btn-outline-primary set-primary-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Set Primary</button>">
+        <cfset local.setPrimaryButton = "<button type='button' class='btn btn-sm btn-ui-outline set-primary-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Set Primary</button>">
     </cfif>
     <cfif val(local.al.ISACTIVE ?: 0)>
-        <cfset local.activeBadge = "<span class='badge bg-success rounded-pill'>Active</span>">
+        <cfset local.activeBadge = "<span class='badge badge-success rounded-pill'>Active</span>">
     <cfelse>
-        <cfset local.activeBadge = "<span class='badge bg-warning text-dark rounded-pill'>Inactive</span>">
+        <cfset local.activeBadge = "<span class='badge badge-danger rounded-pill'>Inactive</span>">
     </cfif>
 
     <cfset content &= "
-                    <div class='card mb-2 alias-card users-edit-item-card' data-idx='#(local.ai-1)#'>
+                    <div class='card mb-2 alias-card users-edit-item-card card-surface' data-idx='#(local.ai-1)#'>
                         <div class='card-body py-2 px-3 users-edit-item-card-body'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
@@ -869,8 +869,8 @@
                                 </div>
                                 <div>
                                     #local.setPrimaryButton#    
-                                    <button type='button' class='btn btn-sm btn-outline-secondary edit-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-outline-danger remove-alias-btn users-edit-danger-button' data-idx='#(local.ai-1)#'>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-edit edit-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-remove remove-alias-btn users-edit-danger-button' data-idx='#(local.ai-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -913,7 +913,7 @@
 
             <div class='row mb-3'>
                 <div class='col-md-4'>
-                    <label class='form-label'>Title 1 (UH Title)" & (isSuperAdmin ? " <span class='badge bg-warning text-dark'>Super Admin</span>" : "") & "</label>
+                    <label class='form-label'>Title 1 (UH Title)" & (isSuperAdmin ? " <span class='badge badge-warning'>Super Admin</span>" : "") & "</label>
                     <input class='form-control' name='Title1' value='#user.TITLE1#'" & (isSuperAdmin ? "" : " readonly") & ">
                 </div>
                 <div class='col-md-4'>
@@ -932,9 +932,9 @@
                 <div class='d-flex align-items-center flex-wrap gap-2'>
                     #renderTabActionButtonGroup("refreshContactInfoBtn")#
                     <span class='navbar-text'><strong>Actions:</strong></span>
-                    <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addEmailBtn'><i class='bi bi-envelope-plus me-1'></i>Add Email</button>
-                    <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addPhoneBtn'><i class='bi bi-telephone-plus me-1'></i>Add Phone</button>
-                    <button type='button' class='btn btn-sm btn-outline-primary users-edit-outline-button' id='addAddressBtn'><i class='bi bi-geo-alt me-1'></i>Add Address</button>
+                    <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addEmailBtn'><i class='bi bi-envelope-plus me-1'></i>Add Email</button>
+                    <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addPhoneBtn'><i class='bi bi-telephone-plus me-1'></i>Add Phone</button>
+                    <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addAddressBtn'><i class='bi bi-geo-alt me-1'></i>Add Address</button>
                     <span id='emailsSaveStatus' class='save-status ms-1'></span>
                     <span id='phonesSaveStatus' class='save-status ms-1'></span>
                     <span id='addressesSaveStatus' class='save-status ms-1'></span>
@@ -950,17 +950,17 @@
 <cfloop from="1" to="#arrayLen(userEmails)#" index="local.ei">
     <cfset local.em = userEmails[local.ei]>
     <cfset content &= "
-                    <div class='card mb-2 email-card users-edit-item-card' data-idx='#(local.ei-1)#'>
+                    <div class='card mb-2 email-card users-edit-item-card card-surface' data-idx='#(local.ei-1)#'>
                         <div class='card-body py-2 px-3 users-edit-item-card-body'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(local.em.EMAILADDRESS)#</strong>
-                                    <cfif len(trim(local.em.EMAILTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.em.EMAILTYPE)#</span></cfif>
-                                    <cfif val(local.em.ISPRIMARY ?: 0)> <span class='badge bg-success'>Primary</span></cfif>
+                                    <cfif len(trim(local.em.EMAILTYPE ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(local.em.EMAILTYPE)#</span></cfif>
+                                    <cfif val(local.em.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-outline-secondary edit-email-btn users-edit-secondary-button' data-idx='#(local.ei-1)#'>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-outline-danger remove-email-btn users-edit-danger-button' data-idx='#(local.ei-1)#'>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-edit edit-email-btn users-edit-secondary-button' data-idx='#(local.ei-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-remove remove-email-btn users-edit-danger-button' data-idx='#(local.ei-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -990,17 +990,17 @@
 <cfloop from="1" to="#arrayLen(userPhones)#" index="local.pi">
     <cfset local.ph = userPhones[local.pi]>
     <cfset content &= "
-                    <div class='card mb-2 phone-card users-edit-item-card' data-idx='#(local.pi-1)#'>
+                    <div class='card mb-2 phone-card users-edit-item-card card-surface' data-idx='#(local.pi-1)#'>
                         <div class='card-body py-2 px-3 users-edit-item-card-body'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(local.ph.PHONENUMBER)#</strong>
-                                    <cfif len(trim(local.ph.PHONETYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.ph.PHONETYPE)#</span></cfif>
-                                    <cfif val(local.ph.ISPRIMARY ?: 0)> <span class='badge bg-success'>Primary</span></cfif>
+                                    <cfif len(trim(local.ph.PHONETYPE ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(local.ph.PHONETYPE)#</span></cfif>
+                                    <cfif val(local.ph.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-outline-secondary edit-phone-btn users-edit-secondary-button' data-idx='#(local.pi-1)#'>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-outline-danger remove-phone-btn users-edit-danger-button' data-idx='#(local.pi-1)#'>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-edit edit-phone-btn users-edit-secondary-button' data-idx='#(local.pi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-remove remove-phone-btn users-edit-danger-button' data-idx='#(local.pi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1030,12 +1030,12 @@
 <cfloop from="1" to="#arrayLen(userAddresses)#" index="local.adi">
     <cfset local.addr = userAddresses[local.adi]>
     <cfset content &= "
-                <div class='card mb-2 address-card users-edit-item-card'>
+                <div class='card mb-2 address-card users-edit-item-card card-surface'>
                     <div class='card-body py-2 px-3 users-edit-item-card-body'>
                         <div class='d-flex justify-content-between align-items-start'>
                             <div>
                                 <strong>#EncodeForHTML(local.addr.ADDRESSTYPE ?: "")#</strong>
-                                <cfif val(local.addr.ISPRIMARY ?: 0)> <span class='badge bg-success'>Primary</span></cfif>
+                                <cfif val(local.addr.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 <br>
                                 <small class='text-muted'>
                                     #EncodeForHTML(local.addr.ADDRESS1 ?: "")#
@@ -1049,8 +1049,8 @@
                                 </small>
                             </div>
                             <div>
-                                <button type='button' class='btn btn-sm btn-outline-secondary edit-address-btn users-edit-secondary-button' data-idx='#(local.adi-1)#'>Edit</button>
-                                <button type='button' class='btn btn-sm btn-outline-danger remove-address-btn users-edit-danger-button' data-idx='#(local.adi-1)#'>Remove</button>
+                                <button type='button' class='btn btn-sm btn-edit edit-address-btn users-edit-secondary-button' data-idx='#(local.adi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                <button type='button' class='btn btn-sm btn-remove remove-address-btn users-edit-danger-button' data-idx='#(local.adi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                             </div>
                         </div>
                     </div>
@@ -1085,11 +1085,11 @@
                 <div>#renderTabActionButtonGroup("refreshFlagsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-flags-btn'><i class='bi bi-floppy me-1'></i>Save Flags</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-flags-btn'><i class='bi bi-floppy me-1'></i>Save Flags</button>
                     <span id='save-flags-status' class='ms-1'></span>
                 </div>
             </div>
-            <div class='border p-3 rounded users-edit-scroll-panel'>
+            <div class='border p-3 rounded users-edit-scroll-panel panel-surface panel-scroll-md'>
 " />
 
 <cfif arrayLen(allFlags) gt 0>
@@ -1119,7 +1119,7 @@
                 <div>#renderTabActionButtonGroup("refreshOrgsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-orgs-btn'><i class='bi bi-floppy me-1'></i>Save Organizations</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-orgs-btn'><i class='bi bi-floppy me-1'></i>Save Organizations</button>
                     <span id='save-orgs-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1136,7 +1136,7 @@
                 <div>#renderTabActionButtonGroup("refreshExtidsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-extids-btn'><i class='bi bi-floppy me-1'></i>Save External IDs</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-extids-btn'><i class='bi bi-floppy me-1'></i>Save External IDs</button>
                     <span id='save-extids-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1181,7 +1181,7 @@
                 <div>#renderTabActionButtonGroup("refreshUhBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-uh-btn'><i class='bi bi-floppy me-1'></i>Save UH Info</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-uh-btn'><i class='bi bi-floppy me-1'></i>Save UH Info</button>
                     <span id='save-uh-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1242,7 +1242,7 @@
                     <label class='form-label'>Office Mailing Address</label>
                     <div class='input-group'>
                         <input class='form-control' name='Office_Mailing_Address' id='officeMailingAddress' value='#(user.OFFICE_MAILING_ADDRESS ?: "")#'>
-                        <button type='button' class='btn btn-outline-secondary' id='copyToAddressesBtn' title='Parse and copy to Addresses tab'>
+                        <button type='button' class='btn btn-ui-outline' id='copyToAddressesBtn' title='Parse and copy to Addresses tab'>
                             <i class='bi bi-arrow-right-square'></i> Copy to Addresses
                         </button>
                     </div>
@@ -1293,13 +1293,13 @@
                 <div class='d-flex align-items-center flex-wrap gap-2'>
                     #renderTabActionButtonGroup("refreshBiographicalInfoBtn")#
                     <span class='navbar-text'><strong>Actions:</strong></span>
-                    <button type='button' class='btn btn-sm btn-outline-primary' id='addDegreeBtn'><i class='bi bi-mortarboard me-1'></i>Add Degree</button>
-                    <button type='button' class='btn btn-sm btn-outline-primary' id='addAwardBtn'><i class='bi bi-award me-1'></i>Add Award</button>
+                    <button type='button' class='btn btn-sm btn-ui-add' id='addDegreeBtn'><i class='bi bi-mortarboard me-1'></i>Add Degree</button>
+                    <button type='button' class='btn btn-sm btn-ui-add' id='addAwardBtn'><i class='bi bi-award me-1'></i>Add Award</button>
                     <span id='degreesSaveStatus' class='save-status ms-1'></span>
                     <span id='awardsSaveStatus' class='save-status ms-1'></span>
                 </div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-success' id='save-bioinfo-btn'><i class='bi bi-floppy me-1'></i>Save Biographical Info</button>
+                    <button type='button' class='btn btn-sm btn-ui-success' id='save-bioinfo-btn'><i class='bi bi-floppy me-1'></i>Save Biographical Info</button>
                     <span id='save-bioinfo-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1358,17 +1358,17 @@
     <cfloop from="1" to="#arrayLen(userDegrees)#" index="local.di">
         <cfset local.dg = userDegrees[local.di]>
         <cfset content &= "
-                    <div class='card mb-2 degree-card' data-idx='#(local.di-1)#'>
+                    <div class='card mb-2 degree-card card-surface' data-idx='#(local.di-1)#'>
                         <div class='card-body py-2 px-3'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(local.dg.DEGREENAME)#</strong>
                                     <cfif len(trim(local.dg.UNIVERSITY ?: ""))> — #EncodeForHTML(local.dg.UNIVERSITY)#</cfif>
-                                    <cfif len(trim(local.dg.DEGREEYEAR ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(local.dg.DEGREEYEAR)#</span></cfif>
+                                    <cfif len(trim(local.dg.DEGREEYEAR ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(local.dg.DEGREEYEAR)#</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-outline-secondary edit-degree-btn' data-idx='#(local.di-1)#'>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-outline-danger remove-degree-btn' data-idx='#(local.di-1)#'>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-edit edit-degree-btn' data-idx='#(local.di-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-remove remove-degree-btn' data-idx='#(local.di-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1400,16 +1400,16 @@
         <cfset aw = spAwards[ai]>
         <cfset awName = trim(aw.AWARDNAME)>
         <cfset content &= "
-                    <div class='card mb-2 award-card' data-idx='#(ai-1)#'>
+                    <div class='card mb-2 award-card card-surface' data-idx='#(ai-1)#'>
                         <div class='card-body py-2 px-3'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
                                     <strong>#EncodeForHTML(awName)#</strong>
-                                    <cfif len(trim(aw.AWARDTYPE ?: ""))> <span class='badge bg-secondary text-dark'>#EncodeForHTML(aw.AWARDTYPE)#</span></cfif>
+                                    <cfif len(trim(aw.AWARDTYPE ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(aw.AWARDTYPE)#</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-outline-secondary edit-award-btn' data-idx='#(ai-1)#'>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-outline-danger remove-award-btn' data-idx='#(ai-1)#'>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-edit edit-award-btn' data-idx='#(ai-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-remove remove-award-btn' data-idx='#(ai-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1636,19 +1636,19 @@
                         <option value='Award' #(aw.AWARDTYPE EQ 'Award' ? 'selected' : '')#>Award</option>
                     </select>
                 </div>
-                <div class='col-md-2'><button type='button' class='btn btn-sm btn-outline-danger remove-award-row w-100'>Remove</button></div>
+                <div class='col-md-2'><button type='button' class='btn btn-sm btn-remove remove-award-row w-100'><i class='bi bi-trash me-1'></i>Remove</button></div>
             </div>">
     </cfloop>
     <cfset content &= "
             </div>
             <input type='hidden' id='spAwardCount' value='#arrayLen(spAwards)#'>
-            <button type='button' class='btn btn-sm btn-outline-primary mt-2' id='addSpAwardRow'>+ Add Award / Honor</button>
+            <button type='button' class='btn btn-sm btn-ui-add mt-2' id='addSpAwardRow'><i class='bi bi-plus-circle me-1'></i>Add Award / Honor</button>
         </div>
     ">
 </cfif>
 <cfset content &= "
     <div class='mt-3'>
-        <button type='button' class='btn btn-primary' id='save-studentprofile-btn'>Save Student Profile</button>
+        <button type='button' class='btn btn-ui-success' id='save-studentprofile-btn'>Save Student Profile</button>
         <span id='save-studentprofile-status' class='ms-2'></span>
     </div>
 </div>">
@@ -1660,7 +1660,7 @@
 <cfset content &= renderDegreesPanel(userDegrees, "fac", isSuperAdmin, user.DEGREES ?: "")>
 <cfset content &= "
     <div class='mt-3'>
-        <button type='button' class='btn btn-primary' id='save-facultydeg-btn'>Save Faculty Degrees</button>
+        <button type='button' class='btn btn-ui-success' id='save-facultydeg-btn'>Save Faculty Degrees</button>
         <span id='save-facultydeg-status' class='ms-2'></span>
     </div>
     </div>
@@ -1680,7 +1680,7 @@
 <cfset content &= renderDegreesPanel(userDegrees, "emer", isSuperAdmin, user.DEGREES ?: "")>
 <cfset content &= "
     <div class='mt-3'>
-        <button type='button' class='btn btn-primary' id='save-emeritusdeg-btn'>Save Emeritus Degrees</button>
+        <button type='button' class='btn btn-ui-success' id='save-emeritusdeg-btn'>Save Emeritus Degrees</button>
         <span id='save-emeritusdeg-status' class='ms-2'></span>
     </div>
     </div>
@@ -1693,7 +1693,7 @@
 <cfset content &= renderDegreesPanel(userDegrees, "res", isSuperAdmin, user.DEGREES ?: "")>
 <cfset content &= "
     <div class='mt-3'>
-        <button type='button' class='btn btn-primary' id='save-residentdeg-btn'>Save Resident Degrees</button>
+        <button type='button' class='btn btn-ui-success' id='save-residentdeg-btn'>Save Resident Degrees</button>
         <span id='save-residentdeg-status' class='ms-2'></span>
     </div>
     </div>
@@ -1706,7 +1706,7 @@
         <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
         <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
         <div class='mt-3'>
-            <button type='button' class='btn btn-primary' id='save-bio-btn'>Save Bio</button>
+            <button type='button' class='btn btn-ui-success' id='save-bio-btn'>Save Bio</button>
             <span id='save-bio-status' class='ms-2'></span>
         </div>
     </div>
@@ -2016,8 +2016,8 @@
                 </div>
             </div>
             <div class='modal-footer py-2'>
-                <button type='button' class='btn btn-sm btn-secondary' data-bs-dismiss='modal'>Cancel</button>
-                <button type='button' class='btn btn-sm btn-primary' id='save-orgRoleModal-btn'>Save Role</button>
+                <button type='button' class='btn btn-sm btn-ui-neutral' data-bs-dismiss='modal'>Cancel</button>
+                <button type='button' class='btn btn-sm btn-ui-success' id='save-orgRoleModal-btn'>Save Role</button>
             </div>
         </div>
     </div>
@@ -2316,8 +2316,11 @@
 
             var c4  = document.createElement('div'); c4.className = 'col-md-2';
             var btn = document.createElement('button');
-            btn.type = 'button'; btn.className = 'btn btn-sm btn-outline-danger remove-degree-row w-100';
-            btn.textContent = 'Remove';
+            btn.type = 'button'; btn.className = 'btn btn-sm btn-remove remove-degree-row w-100';
+            var removeIcon = document.createElement('i');
+            removeIcon.className = 'bi bi-trash me-1';
+            btn.appendChild(removeIcon);
+            btn.appendChild(document.createTextNode('Remove'));
             btn.addEventListener('click', function () {
                 row.remove();
                 /* reindex */
@@ -2464,8 +2467,8 @@
 <cfoutput>
             </div>
             <div class='mt-3'>
-                <button type='submit' class='btn btn-warning btn-sm'>
-                    <i class='bi bi-save'></i> Save Exclusions
+                <button type='submit' class='btn btn-save-exclusions btn-sm'>
+                    <i class='bi bi-save me-1'></i>Save Exclusions
                 </button>
             </div>
         </form>
@@ -2561,8 +2564,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveEmailModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveEmailModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2596,8 +2599,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="savePhoneModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="savePhoneModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2641,8 +2644,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveAliasModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveAliasModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2672,8 +2675,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveDegreeModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveDegreeModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2717,8 +2720,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveAwardModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveAwardModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2786,9 +2789,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveAddressBtn">Save Address</button>
-                <button type="button" class="btn btn-success d-none" id="saveAddressToDbBtn">Save to Database</button>
+                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-success" id="saveAddressBtn">Save Address</button>
+                <button type="button" class="btn btn-ui-success d-none" id="saveAddressToDbBtn">Save to Database</button>
             </div>
         </div>
     </div>

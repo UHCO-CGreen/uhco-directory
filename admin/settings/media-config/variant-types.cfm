@@ -360,10 +360,10 @@
                 <td class='text-center'>#vtActive ? '<span class="badge settings-badge-active">Active</span>' : '<span class="badge bg-secondary text-dark">Inactive</span>'#</td>
                 <td>
                     <div class='settings-action-group'>
-                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
+                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
                             <i class='bi bi-pencil-square'></i>
                         </a>
-                        <button type='button' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete'
+                        <button type='button' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete'
                                 title='Delete Variant Type'
                                 data-bs-toggle='tooltip'
                                 data-bs-title='Delete Variant Type'

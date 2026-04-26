@@ -253,10 +253,10 @@
                                     </td>
                                     <td class="text-end">
                                         <a href="/admin/settings/media-config/filename-patterns.cfm?edit=#val(p.FILENAMEPATTERNID)#"
-                                           class="users-list-action-button users-list-action-button-edit" title="Edit" aria-label="Edit Pattern">
+                                           class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit" aria-label="Edit Pattern">
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
-                                        <button type="button" class="users-list-action-button users-list-action-button-delete"
+                                        <button type="button" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete"
                                                 onclick="confirmDelete(#val(p.FILENAMEPATTERNID)#, ''#encodeForJavaScript(p.PATTERN ?: "")#'')"
                                                 title="Delete" aria-label="Delete Pattern">
                                             <i class="bi bi-trash"></i>

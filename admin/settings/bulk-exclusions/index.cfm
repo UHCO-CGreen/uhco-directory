@@ -83,7 +83,7 @@
                             <i class="bi #t.ICON# me-2 settings-hub-icon"></i>#encodeForHTML(t.LABEL)#
                         </h5>
                         <a href="/admin/settings/bulk-exclusions/edit.cfm?type=#encodeForURL(t.TYPE_KEY)#"
-                           class="users-list-action-button users-list-action-button-edit" title="Edit flags &amp; codes" aria-label="Edit #encodeForHTMLAttribute(t.LABEL)#">
+                                    class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit flags &amp; codes" aria-label="Edit #encodeForHTMLAttribute(t.LABEL)#">
                             <i class="bi bi-pencil-square"></i>
                         </a>
                     </div>

@@ -142,7 +142,7 @@
         </cfif>
         <cfset staleUsersActions = "">
         <cfif canUsersEdit>
-            <cfset staleUsersActions &= " <a href='/admin/users/edit.cfm?userID=#val(su.USERID)#' class='btn btn-sm btn-outline-primary ms-1 py-0 px-1'>Edit</a>">
+            <cfset staleUsersActions &= " <a href='/admin/users/edit.cfm?userID=#val(su.USERID)#' class='btn btn-sm btn-edit ms-1 py-0 px-1'>Edit</a>">
         </cfif>
         <cfif canUsersView>
             <cfset staleUsersActions &= " <a href='/admin/users/view.cfm?userID=#val(su.USERID)#&returnTo=#urlEncodedFormat(dashboardReturnTo)#' class='btn btn-sm btn-outline-secondary ms-1 py-0 px-1'>View</a>">

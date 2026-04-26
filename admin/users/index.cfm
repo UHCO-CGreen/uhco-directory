@@ -511,16 +511,16 @@
 </cfif>
 <cfset activeFilterChipsHTML = "">
 <cfif len(selectedFlagLabel)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-flag me-1'></i>Flag: " & encodeForHTML(selectedFlagLabel) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-flag me-1'></i>Flag: " & encodeForHTML(selectedFlagLabel) & "</span>">
 </cfif>
 <cfif showGradFilter AND len(selectedGradYear)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-mortarboard me-1'></i>Grad Year: " & encodeForHTML(selectedGradYear) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-mortarboard me-1'></i>Grad Year: " & encodeForHTML(selectedGradYear) & "</span>">
 </cfif>
 <cfif showOrgFilter AND orgFilterHasSelection>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-diagram-3 me-1'></i>Organizations: " & selectedOrgFilterCount & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-diagram-3 me-1'></i>Organizations: " & selectedOrgFilterCount & "</span>">
 </cfif>
 <cfif len(selectedLetter)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill text-bg-light users-list-active-chip'><i class='bi bi-type me-1'></i>Last Name: " & encodeForHTML(selectedLetter) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-type me-1'></i>Last Name: " & encodeForHTML(selectedLetter) & "</span>">
 </cfif>
 <cfset orgFilterPanelHTML = "">
 <cfif showOrgFilter>
@@ -663,7 +663,7 @@
                         </div>
                     </div>
                     
-                    #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge text-bg-primary'>" & currentUserRoleLabel & "</span></div>" : "")#
+                    #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
 
                     #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
 
@@ -710,13 +710,13 @@
         <input type='hidden' name='page' value='1'>
         <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanel)#' id='usersListFilterPanelInput'>
         <div class='d-flex flex-wrap gap-2 mb-3 align-items-center users-list-action-row'>
-            #(request.hasPermission("users.edit") ? "<button type='button' class='btn btn-sm btn-secondary text-dark' data-bs-toggle='modal' data-bs-target='##quickAddUserModal'><i class='bi bi-plus me-1'></i>Add A New User</button>" : "")#
+            #(request.hasPermission("users.edit") ? "<button type='button' class='btn btn-sm btn-ui-add' data-bs-toggle='modal' data-bs-target='##quickAddUserModal'><i class='bi bi-plus me-1'></i>Add A New User</button>" : "")#
             <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(activeFilterPanel EQ "flags" ? "btn-primary text-white" : "btn-secondary text-dark")#' data-filter-panel-trigger='flags' aria-expanded='#(activeFilterPanel EQ "flags" ? "true" : "false")#' aria-controls='usersListFilterPanel'>
-                <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & flagFilterCount & "</span>" : "")#
+                <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & flagFilterCount & "</span>" : "")#
             </button>
             #(len(testUsersLink) ? "<a href='" & testUsersLink & "' class='btn btn-sm " & ((listType EQ "all" AND selectedFlagFilter EQ testUserFlagID) ? "btn-primary text-white" : "btn-secondary text-dark") & " users-list-test-users-button'><i class='bi bi-person-badge me-1'></i>Test Users</a>" : "")#
-            #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "grad" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='grad' aria-expanded='" & (activeFilterPanel EQ "grad" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
-            #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "orgs" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (activeFilterPanel EQ "orgs" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge text-bg-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
+            #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "grad" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='grad' aria-expanded='" & (activeFilterPanel EQ "grad" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
+            #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "orgs" ? "btn-primary text-white" : "btn-secondary text-dark") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (activeFilterPanel EQ "orgs" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
             <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per Page:</label>
             <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
                 <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
@@ -839,14 +839,15 @@
     <cfset flagsHTML = "">
 
     <cfloop from="1" to="#arrayLen(userOrgsData)#" index="o">
-        <cfset orgsHTML &= "<span class='badge rounded-pill bg-primary text-wrap text-start users-list-badge-org'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
+        <cfset orgBadgeClass = findNoCase("clinic", userOrgsData[o].ORGNAME ?: "") ? "badge-orgs-clinic" : "badge-orgs-college">
+        <cfset orgsHTML &= "<span class='badge rounded-pill " & orgBadgeClass & " text-wrap text-start users-list-badge-org'>#EncodeForHTML(userOrgsData[o].ORGNAME)#</span>">
     </cfloop>
 
     <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
         <cfif highlightFlags AND (userFlags[f].FLAGNAME EQ "Admin - Check" OR userFlags[f].FLAGNAME EQ "No-UH")>
-            <cfset flagsHTML &= "<span class='badge rounded-pill bg-danger text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill badge-warning text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
         <cfelse>
-            <cfset flagsHTML &= "<span class='badge rounded-pill bg-secondary text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
+            <cfset flagsHTML &= "<span class='badge rounded-pill badge-flags text-wrap text-start users-list-badge-flag'>#userFlags[f].FLAGNAME#</span>">
         </cfif>
     </cfloop>
 
@@ -893,7 +894,7 @@
 
     <cfset deleteLink = "">
     <cfif request.hasPermission("users.delete")>
-        <cfset deleteLink = "<a class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
+        <cfset deleteLink = "<a class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' href='/admin/users/deleteConfirm.cfm?userID=#u.USERID#' title='Delete User' data-bs-toggle='tooltip' data-bs-title='Delete User'><i class='bi bi-trash'></i></a>">
     </cfif>
 
     <!--- Deceased icon (alumni only) --->
@@ -925,7 +926,7 @@
     <cfset content &= "
             <td>#deceasedIcon##EncodeForHTML(u.RESOLVEDFIRSTNAME ?: u.FIRSTNAME ?: '')#</td>
             <td>#EncodeForHTML(u.RESOLVEDLASTNAME ?: u.LASTNAME ?: '')#</td>
-            <td class='users-list-email-cell'>#displayEmail##(displayEmailExternal ? " <span class='badge text-dark users-list-external-badge' title='Non-UH email'>External</span>" : "")#</td>
+            <td class='users-list-email-cell'>#displayEmail##(displayEmailExternal ? " <span class='badge badge-info users-list-external-badge' title='Non-UH email'>External</span>" : "")#</td>
     ">
 
     <cfif showGradYear>
@@ -941,7 +942,7 @@
 
     <cfset editLink = "">
     <cfif request.hasPermission("users.edit")>
-        <cfset editLink = "<a class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#&returnTo=#urlEncodedFormat(currentListUrl)#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>">
+        <cfset editLink = "<a class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' href='/admin/users/edit.cfm?userID=#u.USERID#&returnTo=#urlEncodedFormat(currentListUrl)#' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User'><i class='bi bi-pencil-square'></i></a>">
     </cfif>
 
     <cfset content &= "

@@ -11,7 +11,7 @@
 <div class='flags-page'>
 <div class='d-flex justify-content-between align-items-center mb-4 flags-header'>
     <h1>User Flags</h1>
-    <a href='/admin/flags/new.cfm' class='btn btn-primary'>New Flag</a>
+    <a href='/admin/flags/new.cfm' class='btn btn-ui-add'><i class='bi bi-plus-circle me-1'></i>New Flag</a>
 </div>
 " />
 
@@ -40,8 +40,8 @@
                 <td class='flags-name'>#EncodeForHTML(f.FLAGNAME)#</td>
                 <td>
                     <div class='d-flex flex-wrap gap-1 align-items-start users-list-actions flags-actions'>
-                        <a href='/admin/flags/edit.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-info users-list-action-button users-list-action-button-edit' title='Edit Flag' data-bs-toggle='tooltip' data-bs-title='Edit Flag' aria-label='Edit Flag'><i class='bi bi-pencil-square'></i></a>
-                        <a href='/admin/flags/delete.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Flag' data-bs-toggle='tooltip' data-bs-title='Delete Flag' aria-label='Delete Flag'><i class='bi bi-trash'></i></a>
+                        <a href='/admin/flags/edit.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit Flag' data-bs-toggle='tooltip' data-bs-title='Edit Flag' aria-label='Edit Flag'><i class='bi bi-pencil-square'></i></a>
+                        <a href='/admin/flags/delete.cfm?flagID=#f.FLAGID#' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Flag' data-bs-toggle='tooltip' data-bs-title='Delete Flag' aria-label='Delete Flag'><i class='bi bi-trash'></i></a>
                     </div>
                 </td>
             </tr>

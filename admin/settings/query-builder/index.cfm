@@ -123,8 +123,8 @@
         <div class="mb-3 admin-hidden" id="columnsSection">
             <label class="form-label fw-semibold">Columns</label>
             <div class="mb-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAll">Select All</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectNone">Select None</button>
+                <button type="button" class="btn btn-sm btn-ui-outline" id="btnSelectAll"><i class="bi bi-check2-square me-1"></i>Select All</button>
+                <button type="button" class="btn btn-sm btn-ui-outline" id="btnSelectNone"><i class="bi bi-square me-1"></i>Select None</button>
             </div>
             <div id="columnCheckboxes" class="d-flex flex-wrap gap-2"></div>
         </div>
@@ -133,7 +133,7 @@
         <div class="mb-3 admin-hidden" id="conditionsSection">
             <label class="form-label fw-semibold">
                 WHERE Conditions
-                <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="btnAddCondition">
+                <button type="button" class="btn btn-sm btn-ui-add ms-2" id="btnAddCondition">
                     <i class="bi bi-plus"></i> Add
                 </button>
             </label>
@@ -144,7 +144,7 @@
         <div class="mb-3 admin-hidden" id="orderSection">
             <label class="form-label fw-semibold">
                 ORDER BY
-                <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="btnAddOrder">
+                <button type="button" class="btn btn-sm btn-ui-add ms-2" id="btnAddOrder">
                     <i class="bi bi-plus"></i> Add
                 </button>
             </label>
@@ -162,7 +162,7 @@
             <button type="button" class="btn btn-primary" id="btnExecute">
                 <i class="bi bi-play-fill me-1"></i> Execute Query
             </button>
-            <button type="button" class="btn btn-outline-secondary admin-hidden" id="btnExportCsv">
+            <button type="button" class="btn btn-ui-outline admin-hidden" id="btnExportCsv">
                 <i class="bi bi-filetype-csv me-1"></i> Export CSV
             </button>
         </div>
@@ -322,7 +322,7 @@
             '<div class="col-md-3"><select class="form-select form-select-sm cond-col">' + colOpts + '</select></div>' +
             '<div class="col-md-2"><select class="form-select form-select-sm cond-op">' + opOpts + '</select></div>' +
             '<div class="col-md-5"><input type="text" class="form-control form-control-sm cond-val" placeholder="Value"></div>' +
-            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete cond-remove" title="Remove Condition" aria-label="Remove Condition"><i class="bi bi-x"></i></button></div>';
+            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete cond-remove" title="Remove Condition" aria-label="Remove Condition"><i class="bi bi-x"></i></button></div>';
         $condRows.appendChild(row);
 
         row.querySelector('.cond-col').addEventListener('change', updatePreview);
@@ -355,7 +355,7 @@
             '<div class="col-md-4"><select class="form-select form-select-sm order-col">' + colOpts + '</select></div>' +
             '<div class="col-md-3"><select class="form-select form-select-sm order-dir">' +
                 '<option value="ASC">ASC</option><option value="DESC">DESC</option></select></div>' +
-            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete order-remove" title="Remove Order By" aria-label="Remove Order By"><i class="bi bi-x"></i></button></div>';
+            '<div class="col-md-2"><button type="button" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete order-remove" title="Remove Order By" aria-label="Remove Order By"><i class="bi bi-x"></i></button></div>';
         $orderRows.appendChild(row);
 
         row.querySelector('.order-col').addEventListener('change', updatePreview);

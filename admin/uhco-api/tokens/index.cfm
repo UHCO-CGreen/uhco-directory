@@ -6,7 +6,7 @@
 <p class='text-muted'>Tokens grant external applications access to the directory API. The raw token is shown only once at creation.</p>
 
 <div class='mb-3'>
-    <a href='/admin/tokens/create.cfm' class='btn btn-primary'><i class='bi bi-plus-lg me-1'></i>New Token</a>
+    <a href='/admin/tokens/create.cfm' class='btn btn-ui-add'><i class='bi bi-plus-lg me-1'></i>New Token</a>
 </div>
 ">
 

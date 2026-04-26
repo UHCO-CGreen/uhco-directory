@@ -23,23 +23,13 @@
 
 .users-view-quickmatch {
   border: 1px solid rgba(31, 41, 55, 0.08);
-  background: linear-gradient(180deg, #fdfefe 0%, #f5f8fb 100%);
+  background: linear-gradient(180deg, #fff 0%, #f6f6f6 100%);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .users-view-card {
   border-color: rgba(31, 41, 55, 0.08);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-}
-
-.users-view-card .card-header {
-  background: linear-gradient(180deg, #314a61 0%, #22384d 100%);
-  color: #fff;
-  border-bottom: 0;
-}
-
-.users-view-card .card-body {
-  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
 }
 
 .users-view-badge {
@@ -53,27 +43,10 @@
   align-items: flex-start;
 }
 
-.users-view-badge-flag,
-.users-view-badge-org {
+.badge-flags,
+.badge-orgs-college,
+.badge-orgs-clinic {
   color: #fff;
-}
-
-.users-view-pill-stack .users-view-badge-org,
-.users-view-org-list .users-view-badge-org {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-org-badge-primary) 82%, #fff 18%) 0%, var(--uhco-user-org-badge-primary) 100%) !important;
-}
-
-.users-view-pill-stack .users-view-badge-org:nth-child(even),
-.users-view-org-list li:nth-child(even) .users-view-badge-org {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-org-badge-secondary) 82%, #fff 18%) 0%, var(--uhco-user-org-badge-secondary) 100%) !important;
-}
-
-.users-view-pill-stack .users-view-badge-flag {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-flag-badge-primary) 82%, #fff 18%) 0%, var(--uhco-user-flag-badge-primary) 100%) !important;
-}
-
-.users-view-pill-stack .users-view-badge-flag:nth-child(even) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--uhco-user-flag-badge-secondary) 82%, #fff 18%) 0%, var(--uhco-user-flag-badge-secondary) 100%) !important;
 }
 
 .users-view-org-list li + li {
@@ -92,26 +65,24 @@
 
 .users-view-images-accordion .accordion-item {
   border-color: rgba(31, 41, 55, 0.08);
+  border-left: 0;
+  border-radius: 0;
+  border-right: 0;
+  box-shadow: none;
 }
 
 .users-view-images-accordion .accordion-button {
-  background: linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
-  color: #1f3a56;
   font-weight: 600;
   gap: 0.15rem;
 }
 
-.users-view-images-accordion .accordion-button:not(.collapsed) {
-  background: linear-gradient(180deg, #edf4fb 0%, #dfeaf5 100%);
-  color: #16324a;
-  box-shadow: inset 0 -1px 0 rgba(31, 41, 55, 0.08);
+.users-view-images-panel > .accordion > .accordion-item > .accordion-collapse > .accordion-body {
+  padding: 0;
 }
 
 .users-view-image-count-badge {
   min-width: 2rem;
-  color: #fff;
-  background: linear-gradient(180deg, #455a70 0%, #2a3d51 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  text-align: center;
 }
 
 .users-view-image-dimension {
@@ -119,19 +90,44 @@
   font-weight: 500;
 }
 
-.users-view-images-accordion .accordion-button:not(.collapsed) .users-view-image-dimension {
-  color: #5c6f82;
-}
-
 .users-view-section-title {
   color: #18344d;
   margin-bottom: 0.9rem;
+}
+
+.users-view-masonry {
+  column-count: 2;
+  column-gap: 1rem;
+}
+
+.users-view-masonry-item {
+  break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 1rem;
+}
+
+.users-view-accordion .accordion-item {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+
+.users-view-panel-grid p:last-child,
+.users-view-panel-grid ul:last-child,
+.users-view-panel-grid div:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 767.98px) {
   .users-view-profile-thumb {
     width: 88px;
     height: 88px;
+  }
+
+  .users-view-masonry {
+    column-count: 1;
   }
 
   .users-view-images-header {

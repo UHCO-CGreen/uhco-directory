@@ -4,7 +4,7 @@
 <cfset content = "
 <div class='d-flex justify-content-between align-items-center mb-4'>
     <h1 class='h3 mb-0'>API Secrets</h1>
-    <a href='/admin/secrets/create.cfm' class='btn btn-primary'>
+    <a href='/admin/secrets/create.cfm' class='btn btn-ui-add'>
         <i class='bi bi-plus-lg me-1'></i> New Secret
     </a>
 </div>

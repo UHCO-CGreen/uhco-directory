@@ -19,7 +19,7 @@
 <p class='text-muted'>Tokens grant external applications access to the directory API. The raw token is shown only once at creation.</p>
 
 <div class='mb-3'>
-    <a href='/admin/settings/uhco-api/tokens/create.cfm' class='btn btn-primary'><i class='bi bi-plus-lg me-1'></i>New Token</a>
+    <a href='/admin/settings/uhco-api/tokens/create.cfm' class='btn btn-ui-add'><i class='bi bi-plus-lg me-1'></i>New Token</a>
 </div>
 ">
 
@@ -86,7 +86,7 @@
         <cfset content &= "
                 <form method='post' action='/admin/settings/uhco-api/tokens/deleteToken.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this token record?')"">
                     <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                    <button class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Token' data-bs-toggle='tooltip' data-bs-title='Delete Token' aria-label='Delete Token'><i class='bi bi-trash'></i></button>
+                    <button class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Token' data-bs-toggle='tooltip' data-bs-title='Delete Token' aria-label='Delete Token'><i class='bi bi-trash'></i></button>
                 </form>
                 </div>
             </td>

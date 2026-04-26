@@ -472,7 +472,7 @@
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="disable">
                             <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                            <button type="submit" class="btn btn-sm btn-danger users-list-action-button users-list-action-button-delete" title="Disable Task" data-bs-toggle="tooltip" data-bs-title="Disable Task" aria-label="Disable Task">
+                                <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Disable Task" data-bs-toggle="tooltip" data-bs-title="Disable Task" aria-label="Disable Task">
                                     <i class="bi bi-x-circle"></i>
                             </button>
                         </form>
@@ -486,7 +486,7 @@
                         </form>
                     </cfif>
                     <cfif len(t.runNowLink)>
-                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" title="Run Task Now" data-bs-toggle="tooltip" data-bs-title="Run Task Now" aria-label="Run Task Now">
+                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Run Task Now" data-bs-toggle="tooltip" data-bs-title="Run Task Now" aria-label="Run Task Now">
                             <i class="bi bi-play-fill"></i>
                         </a>
                     </cfif>

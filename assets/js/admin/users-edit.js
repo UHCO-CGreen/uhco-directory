@@ -303,8 +303,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (d.type ? " <span class='badge bg-secondary text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "</div><div>" +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-email-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-email-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-email-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-email-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-email-field='addr' data-email-idx='" + i + "' value='" + esc(d.addr) + "'>" +
                     "<input type='hidden' data-email-field='type' data-email-idx='" + i + "' value='" + esc(d.type) + "'>" +
@@ -423,8 +423,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (d.type ? " <span class='badge bg-secondary text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "</div><div>" +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-phone-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-phone-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-phone-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-phone-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-phone-field='number' data-phone-idx='" + i + "' value='" + esc(d.number) + "'>" +
                     "<input type='hidden' data-phone-field='type' data-phone-idx='" + i + "' value='" + esc(d.type) + "'>" +
@@ -578,8 +578,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (d.active === '1' ? " <span class='badge bg-success'>Active</span>" : " <span class='badge bg-secondary text-dark'>Inactive</span>") +
                     "</div><div>" +
                     "<button type='button' class='btn btn-sm btn-outline-primary set-primary-alias-btn' data-idx='" + i + "'" + (d.primary === '1' ? " disabled" : "") + ">Set Primary</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-alias-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-alias-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-alias-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-alias-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-alias-field='first' data-alias-idx='" + i + "' value='" + esc(d.first) + "'>" +
                     "<input type='hidden' data-alias-field='middle' data-alias-idx='" + i + "' value='" + esc(d.middle) + "'>" +
@@ -734,8 +734,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (d.university ? " <small class='text-muted'>— " + esc(d.university) + "</small>" : "") +
                     (d.year ? " <small class='text-muted'>(" + esc(d.year) + ")</small>" : "") +
                     "</div><div>" +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-degree-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-degree-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-degree-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-degree-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-degree-field='name' data-degree-idx='" + i + "' value='" + esc(d.name) + "'>" +
                     "<input type='hidden' data-degree-field='university' data-degree-idx='" + i + "' value='" + esc(d.university) + "'>" +
@@ -859,8 +859,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     "<strong>" + esc(d.name) + "</strong>" +
                     (d.type ? " <span class='badge bg-info text-dark'>" + esc(d.type) + "</span>" : "") +
                     "</div><div>" +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-award-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-award-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-award-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-award-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-award-field='name' data-award-idx='" + i + "' value='" + esc(d.name) + "'>" +
                     "<input type='hidden' data-award-field='type' data-award-idx='" + i + "' value='" + esc(d.type) + "'>"
@@ -998,8 +998,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "<br><small class='text-muted'>" + loc.join('<br>') + "</small>" +
                     "</div><div>" +
-                    "<button type='button' class='btn btn-sm btn-outline-secondary edit-address-btn' data-idx='" + i + "'>Edit</button> " +
-                    "<button type='button' class='btn btn-sm btn-outline-danger remove-address-btn' data-idx='" + i + "'>Remove</button>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-address-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-address-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
                     "</div></div></div></div>" +
                     "<input type='hidden' data-addr-field='type' data-addr-idx='" + i + "' value='" + esc(d.type) + "'>" +
                     "<input type='hidden' data-addr-field='addr1' data-addr-idx='" + i + "' value='" + esc(d.addr1) + "'>" +

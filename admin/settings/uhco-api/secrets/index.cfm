@@ -17,7 +17,7 @@
 
 <div class='d-flex justify-content-between align-items-center mb-4'>
     <h1 class='h3 mb-0'>API Secrets</h1>
-    <a href='/admin/settings/uhco-api/secrets/create.cfm' class='btn btn-primary'>
+    <a href='/admin/settings/uhco-api/secrets/create.cfm' class='btn btn-ui-add'>
         <i class='bi bi-plus-lg me-1'></i> New Secret
     </a>
 </div>
@@ -75,7 +75,7 @@
                 </cfif>
                 <form method='post' action='/admin/settings/uhco-api/secrets/deleteSecret.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this secret?')"">
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-danger users-list-action-button users-list-action-button-delete' title='Delete Secret' data-bs-toggle='tooltip' data-bs-title='Delete Secret' aria-label='Delete Secret'><i class='bi bi-trash'></i></button>
+                    <button class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Secret' data-bs-toggle='tooltip' data-bs-title='Delete Secret' aria-label='Delete Secret'><i class='bi bi-trash'></i></button>
                 </form>
                 </div>
             </td>

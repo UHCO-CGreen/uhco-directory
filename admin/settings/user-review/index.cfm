@@ -105,7 +105,7 @@
                                 <td class="small">#dateTimeFormat(submission.SUBMITTEDAT, "mmm d, yyyy h:nn tt")#</td>
                                 <td><span class="badge text-bg-#submission.STATUS EQ 'pending' ? 'warning' : 'secondary'#">#encodeForHTML(replace(submission.STATUS, "_", " ", "all"))#</span></td>
                                 <td class="small">#encodeForHTML(replace(submission.SECTIONLIST ?: "", ",", ", ", "all"))#</td>
-                                <td class="text-end"><a class="btn btn-sm btn-info users-list-action-button users-list-action-button-edit" href="/admin/settings/user-review/review.cfm?submissionID=#submission.SUBMISSIONID#" title="Review Submission" data-bs-toggle="tooltip" data-bs-title="Review Submission" aria-label="Review Submission"><i class="bi bi-pencil-square"></i></a></td>
+                                <td class="text-end"><a class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" href="/admin/settings/user-review/review.cfm?submissionID=#submission.SUBMISSIONID#" title="Review Submission" data-bs-toggle="tooltip" data-bs-title="Review Submission" aria-label="Review Submission"><i class="bi bi-pencil-square"></i></a></td>
                             </tr>
                         </cfloop>
                     </tbody>

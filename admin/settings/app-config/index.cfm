@@ -490,7 +490,7 @@
                                             <cfelse>
                                                 <button
                                                     type="button"
-                                                    class="btn btn-sm btn-outline-primary js-edit-config"
+                                                    class="btn btn-sm btn-edit js-edit-config"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="##editConfigModal"
                                                     data-config-key="#encodeForHTMLAttribute(row.CONFIGKEY)#"
