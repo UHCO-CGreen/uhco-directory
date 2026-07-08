@@ -1,0 +1,1490 @@
+openapi: 3.1.0
+info:
+  title: UHCO Directory API
+  version: "1.0"
+  description: >
+    Read-only, GET-only REST API for UHCO Identity people, organizations, and classification data.
+    See /api/docs.html for narrative documentation and copy-paste examples.
+
+
+    IMPORTANT: this contract documents the CURRENT WORKING-TREE state of the API as of 2026-07-08,
+    including an in-progress, uncommitted refactor:
+      - A `NAMES` array (one element, with ALIASID/FIRST/MIDDLE/LAST/FULL/PRIMARY) now replaces flat
+        FIRSTNAME/MIDDLENAME/LASTNAME/FULLNAME fields on the five person-based QuickPulls endpoints
+        (attending, gradclass, deans, graduate, myuhco).
+      - Authentication is header-only. Legacy `?token=`/`?secret=` query-string fallbacks have been
+        removed from api_auth.cfc; only `Authorization: Bearer <token>` and `X-API-Secret: <secret>`
+        headers work.
+
+    Re-diff this file against api/v1/**/*.cfm once that refactor is committed, since the shapes it
+    describes could still change before then.
+
+
+    This contract intentionally documents several real inconsistencies found in the live code rather
+    than hiding them — see the notes on individual schemas/operations below (e.g. four different
+    "DEGREES" shapes across endpoints, dynamically-numbered AWARDNAME1/AWARDNAME2/... keys on
+    gradclass, and a `deans` field that legacy docs claimed exists but the code never sets).
+tags:
+  - name: People
+    description: Directory people — list, full profile, and 12 per-person sub-resources.
+  - name: Organizations
+    description: Organizational units people belong to.
+  - name: Flags
+    description: Classification flags (e.g. Alumni, Faculty, Current-Student) assignable to people.
+  - name: QuickPulls
+    description: Curated, use-case-specific record shapes for kiosk/display/self-service integrations.
+  - name: Access & Permissions
+    description: Lookups against the admin permission system, gated behind X-API-Secret.
+  - name: Discovery
+    description: Self-describing API root.
+servers:
+  - url: "https://{host}/api/v1"
+    variables:
+      host:
+        default: example.uh.edu
+    description: >
+      Templated base URL — substitute your actual environment host. The live base is also echoed
+      per-request via the X-UHCO-Directory-Api-Base response header (honors X-Forwarded-Proto), so
+      multi-environment/proxied clients can confirm what they actually hit.
+security:
+  - bearerAuth: []
+paths:
+  /:
+    get:
+      operationId: getDiscoveryRoot
+      tags: [Discovery]
+      summary: API discovery / self-description
+      description: >
+        Self-documenting index of every route this API exposes. Reached only at the API root with no
+        path segments. Always returns JSON regardless of `?return=`.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DiscoveryResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people:
+    get:
+      operationId: listPeople
+      tags: [People]
+      summary: Paginated, searchable list of directory people
+      description: >
+        Row-level secret gating applies ONLY to this list endpoint — none of the twelve
+        `/people/{id}/...` sub-resources below are gated by X-API-Secret. If the caller's secret does
+        not unlock the "Current-Student" or "Alumni" protected flags (or the protected orgs "OD
+        Program", "MS Program", "PhD Program", "Residency Program"), matching people/orgs are
+        silently excluded from results (not a 401/403) — filtering on an excluded value with `flag`,
+        `org`, `class`, or `gradyear` returns `{total: 0, data: []}` rather than an error.
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Full-text search on name/email.
+        - name: flag
+          in: query
+          schema: { type: string }
+          description: Filter by exact flag name, e.g. Staff.
+        - name: org
+          in: query
+          schema: { type: string }
+          description: Filter by exact organization name.
+        - name: class
+          in: query
+          schema: { type: string }
+          description: Filter by graduation year. Silently yields empty results if Current-Student/Alumni isn't unlocked (see description above) — does not return 401.
+        - name: gradyear
+          in: query
+          schema: { type: string }
+          description: Alias for `class` combined with `flag=Alumni`/`Current-Student`.
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 500, minimum: 1 }
+          description: Clamped server-side to a maximum of 500.
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0, minimum: 0 }
+        - name: return
+          in: query
+          schema: { type: string, enum: [json, xml], default: json }
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, limit, offset, data]
+                properties:
+                  total: { type: integer, description: "Total matching rows (COUNT(*)), independent of limit/offset." }
+                  limit: { type: integer, description: "Effective limit actually applied (clamped ≤500)." }
+                  offset: { type: integer }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PersonSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}:
+    get:
+      operationId: getPerson
+      tags: [People]
+      summary: Full aggregated profile for a single person
+      description: >
+        Returns the profile object BARE — no `{data: ...}` wrapper. 404s for a non-existent user, an
+        inactive user (ACTIVE=0), or a user carrying the internal TEST_USER flag.
+      parameters:
+        - $ref: "#/components/parameters/PersonId"
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PersonProfile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/flags:
+    get:
+      operationId: getPersonFlags
+      tags: [People]
+      summary: Flags assigned to a person
+      description: Not secret-gated — returns all flags including Current-Student/Alumni/TEST_USER.
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200": { $ref: "#/components/responses/PersonFlagsOK" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/organizations:
+    get:
+      operationId: getPersonOrganizations
+      tags: [People]
+      summary: Organization memberships for a person
+      description: >
+        Not secret-gated (unlike `/people` list filtering) — protected-program memberships (OD/MS/PhD
+        Program, Residency Program) are always visible here regardless of X-API-Secret.
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/OrganizationWithRole" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/academic:
+    get:
+      operationId: getPersonAcademic
+      tags: [People]
+      summary: Academic info (graduation year) for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/AcademicInfo"
+                      - type: object
+                        required: [effectiveGradYear]
+                        properties:
+                          effectiveGradYear:
+                            type: integer
+                            description: >
+                              camelCase key amid otherwise-ALLCAPS fields — computed server-side
+                              (priority: active enrolled UHCO degree → most recent UHCO grad year →
+                              legacy CurrentGradYear fallback; 0 if none found). Always present, even
+                              when no UserAcademicInfo row exists (in which case USERID/
+                              CURRENTGRADYEAR/ORIGINALGRADYEAR are all absent).
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/addresses:
+    get:
+      operationId: getPersonAddresses
+      tags: [People]
+      summary: Mailing addresses for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/Address" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/externalids:
+    get:
+      operationId: getPersonExternalIds
+      tags: [People]
+      summary: External system identifiers for a person (Cougarnet, UH_API_ID, PeopleSoft, etc.)
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/ExternalIdEntry" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/images:
+    get:
+      operationId: getPersonImages
+      tags: [People]
+      summary: Photo/image variants for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/Image" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/emails:
+    get:
+      operationId: getPersonEmails
+      tags: [People]
+      summary: Email addresses for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/Email" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/degrees:
+    get:
+      operationId: getPersonDegrees
+      tags: [People]
+      summary: Degree records for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/DegreeFull" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/studentprofile:
+    get:
+      operationId: getPersonStudentProfile
+      tags: [People]
+      summary: Student profile and awards for a person
+      description: >
+        Unique wrapper shape — `{userID, profile, awards}` — unlike every other sub-resource's
+        `{userID, data}` pattern. `profile` does NOT include the computed `HometownFull` field that
+        `GET /people/{id}` adds; only the raw UserStudentProfile row.
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, profile, awards]
+                properties:
+                  userID: { type: integer }
+                  profile: { $ref: "#/components/schemas/StudentProfile" }
+                  awards: { type: array, items: { $ref: "#/components/schemas/Award" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/awards:
+    get:
+      operationId: getPersonAwards
+      tags: [People]
+      summary: Awards for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/Award" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /people/{id}/bio:
+    get:
+      operationId: getPersonBio
+      tags: [People]
+      summary: Biography for a person
+      parameters: [{ $ref: "#/components/parameters/PersonId" }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { $ref: "#/components/schemas/Bio" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [Organizations]
+      summary: List all organizations
+      description: Not filtered by Display — returns every organization row regardless of Display flag.
+      parameters:
+        - name: return
+          in: query
+          schema: { type: string, enum: [json, xml], default: json }
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/OrganizationBase" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /organizations/{id}:
+    get:
+      operationId: getOrganization
+      tags: [Organizations]
+      summary: Get a single organization by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Numeric OrgID.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrganizationBase" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /flags:
+    get:
+      operationId: listFlags
+      tags: [Flags]
+      summary: List all flags
+      parameters:
+        - name: return
+          in: query
+          schema: { type: string, enum: [json, xml], default: json }
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/FlagWithDescription" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/attending:
+    get:
+      operationId: getQuickpullAttending
+      tags: [QuickPulls]
+      summary: Clinical-Attending roster (no secret required)
+      description: >
+        Filters to Active=1 users holding the "Clinical-Attending" flag, excluding TEST_USER. Admins
+        can configure additional fields to be appended per-response via Settings → UHCO API →
+        Quickpulls (AppConfig key `api.quickpull.attending.config`) without a code deploy — this
+        schema documents only the guaranteed base fields.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, data]
+                properties:
+                  total: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/QuickpullAttendingItem" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/deans:
+    get:
+      operationId: getQuickpullDeans
+      tags: [QuickPulls]
+      summary: Deans roster (no secret required)
+      description: >
+        Filters to Active=1 users holding the "Deans" flag, excluding TEST_USER. NOTE: despite the
+        service's own self-documentation and legacy docs.html both claiming a `TITLE1` field is
+        returned by default, the actual `getDeansUsers()` query never selects/sets it — `TITLE1` only
+        appears if an admin has explicitly enabled it as an extra field via Settings → UHCO API →
+        Quickpulls. Do not rely on it being present without checking your environment's live config.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, data]
+                properties:
+                  total: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/QuickpullDeansItem" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/gradclass:
+    get:
+      operationId: getQuickpullGradClass
+      tags: [QuickPulls]
+      summary: Graduating class roster by year/program (requires a secret unlocking Alumni)
+      security:
+        - bearerAuth: []
+          apiSecret: []
+      description: >
+        401 "A valid secret with Alumni access is required" if X-API-Secret is missing or doesn't
+        unlock the "Alumni" protected flag.
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema: { type: integer }
+          description: Graduation year. Any numeric string is truncated to an integer server-side.
+        - name: program
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["OD Program", "PhD Program", "MS Program", "All"]
+          description: Matched case-insensitively; "All" (any casing) is normalized to the literal "All".
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["A-C", "D-G", "H-K", "L-M", "N-P", "Q-S", "T-Z"]
+          description: Optional last-name-initial range filter.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, data]
+                properties:
+                  total: { type: integer }
+                  data: { type: array, items: { $ref: "#/components/schemas/QuickpullGradClassItem" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/graduate:
+    get:
+      operationId: getQuickpullGraduate
+      tags: [QuickPulls]
+      summary: Single graduate lookup by UserID (requires a secret unlocking Alumni)
+      security:
+        - bearerAuth: []
+          apiSecret: []
+      description: >
+        401 "A valid secret with Alumni access is required" if the secret doesn't unlock "Alumni".
+        Unlike most endpoints, a non-matching/ineligible `id` does NOT 404 — it returns 200 with
+        `data: {}`.
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: integer }
+          description: Numeric UserID.
+      responses:
+        "200":
+          description: OK (data may be an empty object if not found/not Alumni)
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userID, data]
+                properties:
+                  userID: { type: integer }
+                  data: { $ref: "#/components/schemas/QuickpullGraduateData" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/myuhco:
+    get:
+      operationId: getQuickpullMyUhco
+      tags: [QuickPulls]
+      summary: Self-service profile lookup by external ID (secret optional unless the matched user is Alumni/Current-Student)
+      description: >
+        Matches `id` against external-ID systems in this exact order: UH_API_ID, COUGARNET,
+        PEOPLESOFT (first match wins). If the matched user does NOT carry Alumni/Current-Student, the
+        record is returned regardless of X-API-Secret (CURRENTGRADYEAR is forced to "" in that case).
+        If the matched user DOES carry Alumni/Current-Student, a secret unlocking one of those flags
+        is required or this 404s with "User not found or not authorized". 404 also applies to a
+        completely unmatched external ID.
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+          description: External ID value (COUGARNET, UH_API_ID, or PEOPLESOFT).
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuickpullMyUHCOData" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /quickpulls/myuhco-rosters:
+    get:
+      operationId: getQuickpullMyUhcoRosters
+      tags: [QuickPulls]
+      summary: MyUHCO roster PDF catalog (requires a secret unlocking Alumni or Current-Student)
+      security:
+        - bearerAuth: []
+          apiSecret: []
+      description: >
+        Also reachable at the alias path `/quickpulls/myuhcorosters` (no hyphen). 401 "A valid secret
+        with Alumni or Current-Student access is required" otherwise. Reads a local directory + a
+        publish-status sidecar file, not the database.
+      parameters:
+        - name: publishedOnly
+          in: query
+          required: false
+          schema: { type: string, default: "false" }
+          description: >
+            Truthy if (case-insensitively) "1", "true", "yes", or "on"; anything else (including
+            omitted) is treated as false.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, publishedOnly, data]
+                properties:
+                  total: { type: integer }
+                  publishedOnly: { type: boolean, description: "Echoes the resolved boolean value of the publishedOnly param." }
+                  data: { type: array, items: { $ref: "#/components/schemas/RosterFile" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /access:
+    get:
+      operationId: getUserAccess
+      tags: [Access & Permissions]
+      summary: Get a user's granted permission strings (requires any valid secret)
+      security:
+        - bearerAuth: []
+          apiSecret: []
+      description: 401 "Unauthorized" if X-API-Secret is missing/invalid — any valid, unexpired secret suffices (its unlocked-flag identity doesn't matter here).
+      parameters:
+        - name: userID
+          in: query
+          required: true
+          schema: { type: integer }
+          description: Canonical identity UserID.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /permission-roster:
+    get:
+      operationId: getPermissionRoster
+      tags: [Access & Permissions]
+      summary: List every user holding a given permission (requires any valid secret)
+      security:
+        - bearerAuth: []
+          apiSecret: []
+      description: >
+        401 "Unauthorized" if X-API-Secret is missing/invalid. Only includes users with Active=1 and a
+        currently-active, non-expired permission assignment.
+      parameters:
+        - name: permission
+          in: query
+          required: true
+          schema: { type: string }
+          description: Dot-notation permission key.
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+            X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PermissionRosterResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+components:
+  parameters:
+    PersonId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+      description: Numeric UserID.
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        `Authorization: Bearer <token>` — required on every operation (requireAuth("read") is
+        universal; no endpoint in this codebase currently requires any scope other than "read").
+        Missing/malformed header → 401 "Missing or malformed Authorization header. Expected: Bearer
+        <token>". Invalid, expired, IP-blocked, or insufficient-scope token → 401 "Unauthorized" (the
+        specific reason is deliberately never disclosed to the caller).
+    apiSecret:
+      type: apiKey
+      in: header
+      name: X-API-Secret
+      description: >
+        Secondary credential that unlocks "protected flags" (e.g. Alumni, Current-Student). Checking
+        this header never aborts the request on its own — each endpoint decides whether a missing/
+        invalid secret is fatal (401) or merely narrows/hides results. See each operation's
+        description for its exact requirement.
+
+  headers:
+    XUHCODirectoryApiBase:
+      description: Echoes the canonical base URL (scheme + host + /api/v1) this request was actually served from.
+      schema: { type: string, format: uri }
+    XUHCODirectoryAuthorization:
+      description: >
+        Echoes back the raw bearer token the caller sent, stripped of the "Bearer " prefix and
+        UNVALIDATED. Only present when the incoming Authorization header was well-formed. This is a
+        debugging convenience for the caller, not a security signal.
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: >
+        Invalid or missing request parameter. Exact messages vary by operation, e.g. "Invalid userID",
+        "Missing or invalid required parameter: year", "Invalid program. Allowed values: OD Program,
+        PhD Program, MS Program, All".
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: >
+        Missing/invalid Bearer token, or (on secret-gated operations) a missing/invalid/insufficient
+        X-API-Secret. See the operation description for the exact message used.
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found (e.g. "User not found", "Organization not found", "Unknown sub-resource").
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    MethodNotAllowed:
+      description: >
+        The API is GET-only, system-wide. Any non-GET verb (POST/PUT/DELETE/PATCH/etc.) receives 405
+        "Method not allowed" for every route, including the ones documented here.
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServerError:
+      description: Uncaught exception. Handled by Application.cfc onError(), same flat error shape, status forced to 500.
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    PersonFlagsOK:
+      description: OK
+      headers:
+        X-UHCO-Directory-Api-Base: { $ref: "#/components/headers/XUHCODirectoryApiBase" }
+        X-UHCO-Directory-Authorization: { $ref: "#/components/headers/XUHCODirectoryAuthorization" }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [userID, data]
+            properties:
+              userID: { type: integer }
+              data: { type: array, items: { $ref: "#/components/schemas/Flag" } }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+      description: The single flat error shape used for every 400/401/404/405/500 across the whole API — never a nested {code,message} object.
+
+    DiscoveryResponse:
+      type: object
+      required: [api, version, docs, endpoints]
+      properties:
+        api: { type: string, const: "UHCO Directory API" }
+        version: { type: string, const: "1.0" }
+        docs: { type: string, const: "/api/docs.html" }
+        endpoints:
+          type: array
+          items: { type: string }
+          description: Human-readable route templates, e.g. "GET /api/v1/access?userID={userID}".
+
+    NameEnvelopeItem:
+      type: object
+      required: [ALIASID, FIRST, MIDDLE, LAST, FULL, PRIMARY]
+      properties:
+        ALIASID: { type: integer, description: "0 on endpoints that pass an empty alias map internally (graduate, myuhco); a real alias-map ID elsewhere." }
+        FIRST: { type: string }
+        MIDDLE: { type: string }
+        LAST: { type: string }
+        FULL: { type: string }
+        PRIMARY: { type: boolean, const: true }
+      description: >
+        Replaces flat FIRSTNAME/MIDDLENAME/LASTNAME/FULLNAME fields wherever it appears (part of an
+        uncommitted, in-progress refactor). Always exactly one element in the containing array.
+
+    Flag:
+      type: object
+      required: [FLAGID, FLAGNAME]
+      properties:
+        FLAGID: { type: integer }
+        FLAGNAME: { type: string, description: "e.g. Alumni, Clinical-Attending, Deans, Current-Student, TEST_USER." }
+
+    FlagWithDescription:
+      allOf:
+        - $ref: "#/components/schemas/Flag"
+        - type: object
+          properties:
+            FLAGDESCRIPTION: { type: ["string", "null"] }
+
+    OrganizationBase:
+      type: object
+      required: [ORGID, ORGNAME, ORGTYPE, ADDITIONALROLES, ORGDESCRIPTION, DISPLAY]
+      properties:
+        ORGID: { type: integer }
+        ORGNAME: { type: string }
+        ORGTYPE: { type: string }
+        PARENTORGID: { type: ["integer", "null"], description: "null for top-level organizations." }
+        ADDITIONALROLES: { type: boolean }
+        ORGDESCRIPTION: { type: string }
+        DISPLAY: { type: boolean, description: "Not used to filter GET /organizations — orgs with DISPLAY=0 are still returned by that endpoint." }
+
+    OrganizationWithRole:
+      allOf:
+        - $ref: "#/components/schemas/OrganizationBase"
+        - type: object
+          properties:
+            ROLETITLE: { type: string }
+            ROLEORDER: { type: integer }
+      description: Used by /people/{id}/organizations, which joins in per-user role columns not present on the base /organizations endpoint.
+
+    OrganizationReduced:
+      type: object
+      required: [ORGID, ORGNAME, ORGTYPE]
+      properties:
+        ORGID: { type: integer }
+        ORGNAME: { type: string }
+        ORGTYPE: { type: string }
+        PARENTORGID: { type: ["integer", "null"] }
+      description: The reduced org shape embedded in PersonSummary.ORGANIZATIONS — fewer fields than OrganizationBase/OrganizationWithRole.
+
+    Address:
+      type: object
+      properties:
+        ADDRESSID: { type: integer }
+        USERID: { type: integer }
+        ADDRESSTYPE: { type: string }
+        ADDRESS1: { type: string }
+        ADDRESS2: { type: string }
+        CITY: { type: string }
+        STATE: { type: string }
+        ZIPCODE: { type: string }
+        BUILDING: { type: string }
+        ROOM: { type: string }
+        MAILCODE: { type: string }
+        ISPRIMARY: { type: boolean }
+
+    Phone:
+      type: object
+      properties:
+        PHONEID: { type: integer }
+        USERID: { type: integer }
+        PHONENUMBER: { type: string }
+        PHONETYPE: { type: string }
+        ISPRIMARY: { type: boolean }
+        SORTORDER: { type: integer }
+      description: Only ever exposed via GET /people/{id} (profile.phones) — there is no dedicated /people/{id}/phones sub-resource.
+
+    Email:
+      type: object
+      properties:
+        EMAILID: { type: integer }
+        USERID: { type: integer }
+        EMAILADDRESS: { type: string }
+        EMAILTYPE: { type: string }
+        ISPRIMARY: { type: boolean }
+        SORTORDER: { type: integer }
+
+    ExternalIdEntry:
+      type: object
+      required: [SYSTEMID, SYSTEMNAME, EXTERNALVALUE]
+      properties:
+        SYSTEMID: { type: integer }
+        SYSTEMNAME: { type: string }
+        EXTERNALVALUE: { type: string }
+
+    Image:
+      type: object
+      properties:
+        IMAGEID: { type: integer }
+        USERID: { type: integer }
+        IMAGEVARIANT: { type: string, description: "e.g. WEB_THUMB, WEB_PROFILE, KIOSK_ROSTER, KIOSK_PROFILE, KIOSK_NON_GRID, interactive_roster, LEGACY_ALUMNI." }
+        IMAGEURL: { type: string, description: "Rewritten through mediaConfig_service.normalizePublishedUrl() before being returned." }
+        IMAGEDESCRIPTION: { type: string }
+        IMAGEDIMENSIONS: { type: string }
+        SORTORDER: { type: integer }
+        USERIMAGESOURCEID: { type: ["integer", "null"] }
+        PUBLISHEDAT: { type: ["string", "null"], format: date-time }
+
+    DegreeFull:
+      type: object
+      properties:
+        DEGREEID: { type: integer }
+        USERID: { type: integer }
+        DEGREENAME: { type: string }
+        UNIVERSITY: { type: string }
+        GRADUATIONYEAR: { type: string, description: "Stored as NVARCHAR despite looking numeric — do not treat as an integer." }
+        ISUHCO: { type: boolean }
+        ISENROLLED: { type: ["boolean", "null"] }
+        HASYEARCHANGE: { type: ["boolean", "null"] }
+        ORIGINALEXPECTEDGRADYEAR: { type: ["integer", "null"] }
+        EXPECTEDGRADYEAR: { type: ["integer", "null"] }
+        PROGRAM: { type: ["string", "null"] }
+      description: >
+        This is one of FOUR distinct "degree" shapes in this API — see QuickpullAttendingItem (plain
+        string), QuickpullGradClassItem (comma-joined string excluding "B.S."), and
+        QuickpullGraduateDegreeItem (a leaner array shape) for the others. Do not assume DEGREES means
+        the same thing across endpoints.
+
+    Award:
+      type: object
+      required: [AWARDID, USERID, AWARDNAME, AWARDTYPE]
+      properties:
+        AWARDID: { type: integer }
+        USERID: { type: integer }
+        AWARDNAME: { type: string }
+        AWARDTYPE: { type: string }
+
+    AcademicInfo:
+      type: object
+      properties:
+        USERID: { type: integer }
+        CURRENTGRADYEAR: { type: ["integer", "null"] }
+        ORIGINALGRADYEAR: { type: ["integer", "null"] }
+      description: All fields absent (object is {}) when no UserAcademicInfo row exists for the person.
+
+    StudentProfile:
+      type: object
+      properties:
+        USERID: { type: integer }
+        FIRSTEXTERNSHIP: { type: string }
+        SECONDEXTERNSHIP: { type: string }
+        COMMENCEMENTAGE: { type: ["integer", "null"] }
+        DISSERTATIONTHESIS: { type: ["string", "null"] }
+        HOMETOWNCITY: { type: string }
+        HOMETOWNSTATE: { type: string }
+        UPDATEDAT: { type: ["string", "null"], format: date-time }
+      description: All fields absent (object is {}) when no UserStudentProfile row exists.
+
+    StudentProfileWithHometown:
+      allOf:
+        - $ref: "#/components/schemas/StudentProfile"
+        - type: object
+          properties:
+            HometownFull: { type: string, description: "camelCase key, computed only on GET /people/{id} as \"City, ST\" / \"City\" / \"State\" / \"\"." }
+      description: Only used embedded in PersonProfile.studentProfile — GET /people/{id}/studentprofile returns the plain StudentProfile without this extra field.
+
+    Bio:
+      type: object
+      properties:
+        USERID: { type: integer }
+        BIOCONTENT: { type: string, description: "HTML sanitized to a whitelist: p, strong, em, a, ul, ol, li, br, b, i, u, s." }
+        UPDATEDAT: { type: ["string", "null"], format: date-time }
+      description: All fields absent (object is {}) when no UserBio row exists.
+
+    PublicationConfig:
+      type: object
+      required: [maxShowcasedPerUser, isEligibleFaculty, allowedFlags]
+      properties:
+        maxShowcasedPerUser: { type: integer }
+        isEligibleFaculty: { type: boolean }
+        allowedFlags: { type: array, items: { type: string } }
+
+    ResidencyEntry:
+      type: object
+      properties:
+        RESIDENCYID: { type: integer }
+        USERID: { type: integer }
+        LOCATION: { type: string }
+        SPECIALTY: { type: string }
+        STARTINGYEAR: { type: integer }
+        ISUHCO: { type: boolean }
+        ISCURRENT: { type: boolean }
+        SORTORDER: { type: integer }
+
+    AccessAreaRef:
+      type: object
+      required: [ACCESSNAME]
+      properties:
+        ACCESSNAME: { type: string }
+
+    OpaqueRecord:
+      type: object
+      additionalProperties: true
+      description: >
+        Shape not fully audited in this pass (publications/publicationProfiles/publicationFetchSummary
+        /showcased-publications records) — field set observed to vary; treat as an opaque object bag
+        rather than a closed schema.
+
+    PrimaryEmailRef:
+      type: object
+      properties:
+        EMAIL: { type: string }
+        TYPE: { type: string }
+        PRIMARY: { type: boolean }
+      description: "May be an empty object {} if the person has no primary email."
+
+    PrimaryPhoneRef:
+      type: object
+      properties:
+        PHONE: { type: string }
+        TYPE: { type: string }
+        PRIMARY: { type: boolean }
+      description: "May be an empty object {} if the person has no primary phone."
+
+    PersonSummary:
+      type: object
+      required: [USERID, NAMES, FLAGS, ORGANIZATIONS, DEGREES, COMBINEDDEGREES, SHOWCASED_PUBLICATIONS, ADDRESSES]
+      properties:
+        USERID: { type: integer }
+        PRONOUNS: { type: string }
+        UH_API_ID: { type: string }
+        TITLE1: { type: string }
+        TITLE2: { type: string }
+        TITLE3: { type: string }
+        ROOM: { type: string }
+        BUILDING: { type: string }
+        PREFIX: { type: string }
+        SUFFIX: { type: string }
+        CAMPUS: { type: string }
+        DIVISION: { type: string }
+        DIVISIONNAME: { type: string }
+        DEPARTMENT: { type: string }
+        DEPARTMENTNAME: { type: string }
+        MAILCODE: { type: string }
+        DOB: { type: ["string", "null"], format: date }
+        GENDER: { type: ["string", "null"] }
+        ACTIVE: { type: boolean, description: "Always true on this endpoint — the list is pre-filtered to Active=1." }
+        NOTES: { type: string }
+        DROPBOXFOLDERPATH: { type: string }
+        CREATEDAT: { type: string, format: date-time }
+        UPDATEDAT: { type: string, format: date-time }
+        CURRENTGRADYEAR: { type: ["integer", "null"] }
+        PROGRAM: { type: ["string", "null"], description: "Populated only if the user belongs to an OD/MS/PhD Program org and holds Current-Student or Alumni." }
+        WEBTHUMBURL: { type: ["string", "null"] }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+        FLAGS:
+          type: array
+          items: { $ref: "#/components/schemas/Flag" }
+          description: Row-level secret gating applies to whether a PERSON appears in the list at all — flags on a visible person are never individually stripped.
+        ORGANIZATIONS:
+          type: array
+          items: { $ref: "#/components/schemas/OrganizationReduced" }
+        PRIMARYEMAIL: { $ref: "#/components/schemas/PrimaryEmailRef" }
+        PRIMARYPHONE: { $ref: "#/components/schemas/PrimaryPhoneRef" }
+        ADDRESSES:
+          type: array
+          items: { $ref: "#/components/schemas/Address" }
+          maxItems: 1
+          description: Always an array, but contains at most the one primary/first address.
+        DEGREES:
+          type: array
+          items: { $ref: "#/components/schemas/DegreeFull" }
+          description: Overwrites the raw Users.Degrees composite string with a structured array — contrast with PersonProfile.user.DEGREES, which stays a raw string.
+        COMBINEDDEGREES: { type: string, description: "Comma-joined DEGREENAMEs; may be empty." }
+        SHOWCASED_PUBLICATIONS:
+          type: array
+          items: { $ref: "#/components/schemas/OpaqueRecord" }
+
+    UserRow:
+      type: object
+      required: [USERID, NAMES, DEGREES]
+      properties:
+        USERID: { type: integer }
+        PRONOUNS: { type: string }
+        UH_API_ID: { type: string }
+        TITLE1: { type: string }
+        TITLE2: { type: string }
+        TITLE3: { type: string }
+        ROOM: { type: string }
+        BUILDING: { type: string }
+        PREFIX: { type: string }
+        SUFFIX: { type: string }
+        CAMPUS: { type: string }
+        DIVISION: { type: string }
+        DIVISIONNAME: { type: string }
+        DEPARTMENT: { type: string }
+        DEPARTMENTNAME: { type: string }
+        MAILCODE: { type: string }
+        DOB: { type: ["string", "null"], format: date }
+        GENDER: { type: ["string", "null"] }
+        ACTIVE: { type: boolean }
+        NOTES: { type: string }
+        DROPBOXFOLDERPATH: { type: string }
+        CREATEDAT: { type: string, format: date-time }
+        UPDATEDAT: { type: string, format: date-time }
+        CURRENTGRADYEAR: { type: ["integer", "null"] }
+        PROGRAM: { type: ["string", "null"] }
+        WEBTHUMBURL: { type: ["string", "null"] }
+        DEGREES:
+          type: string
+          description: >
+            Raw Users.Degrees composite string — NOT overwritten into an array here, unlike
+            PersonSummary.DEGREES on the /people list endpoint. A real shape inconsistency between the
+            two endpoints, documented rather than hidden.
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+      description: >
+        FIRSTNAME, MIDDLENAME, LASTNAME, FULLNAME, PREFERREDNAME, MAIDENNAME, and EMAILPRIMARY are
+        deliberately stripped from this object (name data lives in NAMES; email lives in the sibling
+        top-level "emails" array on PersonProfile). Note this object has its OWN NAMES array, distinct
+        from — and duplicating — the top-level PersonProfile.NAMES array.
+
+    PersonProfile:
+      type: object
+      required: [user, flags, organizations, addresses, phones, images, externalIDs, access, emails, degrees, residencies, awards, publicationProfiles, publications, publicationFetchSummary, publicationConfig, NAMES, SHOWCASED_PUBLICATIONS]
+      properties:
+        user: { $ref: "#/components/schemas/UserRow" }
+        flags: { type: array, items: { $ref: "#/components/schemas/Flag" } }
+        organizations: { type: array, items: { $ref: "#/components/schemas/OrganizationWithRole" }, description: "Full org rows, not secret-gated." }
+        addresses: { type: array, items: { $ref: "#/components/schemas/Address" } }
+        phones: { type: array, items: { $ref: "#/components/schemas/Phone" } }
+        images: { type: array, items: { $ref: "#/components/schemas/Image" } }
+        academic: { $ref: "#/components/schemas/AcademicInfo" }
+        externalIDs: { type: array, items: { $ref: "#/components/schemas/ExternalIdEntry" } }
+        access: { type: array, items: { $ref: "#/components/schemas/AccessAreaRef" } }
+        emails: { type: array, items: { $ref: "#/components/schemas/Email" } }
+        degrees: { type: array, items: { $ref: "#/components/schemas/DegreeFull" } }
+        studentProfile: { $ref: "#/components/schemas/StudentProfileWithHometown" }
+        residencies: { type: array, items: { $ref: "#/components/schemas/ResidencyEntry" } }
+        awards: { type: array, items: { $ref: "#/components/schemas/Award" } }
+        bio: { $ref: "#/components/schemas/Bio" }
+        publicationProfiles: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
+        publications: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
+        publicationFetchSummary: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
+        publicationConfig: { $ref: "#/components/schemas/PublicationConfig" }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+          description: Top-level name envelope, duplicating user.NAMES (see UserRow note) — an observed quirk, not intentional design.
+        SHOWCASED_PUBLICATIONS: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
+      description: Returned bare (no wrapper) by GET /people/{id}.
+
+    QuickpullAttendingItem:
+      type: object
+      required: [USERID, DEGREES, NAMES]
+      additionalProperties: true
+      properties:
+        USERID: { type: integer }
+        DEGREES: { type: string, description: "Raw Users.Degrees composite string, not the structured array used elsewhere." }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+      description: >
+        additionalProperties allows for admin-configurable extra fields (Settings → UHCO API →
+        Quickpulls) not represented in this base schema — see the operation description.
+
+    QuickpullDeansItem:
+      type: object
+      required: [USERID, KIOSKNONGRIDIMAGE, NAMES]
+      additionalProperties: true
+      properties:
+        USERID: { type: integer }
+        KIOSKNONGRIDIMAGE: { type: string, description: "Empty string if no KIOSK_NON_GRID image variant exists." }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+      description: >
+        TITLE1 is NOT included by default despite legacy documentation claiming it is — see the
+        operation description. additionalProperties allows for admin-configured extra fields.
+
+    QuickpullGradClassItem:
+      type: object
+      required: [USERID, PROGRAM, KIOSKROSTERIMAGE, KIOSKPROFILEIMAGE, FIRSTEXTERNSHIP, SECONDEXTERNSHIP, DISSERTATIONTHESIS, HOMETOWNFULL, DEGREES, NAMES]
+      patternProperties:
+        "^AWARDNAME\\d+$":
+          type: string
+          description: >
+            Non-standard: one dynamically-numbered key per award the user has (AWARDNAME1,
+            AWARDNAME2, ...), 1-indexed, present only when the user has ≥1 award. Not representable
+            as a fixed property list — this is a real API design quirk, not a documentation
+            simplification.
+      additionalProperties: true
+      properties:
+        USERID: { type: integer }
+        PROGRAM: { type: string, description: "Comma-joined list of matching program org names, e.g. \"MS Program, OD Program\"." }
+        KIOSKROSTERIMAGE: { type: string }
+        KIOSKPROFILEIMAGE: { type: string }
+        FIRSTEXTERNSHIP: { type: string }
+        SECONDEXTERNSHIP: { type: string }
+        DISSERTATIONTHESIS: { type: string }
+        HOMETOWNFULL: { type: string, description: "\"City, State\", \"City\", \"State\", or \"\"." }
+        DEGREES: { type: string, description: "Comma-joined DegreeName list, excluding any degree literally named \"B.S.\" — a third, distinct DEGREES shape." }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+
+    QuickpullGraduateDegreeItem:
+      type: object
+      required: [USERID, DEGREENAME, UNIVERSITY, GRADUATIONYEAR]
+      properties:
+        USERID: { type: integer }
+        DEGREENAME: { type: string }
+        UNIVERSITY: { type: string }
+        GRADUATIONYEAR: { type: string }
+      description: A fourth, distinct DEGREES item shape — leaner than DegreeFull, used only inside QuickpullGraduateData.DEGREES.
+
+    QuickpullGraduateData:
+      type: object
+      additionalProperties: true
+      properties:
+        USERID: { type: integer }
+        CURRENTGRADYEAR: { type: ["string", "integer", "null"], description: "Raw passthrough from UserAcademicInfo, no explicit cast — treat as loosely typed." }
+        FIRSTEXTERNSHIP: { type: string }
+        SECONDEXTERNSHIP: { type: string }
+        HOMETOWNCITY: { type: string }
+        HOMETOWNSTATE: { type: string }
+        DEGREES: { type: array, items: { $ref: "#/components/schemas/QuickpullGraduateDegreeItem" } }
+        AWARDS: { type: array, items: { $ref: "#/components/schemas/Award" } }
+        INTERACTIVEUSERIMAGE: { type: string }
+        KIOSKROSTERIMAGE: { type: string }
+        KIOSKPROFILEIMAGE: { type: string }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+      description: >
+        May be an entirely empty object {} (see the /quickpulls/graduate operation description). If
+        the admin has configured DEGREES/AWARDS as biographical items for this quickpull type, both
+        get overwritten with the richer full-profile shapes (DegreeFull / Award) instead of
+        QuickpullGraduateDegreeItem — verify against live AppConfig for your environment.
+
+    QuickpullMyUHCOData:
+      type: object
+      additionalProperties: true
+      properties:
+        USERID: { type: integer }
+        PREFIX: { type: string }
+        SUFFIX: { type: string }
+        PRONOUNS: { type: string }
+        PREFERREDNAME: { type: string }
+        MAIDENNAME: { type: string }
+        EMAILPRIMARY: { type: string }
+        TITLE1: { type: string }
+        TITLE2: { type: string }
+        TITLE3: { type: string }
+        DIVISION: { type: string }
+        DIVISIONNAME: { type: string }
+        DEPARTMENT: { type: string }
+        DEPARTMENTNAME: { type: string }
+        BUILDING: { type: string }
+        ROOM: { type: string }
+        MAILCODE: { type: string }
+        CAMPUS: { type: string }
+        OFFICE_MAILING_ADDRESS: { type: string }
+        PHONE: { type: string }
+        ACTIVE: { type: boolean }
+        DEGREES:
+          type: array
+          items: { $ref: "#/components/schemas/DegreeFull" }
+          description: A fifth DEGREES shape context — here overwritten to the full directory_service.getDegrees() array, not the raw Users.Degrees string.
+        FLAGS: { type: array, items: { $ref: "#/components/schemas/Flag" } }
+        ORGANIZATIONS: { type: array, items: { $ref: "#/components/schemas/OrganizationWithRole" } }
+        CURRENTGRADYEAR: { type: string, description: "String (possibly empty \"\") here, unlike the integer/null used elsewhere — forced to \"\" when the matched user isn't Alumni/Current-Student." }
+        WEBPROFILEIMAGE: { type: string }
+        WEBTHUMBIMAGE: { type: string }
+        NAMES:
+          type: array
+          items: { $ref: "#/components/schemas/NameEnvelopeItem" }
+          minItems: 1
+          maxItems: 1
+      description: >
+        Effectively the ENTIRE Users database table row (SELECT u.*) plus quickpull-specific
+        additions — this is not a lean curated subset like the other QuickPulls types. The properties
+        listed above are every Users column observed elsewhere in this codebase, but that list is NOT
+        guaranteed complete without direct database schema introspection (no DDL exists in this repo);
+        additionalProperties:true is set deliberately to be honest about that gap.
+
+    RosterFile:
+      type: object
+      required: [FILENAME, GRADYEAR, SIZEKB, LOCALURL, PUBLISHED]
+      properties:
+        FILENAME: { type: string, description: "Matches class-of-(\\d{4})-roster.pdf." }
+        GRADYEAR: { type: integer }
+        SIZEKB: { type: number }
+        DATELASTMODIFIED: { type: ["string", "null"], description: "ISO-ish yyyy-mm-dd'T'HH:nn:ss, or \"\" if unavailable." }
+        LOCALURL: { type: string, description: "/_temp_rosters/{filename}" }
+        PUBLISHED: { type: boolean }
+        LASTPUBLISHSTATUS: { type: string }
+        LASTPUBLISHATTEMPTAT: { type: string }
+        LASTPUBLISHEDAT: { type: string }
+        LASTPUBLISHEDPATH: { type: string }
+        LASTERROR: { type: string }
+      description: Sourced from the filesystem (/_temp_rosters) and a .publish-status.json sidecar, not the database.
+
+    AccessResponse:
+      type: object
+      required: [userID, permissions]
+      properties:
+        userID: { type: integer }
+        permissions:
+          type: array
+          items: { type: string }
+          description: List of AccessName strings; empty array if the user has no active, non-expired permission assignments.
+
+    PermissionRosterUser:
+      type: object
+      required: [USERID, PRIMARYNAME, PRIMARYEMAIL, COUGARNETID]
+      properties:
+        USERID: { type: integer }
+        PRIMARYNAME: { type: string }
+        PRIMARYEMAIL: { type: string }
+        COUGARNETID: { type: string }
+
+    PermissionRosterResponse:
+      type: object
+      required: [permission, total, users]
+      properties:
+        permission: { type: string }
+        total: { type: integer }
+        users: { type: array, items: { $ref: "#/components/schemas/PermissionRosterUser" } }
