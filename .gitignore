@@ -8,7 +8,10 @@ xml/
 scripts/
 x_attending_wallboard/
 z_data_dumps/
-dev/
+dev/*
+!dev/sql
+dev/sql/*
+!dev/sql/migrations
 _dev/
 node_modules/
 
