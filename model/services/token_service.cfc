@@ -2,6 +2,7 @@ component output="false" singleton {
 
     public any function init() {
         variables.dao = createObject("component", "dao.tokens_DAO").init();
+        variables.ipMatch = createObject("component", "cfc.ipMatch_service").init();
         return this;
     }
 
@@ -48,18 +49,9 @@ component output="false" singleton {
 
         // 4. IP allowlist
         var ips = trim(tok.ALLOWEDIPS ?: "");
-        if (len(ips)) {
-            var allowed = false;
-            for (var cidr in listToArray(ips, ",")) {
-                if (ipMatchesCIDR(trim(arguments.remoteIP), trim(cidr))) {
-                    allowed = true;
-                    break;
-                }
-            }
-            if (!allowed) {
-                result.reason = "IP not permitted";
-                return result;
-            }
+        if (len(ips) && !variables.ipMatch.ipMatchesAny(trim(arguments.remoteIP), ips)) {
+            result.reason = "IP not permitted";
+            return result;
         }
 
         // 5. Scope check
@@ -116,34 +108,5 @@ component output="false" singleton {
 
     private string function hashToken( required string raw ) {
         return lCase(hash(arguments.raw, "SHA-256"));
-    }
-
-    /**
-     * Basic IP / CIDR matcher supporting exact IPs and /prefix notation.
-     * Handles IPv4 only (sufficient for internal university use).
-     */
-    private boolean function ipMatchesCIDR( required string ip, required string cidr ) {
-        // Exact match shortcut
-        if (arguments.ip == arguments.cidr) return true;
-
-        if (!find("/", arguments.cidr)) return false;
-
-        var parts      = listToArray(arguments.cidr, "/");
-        var networkIP  = parts[1];
-        var prefixLen  = val(parts[2]);
-
-        var ipLong  = ipToLong(arguments.ip);
-        var netLong = ipToLong(networkIP);
-        var mask    = bitSHLN(javaCast("long", -1), javaCast("long", 32 - prefixLen));
-
-        return bitAnd(ipLong, mask) == bitAnd(netLong, mask);
-    }
-
-    private numeric function ipToLong( required string ip ) {
-        var octets = listToArray(arguments.ip, ".");
-        return (val(octets[1]) * 16777216)
-             + (val(octets[2]) * 65536)
-             + (val(octets[3]) * 256)
-             +  val(octets[4]);
     }
 }

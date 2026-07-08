@@ -22,20 +22,12 @@ component output="false" {
             admin : "UHCO_Identity_API"
         };
 
-        // UH API credentials
-        application.uhApiToken  = "";
-        application.uhApiSecret = "";
-        if (
-            structKeyExists(server, "system")
-            AND structKeyExists(server.system, "environment")
-        ) {
-            if (structKeyExists(server.system.environment, "UH_API_TOKEN")) {
-                application.uhApiToken = trim(server.system.environment["UH_API_TOKEN"]);
-            }
-            if (structKeyExists(server.system.environment, "UH_API_SECRET")) {
-                application.uhApiSecret = trim(server.system.environment["UH_API_SECRET"]);
-            }
-        }
+        application.runtimeSecretPolicyService = createObject("component", "cfc.runtimeSecretPolicy_service").init();
+        application.corsService = createObject("component", "cfc.cors_service").init();
+
+        var uhApiCredentials = application.runtimeSecretPolicyService.getUHApiCredentials();
+        application.uhApiToken = uhApiCredentials.token;
+        application.uhApiSecret = uhApiCredentials.secret;
 
         return true;
     }
@@ -49,42 +41,35 @@ component output="false" {
         }
 
         // Safety: ensure onApplicationStart() has run
-        if (!structKeyExists(application, "datasource")) {
+        if (!structKeyExists(application, "datasource") OR !structKeyExists(application, "runtimeSecretPolicyService")) {
             onApplicationStart();
         }
 
         cfsetting(showDebugOutput = false);
 
         // ── CORS handling ──────────────────────────────────────────────
-        var headers = getHttpRequestData().headers;
-        var origin  = "";
+        // Decision logic (baseline *.opt.uh.edu, admin domain whitelist, and
+        // the optional admin IP-range trust check) lives in cors_service.cfc.
+        var headers  = getHttpRequestData().headers;
+        var origin   = "";
+        var remoteIP = trim(CGI.REMOTE_ADDR ?: "");
 
         if (structKeyExists(headers, "Origin")) {
             origin = trim(headers.Origin);
         }
 
-        // Allowed origins: any subdomain of opt.uh.edu (https or http).
-        // Add explicit entries below for hosts outside this pattern.
-        var allowedPattern  = "^https?://([a-z0-9-]+\.)*opt\.uh\.edu$";
-        var explicitAllowed = [
-            "https://www.opt.uh.edu",
-            "https://www2.opt.uh.edu",
-            "http://www.opt.uh.edu",
-            "http://www2.opt.uh.edu"
-        ];
-
-        var originAllowed = len(origin)
-            && ( reFindNoCase(allowedPattern, origin) || arrayFindNoCase(explicitAllowed, origin) );
+        var originAllowed = application.corsService.isOriginAllowed(origin, remoteIP);
 
         if (originAllowed) {
             cfheader(name="Access-Control-Allow-Origin", value=origin);
             cfheader(name="Vary", value="Origin");
+            cfheader(name="Access-Control-Expose-Headers", value="X-UHCO-Directory-Api-Base, X-UHCO-Directory-Authorization");
         }
 
         // HARD STOP for preflight
         if (cgi.request_method EQ "OPTIONS") {
             cfheader(name="Access-Control-Allow-Methods", value="GET, POST, PUT, DELETE, OPTIONS");
-            cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Authorization");
+            cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Authorization, X-API-Secret");
             cfheader(name="Access-Control-Max-Age", value="86400");
             cfabort;
         }
@@ -96,14 +81,29 @@ component output="false" {
         request.siteBaseUrl = _getRequestBaseUrl();
         request.environmentName = _getEnvironmentName();
         request.isProduction = (request.environmentName EQ "production");
+        request.runtimeSecretPolicy = application.runtimeSecretPolicyService;
+        request.runtimeSecretHealth = application.runtimeSecretPolicyService.getHealthStatus(request.environmentName);
+        request.runtimeSecretPolicyReady = request.runtimeSecretHealth.ready;
         request.uhApiToken  = application.uhApiToken;
         request.uhApiSecret = application.uhApiSecret;
+
+        // ── Response identification headers ──────────────────────────
+        // Echoes the base URL this request was served from, and the bearer
+        // token the caller sent (unvalidated), so multi-environment/proxy
+        // clients can confirm what they actually hit.
+        cfheader(name="X-UHCO-Directory-Api-Base", value=request.siteBaseUrl & "/api/v1");
+
+        var callerAuthHeader = CGI.HTTP_AUTHORIZATION ?: "";
+        if (reFindNoCase("^Bearer\s+\S+", trim(callerAuthHeader))) {
+            cfheader(name="X-UHCO-Directory-Authorization", value=trim(reReplaceNoCase(callerAuthHeader, "^Bearer\s+", "")));
+        }
 
         return true;
     }
 
     private string function _getEnvironmentName() {
         var host = lCase(trim(cgi.http_host ?: cgi.server_name ?: ""));
+        var localHosts = "127.0.0.1,localhost,uhco-identity.local";
 
         if (!len(host)) {
             return "local";
@@ -111,7 +111,7 @@ component output="false" {
 
         host = listFirst(host, ":");
 
-        if (listFindNoCase("127.0.0.1,localhost", host)) {
+        if (listFindNoCase(localHosts, host)) {
             return "local";
         }
 

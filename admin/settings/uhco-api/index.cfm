@@ -12,18 +12,25 @@
 
 <cfset tokenService  = createObject("component", "cfc.token_service").init()>
 <cfset secretService = createObject("component", "cfc.secret_service").init()>
+<cfset corsService   = createObject("component", "cfc.cors_service").init()>
 <cfset tokens  = tokenService.getAllTokens()>
 <cfset secrets = secretService.getAllSecrets()>
+<cfset corsOrigins  = corsService.getAllOrigins().data>
+<cfset corsIPRanges = corsService.getAllIPRanges().data>
 <cfset actionMessage = trim(url.msg ?: "")>
 <cfset actionError = trim(url.error ?: "")>
 
 <cfset activeTokens  = 0>
 <cfset activeSecrets = 0>
+<cfset activeCorsOrigins = 0>
 <cfloop array="#tokens#" index="t">
     <cfif t.ISACTIVE EQ 1><cfset activeTokens++></cfif>
 </cfloop>
 <cfloop array="#secrets#" index="s">
     <cfif s.ISACTIVE><cfset activeSecrets++></cfif>
+</cfloop>
+<cfloop array="#corsOrigins#" index="co">
+    <cfif co.ISACTIVE><cfset activeCorsOrigins++></cfif>
 </cfloop>
 
 <cfset content = "">
@@ -44,13 +51,6 @@
     <div class="mb-3">
         <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
     </div>
-</cfif>
-
-<cfif len(actionMessage)>
-    <div class="alert alert-success">#encodeForHTML(actionMessage)#</div>
-</cfif>
-<cfif len(actionError)>
-    <div class="alert alert-danger">#encodeForHTML(actionError)#</div>
 </cfif>
 
 <div class="row g-4">
@@ -98,7 +98,7 @@
     </div>
 
     <!--- Quickpull Settings Card --->
-    <div class="col-lg-4 col-md-12">
+    <div class="col-lg-4 col-md-6">
         <a href="quickpulls/index.cfm" class="text-decoration-none">
             <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--success">
                 <div class="card-body">
@@ -118,6 +118,28 @@
         </a>
     </div>
 
+    <!--- CORS Whitelist Card --->
+    <div class="col-lg-4 col-md-6">
+        <a href="cors/index.cfm" class="text-decoration-none">
+            <div class="card h-100 shadow-sm settings-hub-card settings-hub-card--info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="bi bi-globe2 fs-2 me-3 settings-hub-icon settings-hub-icon--info"></i>
+                        <div>
+                            <h5 class="card-title text-dark mb-0">CORS Whitelist</h5>
+                            <p class="card-text text-muted small mb-0">Trust additional origins or IP ranges for cross-origin API calls</p>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="badge settings-badge-primary-soft fs-6">#arrayLen(corsOrigins)# origins</span>
+                        <span class="badge settings-badge-success-soft fs-6">#activeCorsOrigins# active</span>
+                        <span class="badge settings-badge-neutral fs-6">#arrayLen(corsIPRanges)# IP ranges</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
 </div>
 
 <!--- Documentation link --->
@@ -128,7 +150,7 @@
             <h6 class="mb-0">API Documentation</h6>
             <p class="text-muted small mb-0">View endpoint reference, usage examples, and authentication details.</p>
         </div>
-        <a href="/api/docs.html" target="_blank" class="btn btn-outline-secondary ms-auto">
+        <a href="/api/docs.html" target="_blank" class="btn btn-ui-help ms-auto">
             <i class="bi bi-box-arrow-up-right me-1"></i>Open Docs
         </a>
     </div>
@@ -136,6 +158,23 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(actionError)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionError)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 
