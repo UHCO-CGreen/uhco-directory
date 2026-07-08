@@ -41,7 +41,7 @@ component output="false" {
         }
 
         // Safety: ensure onApplicationStart() has run
-        if (!structKeyExists(application, "datasource") OR !structKeyExists(application, "runtimeSecretPolicyService")) {
+        if (!structKeyExists(application, "datasource") OR !structKeyExists(application, "runtimeSecretPolicyService") OR !structKeyExists(application, "corsService")) {
             onApplicationStart();
         }
 
