@@ -2,6 +2,7 @@ component output="false" singleton {
 
     public any function init() {
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
+        variables.runtimeSecretPolicyService = createObject("component", "cfc.runtimeSecretPolicy_service").init();
         variables.defaultServer = "cougarnet.uh.edu";
         variables.defaultStartDN = "OU=Master Users,DC=cougarnet,DC=uh,DC=edu";
         return this;
@@ -157,7 +158,7 @@ component output="false" singleton {
     }
 
     private string function _getBindUsername() {
-        var v = trim(variables.appConfigService.getValue("ldap.cougarnet.bind_username", ""));
+        var v = variables.runtimeSecretPolicyService.getLdapBindUsername();
         if (!len(v)) {
             throw(type = "LdapLookup.MissingConfig", message = "Missing AppConfig key ldap.cougarnet.bind_username.");
         }
@@ -182,7 +183,7 @@ component output="false" singleton {
     }
 
     private string function _getBindPassword() {
-        var v = trim(variables.appConfigService.getValue("ldap.cougarnet.bind_password", ""));
+        var v = variables.runtimeSecretPolicyService.getLdapBindPassword();
         if (!len(v)) {
             throw(type = "LdapLookup.MissingConfig", message = "Missing AppConfig key ldap.cougarnet.bind_password.");
         }

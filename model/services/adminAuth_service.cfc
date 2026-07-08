@@ -7,6 +7,8 @@ component output="false" {
 
     public any function init() {
         variables.dao = createObject("component", "dao.adminAuth_DAO").init();
+        variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
+        variables.runtimeSecretPolicyService = createObject("component", "cfc.runtimeSecretPolicy_service").init();
         return this;
     }
 
@@ -451,8 +453,16 @@ component output="false" {
 
     private struct function validateCougarnet(required string username) {
         var result = { found = false, displayName = "", detail = "" };
+        var bindUsername = variables.runtimeSecretPolicyService.getLdapBindUsername();
+        var bindPassword = variables.runtimeSecretPolicyService.getLdapBindPassword();
         try {
             var qUser = "";
+
+            if (!len(bindUsername) || !len(bindPassword)) {
+                result.detail = "LDAP bind credentials are not configured.";
+                return result;
+            }
+
             cfldap(
                 action      = "QUERY",
                 name        = "qUser",
@@ -462,8 +472,8 @@ component output="false" {
                 maxrows     = "1",
                 server      = "cougarnet.uh.edu",
                 filter      = "(&(objectClass=user)(sAMAccountName=#arguments.username#))",
-                username    = "COUGARNET\uhcoweb",
-                password    = "5E9##WN!ag"
+                username    = bindUsername,
+                password    = bindPassword
             );
             if (qUser.recordCount GT 0) {
                 result.found       = true;

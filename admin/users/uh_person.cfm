@@ -11,6 +11,10 @@
 <cfparam name="form.createLastName" default="">
 <cfparam name="form.syncAll" default="0">
 
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/users/index.cfm">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
 <cfset uhApiId = trim(url.uhApiId ?: url.userID ?: "")>
 <cfset sourceUserID = trim(url.sourceUserID ?: "")>
 <cfif uhApiId EQ "" AND len(trim(form.uhApiId))>
@@ -19,14 +23,20 @@
 <cfif sourceUserID EQ "" AND len(trim(form.applySourceUserID))>
     <cfset sourceUserID = trim(form.applySourceUserID)>
 </cfif>
-<cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
 <cfset dbUser = {}>
 <cfset dbUserFound = false>
 <cfset dbFlags = []>
 <cfset dbFlagsLoaded = false>
 <cfset saveMessage = "">
 <cfset saveMessageClass = "">
+
+<cfif isNumeric(sourceUserID) AND val(sourceUserID) GT 0 AND NOT request.canAccessUserByID(val(sourceUserID))>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 
 <cfif cgi.request_method EQ "POST" AND (isNumeric(form.applySourceUserID) OR len(trim(form.uhApiId)))>
     <cfset applyUserID = isNumeric(form.applySourceUserID) ? val(form.applySourceUserID) : 0>
@@ -43,7 +53,17 @@
         </cfloop>
     </cfif>
 
+    <cfif applyUserID GT 0 AND NOT request.canAccessUserByID(applyUserID)>
+        <cfset saveMessage = "Unauthorized.">
+        <cfset saveMessageClass = "alert-danger">
+        <cfset applyUserID = 0>
+    </cfif>
+
     <cfif applyUserID LTE 0 AND len(trim(form.uhApiId)) AND len(trim(form.createFirstName)) AND len(trim(form.createLastName))>
+        <cfif NOT request.canCreateUsers()>
+            <cfset saveMessage = "Unauthorized.">
+            <cfset saveMessageClass = "alert-danger">
+        <cfelse>
         <cfset createResult = usersService.createUser({
             FirstName = trim(form.createFirstName),
             MiddleName = "",
@@ -79,6 +99,7 @@
             <cfset saveMessage = "Unable to create local user: " & (createResult.message ?: "Unknown error")>
             <cfset saveMessageClass = "alert-danger">
         </cfif>
+        </cfif>
     </cfif>
 
     <cfif applyUserID LTE 0 AND saveMessage EQ "">
@@ -88,28 +109,15 @@
 
     <cfif applyUserID GT 0 AND form.syncAll EQ "1">
         <cfset syncUhApiId = trim(form.uhApiId ?: uhApiId)>
-        <cfset syncUhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
-        <cfset syncUhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
+        <cfset syncUhApiToken = uhApiToken>
+        <cfset syncUhApiSecret = uhApiSecret>
         <cfset syncApiPerson = {}>
         <cfset syncStatusCode = "Unknown">
 
-        <cfif (syncUhApiToken EQ "" OR syncUhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-            <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-                <cfset syncUhApiToken = trim(server.system.environment["UH_API_TOKEN"] )>
-            </cfif>
-            <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-                <cfset syncUhApiSecret = trim(server.system.environment["UH_API_SECRET"] )>
-            </cfif>
-        </cfif>
-
-        <cfif syncUhApiToken EQ "">
-            <cfset syncUhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-        </cfif>
-        <cfif syncUhApiSecret EQ "">
-            <cfset syncUhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
-        </cfif>
-
-        <cfif len(syncUhApiId) EQ 0>
+            <cfif syncUhApiToken EQ "" OR syncUhApiSecret EQ "">
+                <cfset saveMessage = "Sync All failed: UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.">
+                <cfset saveMessageClass = "alert-danger">
+            <cfelseif len(syncUhApiId) EQ 0>
             <cfset saveMessage = "Sync All failed: UH API ID is missing.">
             <cfset saveMessageClass = "alert-danger">
         <cfelse>
@@ -510,20 +518,10 @@
     </cfif>
 </cfif>
 
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken = trim(server.system.environment["UH_API_TOKEN"] )>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"] )>
-    </cfif>
-</cfif>
-
-<cfif uhApiToken EQ "">
-    <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-</cfif>
-<cfif uhApiSecret EQ "">
-    <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cfset content = "<h1>UH API Details</h1><div class='alert alert-danger'>UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.</div>">
+    <cfinclude template="/admin/layout.cfm">
+    <cfabort>
 </cfif>
 
 <cfset content = "
@@ -531,9 +529,9 @@
 " />
 
 <cfif sourceUserID NEQ "">
-    <cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-outline-secondary mb-3 me-2'>Back to User Details</a>">
+    <cfset content &= "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-sm btn-ui-cancel mb-3 me-2'>Back to User Details</a>">
 </cfif>
-<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-outline-secondary mb-3'>Back to All Users</a>">
+<cfset content &= "<a href='/admin/users/index.cfm' class='btn btn-sm btn-ui-cancel mb-3'>Back to All Users</a>">
 <cfif saveMessage NEQ "">
     <cfset content &= "<div class='alert #saveMessageClass# mt-3'>#EncodeForHTML(saveMessage)#</div>">
 </cfif>
@@ -823,7 +821,7 @@
                             <input type='hidden' name='uhApiId' value='#EncodeForHTMLAttribute(uhApiId)#'>
                             <input type='hidden' name='createFirstName' value='#EncodeForHTMLAttribute(apiCreateFirstName)#'>
                             <input type='hidden' name='createLastName' value='#EncodeForHTMLAttribute(apiCreateLastName)#'>
-                            <button type='submit' class='btn btn-sm btn-outline-primary'>Use API Value</button>
+                            <button type='submit' class='btn btn-sm btn-ui-save'>Use API Value</button>
                         </form>
                 ">
             <cfelse>
@@ -866,7 +864,7 @@
                             <input type='hidden' name='uhApiId' value='#EncodeForHTMLAttribute(uhApiId)#'>
                             <input type='hidden' name='createFirstName' value='#EncodeForHTMLAttribute(apiCreateFirstName)#'>
                             <input type='hidden' name='createLastName' value='#EncodeForHTMLAttribute(apiCreateLastName)#'>
-                            <button type='submit' class='btn btn-sm btn-outline-primary'>Sync Flag</button>
+                            <button type='submit' class='btn btn-sm btn-ui-save'>Sync Flag</button>
                         </form>
                 ">
             <cfelse>
@@ -906,7 +904,7 @@
                     <input type='hidden' name='uhApiId' value='#EncodeForHTMLAttribute(uhApiId)#'>
                     <input type='hidden' name='createFirstName' value='#EncodeForHTMLAttribute(apiCreateFirstName)#'>
                     <input type='hidden' name='createLastName' value='#EncodeForHTMLAttribute(apiCreateLastName)#'>
-                    <button type='submit' class='btn btn-lg btn-success'>Sync All Fields & Flags</button>
+                    <button type='submit' class='btn btn-lg btn-ui-save'>Sync All Fields & Flags</button>
                 </form>
             </div>
             ">
@@ -919,9 +917,9 @@
 
 <cfset content &= "
 <div class='mt-4'>
-    " & (sourceUserID != "" ? "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-primary'>Back to Profile</a>" : "") & "
-    <a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>
-    <a href='/admin/users/uh_people_import.cfm' class='btn btn-secondary'>Back to UH Import</a>
+    " & (sourceUserID != "" ? "<a href='/admin/users/view.cfm?userID=#urlEncodedFormat(sourceUserID)#' class='btn btn-ui-cancel'>Back to Profile</a>" : "") & "
+    <a href='/admin/users/index.cfm' class='btn btn-ui-cancel'>Back to Users</a>
+    <a href='/admin/users/uh_people_import.cfm' class='btn btn-ui-cancel'>Back to UH Import</a>
 </div>
 " />
 

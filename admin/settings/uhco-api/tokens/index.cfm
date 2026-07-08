@@ -1,4 +1,4 @@
-<cfif NOT request.hasPermission("settings.api.manage")>
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -77,16 +77,16 @@
         ">
 
         <cfif isActive AND !isExpired>
-            <cfset content &= "<form method='post' action='/admin/settings/uhco-api/tokens/revokeToken.cfm' class='d-inline' onsubmit=""return confirm('Revoke this token? The application will immediately lose access.')"">
+            <cfset content &= "<form method='post' action='/admin/settings/uhco-api/tokens/revokeToken.cfm' class='d-inline' data-confirm=""Revoke this token? The application will immediately lose access."">
                 <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                <button class='btn btn-sm btn-outline-warning' title='Revoke Token' data-bs-toggle='tooltip' data-bs-title='Revoke Token' aria-label='Revoke Token'><i class='bi bi-pause-circle'></i></button>
+                <button class='btn btn-sm btn-ui-warning' title='Revoke Token' data-bs-toggle='tooltip' data-bs-title='Revoke Token' aria-label='Revoke Token'><i class='bi bi-pause-circle'></i></button>
             </form>">
         </cfif>
 
         <cfset content &= "
-                <form method='post' action='/admin/settings/uhco-api/tokens/deleteToken.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this token record?')"">
+                <form method='post' action='/admin/settings/uhco-api/tokens/deleteToken.cfm' class='d-inline ms-1' data-confirm=""Permanently delete this token record?"">
                     <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                    <button class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Token' data-bs-toggle='tooltip' data-bs-title='Delete Token' aria-label='Delete Token'><i class='bi bi-trash'></i></button>
+                    <button class='btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete' title='Delete Token' data-bs-toggle='tooltip' data-bs-title='Delete Token' aria-label='Delete Token'><i class='bi bi-trash'></i></button>
                 </form>
                 </div>
             </td>

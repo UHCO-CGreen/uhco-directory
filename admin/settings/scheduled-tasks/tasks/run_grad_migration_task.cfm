@@ -1,4 +1,4 @@
-<cfsetting showdebugoutput="false">
+﻿<cfsetting showdebugoutput="false">
 <!---
     Scheduled-task wrapper for graduation migration.
 --->
@@ -11,4 +11,4 @@
 
 <cfinclude template="/admin/settings/scheduled-tasks/tasks/_scheduled_task_auth.cfm">
 
-<cfinclude template="/admin/settings/migrations/run_grad_migration.cfm">
+<cfinclude template="/admin/migrations/run_grad_migration.cfm">

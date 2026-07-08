@@ -44,6 +44,32 @@ component output="false" singleton {
         return { success=true, message="External ID saved." };
     }
 
+    public struct function deleteExternalID(
+        required numeric userID,
+        required numeric systemID
+    ) {
+        variables.ExternalIDsDAO.deleteExternalID(arguments.userID, arguments.systemID);
+        return { success=true, message="External ID removed." };
+    }
+
+    // Returns struct keyed by UserID → { lowerSystemName: externalValue, ... }
+    public struct function getAllUserExternalIDsMap() {
+        var allRows = variables.ExternalIDsDAO.getAllExternalIDs();
+        var allSystems = variables.ExternalSystemsDAO.getSystems();
+        var systemNames = {};
+        for ( var sys in allSystems ) {
+            systemNames[toString(sys.SYSTEMID)] = lCase(trim(sys.SYSTEMNAME ?: ""));
+        }
+        var result = {};
+        for ( var row in allRows ) {
+            var key = toString(row.USERID);
+            if ( !structKeyExists(result, key) ) result[key] = {};
+            var sysName = structKeyExists(systemNames, toString(row.SYSTEMID)) ? systemNames[toString(row.SYSTEMID)] : "";
+            if ( len(sysName) ) result[key][sysName] = trim(row.EXTERNALVALUE ?: "");
+        }
+        return result;
+    }
+
     // Returns struct keyed by ExternalValue (trimmed, lower-cased) → UserID, for a given SystemID
     public struct function getValueToUserMap( required numeric systemID ) {
         var rows = variables.ExternalIDsDAO.getAllExternalIDs();

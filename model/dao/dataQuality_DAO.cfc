@@ -229,8 +229,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                 FROM UserAliases ua
                 WHERE ua.UserID = u.UserID
                 ORDER BY
+                                        CASE
+                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                THEN 0 ELSE 1
+                                        END,
+                                        CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 2147483647),
                     ua.AliasID
              ) pa

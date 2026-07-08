@@ -11,6 +11,8 @@
     <cfset triggeredBy = trim(form.triggeredBy)>
 </cfif>
 
+<cfinclude template="/admin/settings/scheduled-tasks/tasks/_scheduled_task_auth.cfm">
+
 <cfset returnJson = structKeyExists(url, "format") AND lCase(trim(url.format ?: "")) EQ "json">
 <cfset scanMode = lCase(trim(url.scan ?: form.scan ?: ""))>
 <cfset stageMode = lCase(trim(url.stage ?: form.stage ?: ""))>
@@ -20,7 +22,7 @@
 </cfif>
 <cfset ruleMode = lCase(trim(url.mode ?: form.mode ?: ""))>
 
-<cfif lCase(triggeredBy) NEQ "scheduled" AND NOT application.authService.hasRole("SUPER_ADMIN")>
+<cfif lCase(triggeredBy) NEQ "scheduled" AND NOT application.authService.hasRole("SUPER_ADMIN") AND NOT request.hasPermission("reporting.duplicate_users.manage")>
     <cfif returnJson>
         <cfheader statuscode="403">
         <cfcontent type="application/json; charset=utf-8" reset="true"><cfoutput>#serializeJSON({ success=false, error="Super admin access is required." })#</cfoutput>

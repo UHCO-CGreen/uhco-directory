@@ -373,7 +373,7 @@ component output="false" singleton {
                 return { status = "error", message = oRes.message };
 
             case "student_academic":
-                variables.studentSvc.saveProfile(
+                variables.studentSvc.saveImportedAcademicProfile(
                     userID          = val(row.UserID),
                     hometownCity    = trim(row.HometownCity ?: ""),
                     hometownState   = trim(row.HometownState ?: ""),

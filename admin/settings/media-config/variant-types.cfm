@@ -1,4 +1,4 @@
-<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
+﻿<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
 <cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -146,6 +146,28 @@
     </cfloop>
 </cfif>
 
+<!--- Sort params --->
+<cfset allowedVtSortCols = ["CODE","DESCRIPTION","AUDIENCE","MODE","ISACTIVE"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedVtSortCols, url.sortCol) GT 0) ? url.sortCol : "CODE">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfscript>
+    arraySort(allTypes, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function vtSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        return "?sortCol=" & col & "&sortDir=" & dir;
+    }
+    function vtSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <!--- ═══════════════════════════════════════════════════════════════════════
      Page content
      ═══════════════════════════════════════════════════════════════════════ --->
@@ -167,15 +189,7 @@
 </div>
 ">
 
-<!--- ── Feedback ─────────────────────────────────────────────────────────── --->
-<cfif len(actionMessage)>
-    <cfset content &= "
-    <div class='alert #actionMessageClass# alert-dismissible fade show' role='alert'>
-        #actionMessage#
-        <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
-    </div>
-    ">
-</cfif>
+
 
 <!--- ═══════════════════════════════════════════════════════════════════════
      Add / Edit Form
@@ -284,14 +298,14 @@
             </div>
 
             <div class='mt-4 d-flex gap-2'>
-                <button type='submit' class='btn btn-primary'>
+                <button type='submit' class='btn #editMode ? "btn-ui-save" : "btn-ui-add"#'>
                     <i class='bi bi-check-lg me-1'></i> #editMode ? 'Update' : 'Create'#
                 </button>
 ">
 
 <cfif editMode>
     <cfset content &= "
-                <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-outline-secondary'>Cancel</a>
+                <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-ui-cancel'>Cancel</a>
     ">
 </cfif>
 
@@ -316,16 +330,16 @@
 <cfif arrayLen(allTypes) GT 0>
     <cfset content &= "
     <div class='table-responsive'>
-        <table class='table table-hover align-middle mb-0 settings-table'>
+        <table class='table table-sm table-hover align-middle mb-0 settings-table'>
             <thead>
                 <tr>
-                    <th>Code</th>
-                    <th>Description</th>
-                    <th>Audience</th>
+                    <th><a href='#vtSortLink("CODE")#' class='settings-sort-link'>Code#vtSortArrow("CODE")#</a></th>
+                    <th><a href='#vtSortLink("DESCRIPTION")#' class='settings-sort-link'>Description#vtSortArrow("DESCRIPTION")#</a></th>
+                    <th><a href='#vtSortLink("AUDIENCE")#' class='settings-sort-link'>Audience#vtSortArrow("AUDIENCE")#</a></th>
                     <th class='text-center'>Dimensions</th>
-                    <th>Mode</th>
+                    <th><a href='#vtSortLink("MODE")#' class='settings-sort-link'>Mode#vtSortArrow("MODE")#</a></th>
                     <th>Format</th>
-                    <th class='text-center'>Active</th>
+                    <th class='text-center'><a href='#vtSortLink("ISACTIVE")#' class='settings-sort-link'>Active#vtSortArrow("ISACTIVE")#</a></th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -360,10 +374,10 @@
                 <td class='text-center'>#vtActive ? '<span class="badge settings-badge-active">Active</span>' : '<span class="badge bg-secondary text-dark">Inactive</span>'#</td>
                 <td>
                     <div class='settings-action-group'>
-                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-edit users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
+                        <a href='/admin/settings/media-config/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit' title='Edit Variant Type' data-bs-toggle='tooltip' data-bs-title='Edit Variant Type' aria-label='Edit Variant Type'>
                             <i class='bi bi-pencil-square'></i>
                         </a>
-                        <button type='button' class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete'
+                        <button type='button' class='btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete'
                                 title='Delete Variant Type'
                                 aria-label='Delete Variant Type'
                                 data-bs-toggle='modal'
@@ -464,11 +478,11 @@
                 </ul>
             </div>
             <div class='modal-footer'>
-                <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Cancel</button>
+                <button type='button' class='btn btn-ui-cancel' data-bs-dismiss='modal'>Cancel</button>
                 <form method='post' class='d-inline'>
                     <input type='hidden' name='action' value='delete'>
                     <input type='hidden' name='imageVariantTypeID' id='deleteVtID' value=''>
-                    <button type='submit' class='btn btn-danger'>
+                    <button type='submit' class='btn btn-ui-delete'>
                         <i class='bi bi-trash me-1'></i> Delete Permanently
                     </button>
                 </form>
@@ -477,7 +491,7 @@
     </div>
 </div>
 
-            <script>
+            <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
             (function () {
                 'use strict';
                 var modeSelect = document.getElementById('vtMode');
@@ -526,7 +540,7 @@
             }());
             </script>
 
-            <script>
+            <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
             (function () {
                 'use strict';
                 var deleteModal = document.getElementById('deleteModal');
@@ -543,5 +557,20 @@
 ">
 
 <cfset content &= "</div>">
+
+<cfif len(actionMessage)>
+<cfset toastTone = actionMessageClass CONTAINS "success" ? "success" : (actionMessageClass CONTAINS "warning" ? "warning" : "danger")>
+</cfif>
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: '#toastTone#' });
+}
+</cfif>
+</script>
+</cfoutput>
+</cfsavecontent>
 
 <cfinclude template="/admin/layout.cfm">

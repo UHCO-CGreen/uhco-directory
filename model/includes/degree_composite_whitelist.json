@@ -1,0 +1,19 @@
+{
+  "degrees": [
+    { "display": "OD", "aliases": ["OD", "O.D.", "Doctor of Optometry"] },
+    { "display": "PHD", "aliases": ["PHD", "PH.D.", "PhD", "Ph.D.", "Doctor of Philosophy"] },
+    { "display": "MS", "aliases": ["MS", "M.S.", "Master of Science"] },
+    { "display": "MPH", "aliases": ["MPH", "M.P.H.", "Master of Public Health"] },
+    { "display": "Pharm.D", "aliases": ["PHARMD", "PHARM.D", "PharmD", "Pharm.D", "Doctor of Pharmacy"] },
+    { "display": "MD", "aliases": ["MD", "M.D.", "Doctor of Medicine"] },
+    { "display": "MBA", "aliases": ["MBA", "M.B.A.", "Master of Business Administration"] },
+    { "display": "MSc(Optom)", "aliases": ["MSCOPTOM", "MSC(OPTOM)", "MSc(Optom)", "Master of Science (Optometry)"] },
+    { "display": "Ed.D", "aliases": ["EDD", "ED.D", "ED.D.", "Ed.D", "Ed.D.", "Doctor of Education"] },
+    { "display": "RN", "aliases": ["RN", "Registered Nurse"] },
+    { "display": "MCOptom", "aliases": ["MCOPTOM", "MCOptom"] },
+    { "display": "FACS", "aliases": ["FACS", "Fellow of the American College of Surgeons"] },
+    { "display": "FAAO", "aliases": ["FAAO", "F.A.A.O.", "Fellowship of the American Academy of Optometry"] },
+    { "display": "FARVO", "aliases": ["FARVO", "Fellowship of the Association for Research in Vision and Ophthalmology"] },
+    { "display": "JD", "aliases": ["JD", "J.D.", "Juris Doctor"] }
+  ]
+}

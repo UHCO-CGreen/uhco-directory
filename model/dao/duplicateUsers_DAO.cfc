@@ -1094,6 +1094,20 @@ component extends="dao.BaseDAO" output="false" singleton {
                   );
                 SET @aliasesDeduped = @aliasesDeduped + @@ROWCOUNT;
 
+                -- One primary alias per user: demote secondary primaries before reassignment.
+                IF EXISTS (
+                    SELECT 1
+                    FROM UserAliases
+                    WHERE UserID = @primaryUserID
+                      AND ISNULL(IsPrimary, 0) = 1
+                )
+                BEGIN
+                    UPDATE UserAliases
+                    SET IsPrimary = 0
+                    WHERE UserID = @secondaryUserID
+                      AND ISNULL(IsPrimary, 0) = 1;
+                END
+
                 UPDATE UserAliases
                 SET UserID = @primaryUserID
                 WHERE UserID = @secondaryUserID;

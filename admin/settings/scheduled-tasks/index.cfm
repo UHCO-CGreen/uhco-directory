@@ -1,4 +1,4 @@
-<!--- ── Scheduled Tasks Manager ─────────────────────────────────────────── --->
+﻿<!--- ── Scheduled Tasks Manager ─────────────────────────────────────────── --->
 <cfif NOT request.hasPermission("settings.scheduled_tasks.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -6,9 +6,11 @@
 <cfinclude template="/admin/settings/section-status-config.cfm">
 <cfset sectionStatus = getSettingsSectionStatus("scheduled-tasks")>
 
+<cfinclude template="/admin/settings/feature-gates.cfm">
+<cfset migrationsFeatureState = request.getSettingsFeatureAvailability("migrations")>
+
 <cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
 <cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
-<cfset scheduleTaskTokenParam = len(scheduleTaskToken) ? "&token=" & urlEncodedFormat(scheduleTaskToken) : "">
 
 <!--- ── Task definitions ─────────────────────────────────────────────────── --->
 <cfset baseUrl = request.siteBaseUrl>
@@ -19,13 +21,13 @@
         label          = "Graduation Migration",
         icon           = "bi-mortarboard",
         color          = "primary",
-        description    = "Migrates graduating students to alumni status. Date guard restricts execution to Memorial Day weekend window.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        description    = migrationsFeatureState.isDisabled ? migrationsFeatureState.reason : "Migrates graduating students to alumni status. Date guard restricts execution to Memorial Day weekend window.",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?triggeredBy=scheduled&format=json",
         startTime      = "12:01 AM",
         frequency      = "daily",
         timeout        = 600,
-        dashboardLink  = "/admin/settings/migrations/",
-        runNowLink     = "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?force=true"
+        dashboardLink  = migrationsFeatureState.isDisabled ? "" : "/admin/migrations/",
+        runNowLink     = migrationsFeatureState.isDisabled ? "" : "/admin/settings/scheduled-tasks/tasks/run_grad_migration_task.cfm?force=true"
     },
     {
         key            = "UHCO_BulkExclusions",
@@ -33,7 +35,7 @@
         icon           = "bi-funnel",
         color          = "warning",
         description    = "Runs all 6 data quality exclusion rule sets (adjunct faculty, alumni, current students, faculty, retirees, staff).",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_bulk_exclusions_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_bulk_exclusions_task.cfm?triggeredBy=scheduled&format=json",
         startTime      = "01:00 AM",
         frequency      = "daily",
         timeout        = 900,
@@ -46,7 +48,7 @@
         icon           = "bi-clipboard-check",
         color          = "success",
         description    = "Scans all users for data quality issues and generates an issue-level report.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_data_quality_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_data_quality_report_task.cfm?triggeredBy=scheduled&format=json",
         startTime      = "02:00 AM",
         frequency      = "daily",
         timeout        = 300,
@@ -59,7 +61,7 @@
         icon           = "bi-arrow-left-right",
         color          = "info",
         description    = "Compares local user data against UH API to detect field-level diffs and membership changes.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_uh_sync_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_uh_sync_report_task.cfm?triggeredBy=scheduled&format=json",
         startTime      = "03:00 AM",
         frequency      = "daily",
         timeout        = 600,
@@ -72,7 +74,7 @@
         icon           = "bi-people",
         color          = "danger",
         description    = "Scans all user-related tables for likely duplicate identities and stores scored candidate pairs.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json",
         startTime      = "05:00 AM",
         frequency      = "monthly",
         timeout        = 600,
@@ -85,7 +87,7 @@
         icon           = "bi-geo-alt",
         color          = "secondary",
         description    = "Checks Hometown addresses for Alumni and Current-Students, and fills blank UserStudentProfile hometown city/state values when available.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_hometown_sync.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_hometown_sync.cfm?triggeredBy=scheduled&format=json",
         startTime      = "04:00 AM",
         frequency      = "daily",
         timeout        = 600,
@@ -98,7 +100,7 @@
         icon           = "bi-person-exclamation",
         color          = "warning",
         description    = "Calculates stale user-record totals for dashboard summary cards using dashboard.stale_months.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_users_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_users_snapshot.cfm?triggeredBy=scheduled&format=json",
         startTime      = "04:10 AM",
         frequency      = "daily",
         timeout        = 180,
@@ -111,7 +113,7 @@
         icon           = "bi-images",
         color          = "info",
         description    = "Calculates stale media totals for dashboard summary cards using dashboard.stale_months.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_media_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_stale_media_snapshot.cfm?triggeredBy=scheduled&format=json",
         startTime      = "04:12 AM",
         frequency      = "daily",
         timeout        = 180,
@@ -124,7 +126,7 @@
         icon           = "bi-file-earmark-image",
         color          = "secondary",
         description    = "Calculates generated-but-unpublished variant totals for dashboard summary cards.",
-        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_unpublished_variants_snapshot.cfm?triggeredBy=scheduled&format=json#scheduleTaskTokenParam#",
+        endpoint       = "/admin/settings/scheduled-tasks/tasks/run_dashboard_unpublished_variants_snapshot.cfm?triggeredBy=scheduled&format=json",
         startTime      = "04:14 AM",
         frequency      = "daily",
         timeout        = 180,
@@ -283,24 +285,31 @@
         </cfif>
     <cfelseif action EQ "enable">
         <cfset effectiveSchedule = structKeyExists(scheduleSettings, taskKey) ? scheduleSettings[taskKey] : { startTime = taskDef.startTime, frequency = taskDef.frequency ?: "daily" }>
-        <cftry>
-            <cfschedule
-                action         = "update"
-                task           = "#taskKey#"
-                operation      = "HTTPRequest"
-                url            = "#baseUrl##taskDef.endpoint#"
-                startDate      = "#dateFormat(now(), 'MM/DD/YYYY')#"
-                startTime      = "#effectiveSchedule.startTime#"
-                interval       = "#effectiveSchedule.frequency#"
-                requesttimeout = "#taskDef.timeout#"
-                resolveurl     = "false"
-                publish        = "false">
-            <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> scheduled #encodeForHTML(effectiveSchedule.frequency)# at #encodeForHTML(effectiveSchedule.startTime)#.">
-        <cfcatch>
-            <cfset actionMessage      = "Could not enable schedule: #encodeForHTML(cfcatch.message)#">
+        <cfif NOT len(scheduleTaskToken)>
+            <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> could not be scheduled because <code>scheduled_tasks.shared_secret</code> is not configured.">
             <cfset actionMessageClass = "alert-danger">
-        </cfcatch>
-        </cftry>
+        <cfelse>
+            <cftry>
+                <cfschedule
+                    action         = "update"
+                    task           = "#taskKey#"
+                    operation      = "HTTPRequest"
+                    url            = "#baseUrl##taskDef.endpoint#"
+                    username       = "scheduler"
+                    password       = "#scheduleTaskToken#"
+                    startDate      = "#dateFormat(now(), 'mm/dd/yyyy')#"
+                    startTime      = "#effectiveSchedule.startTime#"
+                    interval       = "#effectiveSchedule.frequency#"
+                    requesttimeout = "#taskDef.timeout#"
+                    resolveurl     = "false"
+                    publish        = "false">
+                <cfset actionMessage = "<strong>#encodeForHTML(taskDef.label)#</strong> scheduled #encodeForHTML(effectiveSchedule.frequency)# at #encodeForHTML(effectiveSchedule.startTime)#.">
+            <cfcatch>
+                <cfset actionMessage      = "Could not enable schedule: #encodeForHTML(cfcatch.message)#">
+                <cfset actionMessageClass = "alert-danger">
+            </cfcatch>
+            </cftry>
+        </cfif>
     <cfelseif action EQ "disable">
         <cftry>
             <cfschedule action="delete" task="#taskKey#">
@@ -335,13 +344,6 @@
         <span class='badge bg-warning text-dark float-end'>Currently in: #sectionStatus#</span>
     </cfif>
 </div>
-
-<cfif len(actionMessage)>
-    <div class="alert #actionMessageClass# alert-dismissible fade show" role="alert">
-        #actionMessage#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
 
 <!--- ── Nightly Run-Order Timeline ───────────────────────────────────────── --->
 <div class="card shadow-sm mb-4 settings-shell settings-summary-card">
@@ -434,7 +436,7 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Save</button>
+                                <button type="submit" class="btn btn-sm btn-ui-save w-100">Save</button>
                             </div>
                         </form>
                     </div>
@@ -479,8 +481,8 @@
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control form-control-sm font-monospace"
                                    value="#encodeForHTMLAttribute(fullUrl)#" readonly id="url_#t.key#">
-                            <button class="btn btn-outline-secondary" type="button"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('url_#t.key#').value)"
+                            <button class="btn btn-ui-go" type="button"
+                                    data-clipboard-source="url_#t.key#"
                                     title="Copy URL">
                                 <i class="bi bi-clipboard"></i>
                             </button>
@@ -495,7 +497,7 @@
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="disable">
                             <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                                <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Disable Task" data-bs-toggle="tooltip" data-bs-title="Disable Task" aria-label="Disable Task">
+                                <button type="submit" class="btn btn-sm btn-ui-warning users-list-action-button users-list-action-button-delete" title="Disable Task" data-bs-toggle="tooltip" data-bs-title="Disable Task" aria-label="Disable Task">
                                     <i class="bi bi-x-circle"></i>
                             </button>
                         </form>
@@ -503,18 +505,18 @@
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="enable">
                             <input type="hidden" name="taskKey" value="#encodeForHTMLAttribute(t.key)#">
-                            <button type="submit" class="btn btn-sm btn-success users-list-action-button" title="Enable Task" data-bs-toggle="tooltip" data-bs-title="Enable Task" aria-label="Enable Task">
+                            <button type="submit" class="btn btn-sm btn-ui-save users-list-action-button" title="Enable Task" data-bs-toggle="tooltip" data-bs-title="Enable Task" aria-label="Enable Task">
                                 <i class="bi bi-check-circle"></i>
                             </button>
                         </form>
                     </cfif>
                     <cfif len(t.runNowLink)>
-                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Run Task Now" data-bs-toggle="tooltip" data-bs-title="Run Task Now" aria-label="Run Task Now">
+                        <a href="#encodeForHTMLAttribute(t.runNowLink)#" class="btn btn-sm btn-ui-filter users-list-action-button users-list-action-button-edit" title="Run Task Now" data-bs-toggle="tooltip" data-bs-title="Run Task Now" aria-label="Run Task Now">
                             <i class="bi bi-play-fill"></i>
                         </a>
                     </cfif>
                     <cfif len(t.dashboardLink)>
-                        <a href="#encodeForHTMLAttribute(t.dashboardLink)#" class="btn btn-sm btn-outline-secondary ms-auto">
+                        <a href="#encodeForHTMLAttribute(t.dashboardLink)#" class="btn btn-sm btn-ui-go ms-auto">
                             <i class="bi bi-box-arrow-up-right me-1"></i> Dashboard
                         </a>
                     </cfif>
@@ -546,6 +548,21 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfif len(actionMessage)>
+<cfset toastTone = actionMessageClass CONTAINS "success" ? "success" : (actionMessageClass CONTAINS "warning" ? "warning" : "danger")>
+</cfif>
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: '#toastTone#' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

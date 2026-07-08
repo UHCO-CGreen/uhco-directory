@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     data_quality_report.cfm
     Displays the most recent data quality audit results.
     Use the "Run Now" button to trigger a fresh audit, or schedule
@@ -55,6 +55,36 @@
 <cfset syncFieldParam = structKeyExists(url, "syncField") ? url.syncField     : "">
 <cfset filterCode     = structKeyExists(url, "filter")    ? trim(url.filter)  : "">
 <cfset viewRunID   = structKeyExists(url, "runID")  AND isNumeric(url.runID) ? val(url.runID) : 0>
+<cfset pageScripts = "">
+<cfset dqToastMessage = "">
+<cfset dqToastTone = "success">
+
+<cfif msgParam EQ "ran">
+    <cfset dqToastMessage = "Report run complete. Results shown below.">
+<cfelseif msgParam EQ "error" AND len(errParam)>
+    <cfset dqToastMessage = "Run failed: " & errParam>
+    <cfset dqToastTone = "danger">
+<cfelseif msgParam EQ "synced" AND len(syncFieldParam)>
+    <cfset dqToastMessage = "Synced " & syncFieldParam & " successfully.">
+<cfelseif len(errParam)>
+    <cfset dqToastMessage = "Sync failed: " & errParam>
+    <cfset dqToastTone = "danger">
+</cfif>
+
+<cfif len(dqToastMessage)>
+    <cfsavecontent variable="pageScripts">
+        <cfoutput>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+(function () {
+    if (!window.AdminUI || typeof window.AdminUI.showToast !== 'function') { return; }
+    window.AdminUI.showToast("#encodeForJavaScript(dqToastMessage)#", {
+        tone: "#encodeForJavaScript(dqToastTone)#"
+    });
+})();
+</script>
+        </cfoutput>
+    </cfsavecontent>
+</cfif>
 
 <!--- ── Load data ── --->
 <cfset dqDAO      = createObject("component", "dao.dataQuality_DAO").init()>
@@ -96,31 +126,40 @@
 </cfloop>
 
 <!--- ── Schedule helper — build the runner URL ── --->
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
 <cfset schedulerUrl = request.siteBaseUrl & "/admin/reporting/run_data_quality_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Handle schedule form submission ── --->
 <cfset scheduleMsg = "">
 <cfset scheduleMsgClass = "">
 <cfif structKeyExists(form, "scheduleAction") AND form.scheduleAction EQ "enable">
-    <cftry>
-        <cfschedule
-            action      = "update"
-            task        = "UHCO_DataQualityReport"
-            operation   = "HTTPRequest"
-            url         = "#schedulerUrl#"
-            startDate   = "#dateFormat(now(), 'MM/DD/YYYY')#"
-            startTime   = "02:00 AM"
-            interval    = "daily"
-            requesttimeout = "300"
-            resolveurl  = "false"
-            publish     = "false">
-        <cfset scheduleMsg      = "Daily schedule enabled — report will run at 2:00 AM each day.">
-        <cfset scheduleMsgClass = "alert-success">
-    <cfcatch>
-        <cfset scheduleMsg      = "Could not register schedule: " & cfcatch.message>
+    <cfif NOT len(scheduleTaskToken)>
+        <cfset scheduleMsg = "Could not register schedule: scheduled_tasks.shared_secret is not configured.">
         <cfset scheduleMsgClass = "alert-danger">
-    </cfcatch>
-    </cftry>
+    <cfelse>
+        <cftry>
+            <cfschedule
+                action      = "update"
+                task        = "UHCO_DataQualityReport"
+                operation   = "HTTPRequest"
+                url         = "#schedulerUrl#"
+                username    = "scheduler"
+                password    = "#scheduleTaskToken#"
+                startDate   = "#dateFormat(now(), 'mm/dd/yyyy')#"
+                startTime   = "02:00 AM"
+                interval    = "daily"
+                requesttimeout = "300"
+                resolveurl  = "false"
+                publish     = "false">
+            <cfset scheduleMsg      = "Daily schedule enabled — report will run at 2:00 AM each day.">
+            <cfset scheduleMsgClass = "alert-success">
+        <cfcatch>
+            <cfset scheduleMsg      = "Could not register schedule: " & cfcatch.message>
+            <cfset scheduleMsgClass = "alert-danger">
+        </cfcatch>
+        </cftry>
+    </cfif>
 </cfif>
 
 <!--- ═══════════════════════════════════════════════════════════════════════ --->
@@ -130,16 +169,6 @@
 <cfset content = "<h1 class='mb-1'>Data Quality Report</h1>">
 
 <!--- Status messages --->
-<cfif msgParam EQ "ran">
-    <cfset content &= "<div class='alert alert-success mt-3'>Report run complete. Results shown below.</div>">
-<cfelseif msgParam EQ "error">
-    <cfset content &= "<div class='alert alert-danger mt-3'><strong>Run failed:</strong> #EncodeForHTML(errParam)#</div>">
-<cfelseif msgParam EQ "synced">
-    <cfset content &= "<div class='alert alert-success mt-3'><i class='bi bi-check-circle-fill'></i> Synced <strong>#EncodeForHTML(syncFieldParam)#</strong> successfully.</div>">
-</cfif>
-<cfif len(errParam) AND msgParam NEQ "error">
-    <cfset content &= "<div class='alert alert-danger mt-3'><strong>Sync failed:</strong> #EncodeForHTML(errParam)#</div>">
-</cfif>
 <cfif len(scheduleMsg)>
     <cfset content &= "<div class='alert #scheduleMsgClass# mt-2'>#EncodeForHTML(scheduleMsg)#</div>">
 </cfif>
@@ -150,14 +179,14 @@
 <!--- ── Action bar ── --->
 <cfset content &= "
 <div class='d-flex flex-wrap align-items-center gap-2 mb-4 mt-2'>
-    <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-primary'>
+    <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-ui-filter'>
         <i class='bi bi-play-fill'></i> Run Now
     </a>
-    <button class='btn btn-outline-secondary btn-sm' type='button'
+    <button class='btn btn-ui-cancel btn-sm' type='button'
             data-bs-toggle='collapse' data-bs-target='##schedulePanel'>
         <i class='bi bi-clock'></i> Schedule
     </button>
-    <button class='btn btn-outline-secondary btn-sm' type='button'
+    <button class='btn btn-ui-cancel btn-sm' type='button'
             data-bs-toggle='collapse' data-bs-target='##historyPanel'>
         <i class='bi bi-clock-history'></i> Run History
     </button>
@@ -176,14 +205,14 @@
         <div class='input-group mb-3 report-scheduler-input'>
             <input type='text' class='form-control form-control-sm font-monospace'
                    value='#EncodeForHTMLAttribute(schedulerUrl)#' readonly id='schedUrlInput'>
-            <button class='btn btn-sm btn-outline-secondary'
-                    onclick=""navigator.clipboard.writeText(document.getElementById('schedUrlInput').value)"">
+            <button class='btn btn-sm btn-ui-go'
+                    data-clipboard-source='schedUrlInput'>
                 <i class='bi bi-clipboard'></i>
             </button>
         </div>
         <form method='post'>
             <input type='hidden' name='scheduleAction' value='enable'>
-            <button type='submit' class='btn btn-sm btn-success'>
+            <button type='submit' class='btn btn-sm btn-ui-save'>
                 <i class='bi bi-check-circle'></i> Enable Daily Schedule via ColdFusion
             </button>
         </form>
@@ -208,7 +237,7 @@
             <td>#EncodeForHTML(r.TRIGGEREDBY)#</td>
             <td>#r.TOTALUSERS#</td>
             <td><span class='badge #badgeCls#'>#r.TOTALISSUES#</span></td>
-            <td><a href='?runID=#r.RUNID#' class='btn btn-xs btn-sm btn-outline-secondary py-0 px-1'>View</a></td>
+            <td><a href='?runID=#r.RUNID#' class='btn btn-xs btn-sm btn-ui-go py-0 px-1'>View</a></td>
         </tr>">
     </cfloop>
     <cfset content &= "</tbody></table>">
@@ -240,7 +269,7 @@
         &mdash; #currentRun.TOTALUSERS# total users
     </span>
     <span class='badge #runBadgeCls# fs-6'>#currentRun.TOTALISSUES# issue(s)</span>
-    <button class='btn btn-outline-secondary btn-sm ms-auto' type='button'
+    <button class='btn btn-ui-filter btn-sm ms-auto' type='button'
             data-bs-toggle='collapse' data-bs-target='##filterCards'
             aria-expanded='true' aria-controls='filterCards'>
         <i class='bi bi-funnel'></i> Filter by Issue
@@ -288,7 +317,7 @@
     <cfset filterLabel = structKeyExists(issueLabels, filterCode) ? issueLabels[filterCode] : filterCode>
     <cfset content &= "
     <span class='badge bg-primary fs-6'>#EncodeForHTML(filterLabel)#</span>
-    <a href='?runID=#currentRun.RUNID#' class='btn btn-sm btn-outline-secondary'>
+    <a href='?runID=#currentRun.RUNID#' class='btn btn-sm btn-ui-clear'>
         <i class='bi bi-x'></i> Clear filter
     </a>">
 <cfelse>
@@ -341,13 +370,7 @@
         <cfset uhApiIdVal = trim(row.UH_API_ID ?: "")>
         <cfset syncBtnHtml = "">
         <cfif len(uhApiIdVal)>
-            <cfset syncBtnHtml = "<a href='/admin/users/uh_sync.cfm?userID=#row.USERID#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-secondary py-0 ms-1'>UH Sync</a>">
-            <cfloop list="#row.ISSUECODES#" index="qsc">
-                <cfset qsc = trim(qsc)>
-                <cfif structKeyExists(quickSyncLabels, qsc)>
-                    <cfset syncBtnHtml &= "<a href='/admin/users/quick_sync_field.cfm?userID=#row.USERID#&issueCode=#urlEncodedFormat(qsc)#&returnTo=#urlEncodedFormat(returnToUrl)#' class='btn btn-sm btn-outline-success py-0 ms-1'>#EncodeForHTML(quickSyncLabels[qsc])#</a>">
-                </cfif>
-            </cfloop>
+            <cfset syncBtnHtml = "<button type='button' class='btn btn-sm btn-ui-warning py-0 ms-1 disabled' disabled title='Temporarily disabled while the priority fix plan is in progress'>UH Sync Disabled</button>">
         </cfif>
         <cfset content &= "
         <tr>
@@ -356,7 +379,7 @@
             <td>#EncodeForHTML(row.EMAILPRIMARY)#</td>
             <td>#badgesHtml#</td>
             <td class='text-nowrap'>
-                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-edit py-0 users-list-action-button users-list-action-button-edit' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User' aria-label='Edit User'><i class='bi bi-pencil-square'></i></a>#syncBtnHtml#
+                <a href='/admin/users/edit.cfm?userID=#row.USERID#' class='btn btn-sm btn-ui-edit py-0 users-list-action-button users-list-action-button-edit' title='Edit User' data-bs-toggle='tooltip' data-bs-title='Edit User' aria-label='Edit User'><i class='bi bi-pencil-square'></i></a>#syncBtnHtml#
             </td>
         </tr>
         ">
@@ -365,7 +388,7 @@
 </cfif>
 
 <cfset content &= "
-<script>
+<cfoutput><script nonce='#encodeForHTMLAttribute(request.cspNonce ?: '')#'></cfoutput>
 (function () {
     var el  = document.getElementById('filterCards');
     var KEY = 'dqr_filterCards_open';

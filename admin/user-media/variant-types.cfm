@@ -1,4 +1,4 @@
-<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
+﻿<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
 <cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -259,14 +259,14 @@
             </div>
 
             <div class='mt-4 d-flex gap-2'>
-                <button type='submit' class='btn btn-primary'>
+                <button type='submit' class='btn #editMode ? "btn-ui-save" : "btn-ui-add"#'>
                     <i class='bi bi-check-lg me-1'></i> #editMode ? 'Update' : 'Create'#
                 </button>
 ">
 
 <cfif editMode>
     <cfset content &= "
-                <a href='/admin/user-media/variant-types.cfm' class='btn btn-outline-secondary'>Cancel</a>
+                <a href='/admin/user-media/variant-types.cfm' class='btn btn-ui-cancel'>Cancel</a>
     ">
 </cfif>
 
@@ -332,10 +332,10 @@
                 <td class='text-center'>#vtActive ? '<span class=""badge bg-success"">Active</span>' : '<span class=""badge bg-secondary"">Inactive</span>'#</td>
                 <td>
                     <div class='d-flex gap-1'>
-                        <a href='/admin/user-media/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-outline-primary'>
+                        <a href='/admin/user-media/variant-types.cfm?edit=#vtID#' class='btn btn-sm btn-ui-edit'>
                             <i class='bi bi-pencil'></i>
                         </a>
-                        <button type='button' class='btn btn-sm btn-outline-danger'
+                        <button type='button' class='btn btn-sm btn-ui-delete'
                                 data-bs-toggle='modal'
                                 data-bs-target='##deleteModal'
                                 data-vt-id='#vtID#'
@@ -430,11 +430,11 @@
                 </ul>
             </div>
             <div class='modal-footer'>
-                <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Cancel</button>
+                <button type='button' class='btn btn-ui-cancel' data-bs-dismiss='modal'>Cancel</button>
                 <form method='post' class='d-inline'>
                     <input type='hidden' name='action' value='delete'>
                     <input type='hidden' name='imageVariantTypeID' id='deleteVtID' value=''>
-                    <button type='submit' class='btn btn-danger'>
+                    <button type='submit' class='btn btn-ui-delete'>
                         <i class='bi bi-trash me-1'></i> Delete Permanently
                     </button>
                 </form>
@@ -443,7 +443,7 @@
     </div>
 </div>
 
-<script>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
 (function () {
     'use strict';
     var deleteModal = document.getElementById('deleteModal');

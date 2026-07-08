@@ -2,6 +2,7 @@ component output="false" singleton {
 
     public any function init() {
         variables.dao = createObject("component", "dao.roster_DAO").init();
+        variables.nameResolutionService = createObject("component", "cfc.nameResolution_service").init();
         return this;
     }
 
@@ -28,6 +29,7 @@ component output="false" singleton {
         _validateProgram(arguments.programName);
 
         var rows = variables.dao.getRosterUsers(arguments.gradYear, arguments.programName);
+        variables.nameResolutionService.resolveRows(rows);
 
         for (var i = 1; i <= arrayLen(rows); i++) {
             rows[i]["FULLNAME"] = _buildFullName(rows[i]);

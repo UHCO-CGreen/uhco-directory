@@ -1,4 +1,4 @@
-<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
+﻿<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
 <cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -88,7 +88,7 @@
             <h2 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Filename Patterns</h2>
             <p class="text-muted mb-0">Manage patterns used to auto-match source image files to users.</p>
         </div>
-        <a href="/admin/user-media/index.cfm" class="btn btn-outline-secondary btn-sm">
+        <a href="/admin/user-media/index.cfm" class="btn btn-ui-cancel btn-sm">
             <i class="bi bi-arrow-left me-1"></i> Back to User Media
         </a>
     </div>
@@ -152,11 +152,11 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn #editMode ? 'btn-ui-save' : 'btn-ui-add'#">
                                 <i class="bi bi-check-lg me-1"></i> #editMode ? "Update" : "Create"#
                             </button>
                             <cfif editMode>
-                                <a href="/admin/user-media/filename-patterns.cfm" class="btn btn-outline-secondary">Cancel</a>
+                                <a href="/admin/user-media/filename-patterns.cfm" class="btn btn-ui-cancel">Cancel</a>
                             </cfif>
                         </div>
                     </form>
@@ -247,11 +247,11 @@
                                     </td>
                                     <td class="text-end">
                                         <a href="/admin/user-media/filename-patterns.cfm?edit=#val(p.FILENAMEPATTERNID)#"
-                                           class="btn btn-outline-primary btn-sm" title="Edit">
+                                           class="btn btn-ui-edit btn-sm" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
-                                        <button type="button" class="btn btn-outline-danger btn-sm"
-                                                onclick="confirmDelete(#val(p.FILENAMEPATTERNID)#, ''#encodeForJavaScript(p.PATTERN ?: "")#'')"
+                                        <button type="button" class="btn btn-ui-delete btn-sm"
+                                                data-confirm-delete-id="#val(p.FILENAMEPATTERNID)#" data-confirm-delete-pattern="#encodeForHTMLAttribute(p.PATTERN ?: "")#"
                                                 title="Delete">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -286,11 +286,11 @@
                 <p class="text-muted small mb-0">This only removes the pattern definition. It does not affect any existing source assignments or generated images.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
                 <form method="post" action="/admin/user-media/filename-patterns.cfm" id="deleteForm" class="d-inline">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="fileNamePatternID" id="deleteID" value="">
-                    <button type="submit" class="btn btn-danger">
+                    <button type="submit" class="btn btn-ui-delete">
                         <i class="bi bi-trash me-1"></i> Delete
                     </button>
                 </form>
@@ -305,13 +305,7 @@
 <cfset pageScripts = "">
 <cfoutput>
 <cfset pageScripts &= '
-<script>
-    function confirmDelete(id, pattern) {
-        document.getElementById("deleteID").value = id;
-        document.getElementById("deletePatternName").textContent = pattern;
-        new bootstrap.Modal(document.getElementById("deleteModal")).show();
-    }
-
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
     // Live preview of all active patterns
     (function() {
         const sample = { first: "john", last: "doe", middle: "michael", fi: "j", mi: "m" };
@@ -342,7 +336,9 @@
             resolved = resolved.replace(/\{mi\}/g, sample.mi);
 
             const tr = document.createElement("tr");
-            tr.innerHTML = "<td><code>" + r.pattern + "</code></td><td><code>" + resolved + "</code></td>";
+            const td1 = document.createElement("td"); const c1 = document.createElement("code"); c1.textContent = r.pattern; td1.appendChild(c1);
+            const td2 = document.createElement("td"); const c2 = document.createElement("code"); c2.textContent = resolved;  td2.appendChild(c2);
+            tr.appendChild(td1); tr.appendChild(td2);
             tbody.appendChild(tr);
         });
         if (!rows.length) {

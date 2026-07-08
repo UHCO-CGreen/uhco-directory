@@ -271,6 +271,41 @@
         <cfreturn normalizedFolder>
     </cffunction>
 
+    <cffunction name="moveFolder" access="public" returntype="string" output="false">
+        <cfargument name="fromPath" type="string" required="true">
+        <cfargument name="toPath"   type="string" required="true">
+
+        <cfset var normalizedFrom = _normalizeDropboxPath(arguments.fromPath)>
+        <cfset var normalizedTo   = _normalizeDropboxPath(arguments.toPath)>
+        <cfset var payload = "">
+        <cfset var responseData = {}>
+
+        <cfset _assertWriteEnabled()>
+        <cfset _assertWritePathAllowed(normalizedTo)>
+
+        <cfset payload = '{'
+            & '"from_path":' & serializeJSON(normalizedFrom)
+            & ',"to_path":'  & serializeJSON(normalizedTo)
+            & ',"autorename":false'
+            & '}'>
+
+        <cftry>
+            <cfset responseData = _postDropboxJson(
+                endpoint       = "https://api.dropboxapi.com/2/files/move_v2",
+                payload        = payload,
+                timeoutSeconds = 30
+            )>
+            <cfcatch type="DropboxProvider.ApiError">
+                <cfif findNoCase("conflict", cfcatch.message ?: "")>
+                    <cfreturn normalizedTo>
+                </cfif>
+                <cfrethrow>
+            </cfcatch>
+        </cftry>
+
+        <cfreturn normalizedTo>
+    </cffunction>
+
     <cffunction name="uploadFile" access="public" returntype="string" output="false">
         <cfargument name="localPath" type="string" required="true">
         <cfargument name="dropboxPath" type="string" required="true">
@@ -550,7 +585,7 @@
             </cfif>
             <cfif structKeyExists(parsed, "error_summary") AND len(trim(parsed.error_summary ?: ""))>
                 <cfif findNoCase("missing_scope", parsed.error_summary)>
-                    <cfreturn messageText & ": " & parsed.error_summary & " (App key: " & appKeyHint & "). Verify app scopes include files.metadata.read and files.content.read, then generate a NEW refresh token and update AppConfig.">
+                    <cfreturn messageText & ": " & parsed.error_summary & " (App key: " & appKeyHint & "). Verify app scopes include files.metadata.read, files.content.read, and files.content.write, then generate a NEW refresh token and update AppConfig.">
                 </cfif>
                 <cfreturn messageText & ": " & parsed.error_summary>
             </cfif>

@@ -4,11 +4,24 @@
    ══════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function () {
 
+    var adminUI = window.AdminUI || {};
+    var sharedToastOptions = { toastId: 'saveToast', bodyId: 'saveToastBody' };
+    var honorsSet = {
+        'Gold Key': 1,
+        'Summa Cum Laude': 1,
+        'Magna Cum Laude': 1,
+        'BSK Gold': 1,
+        'BSK Black & Gold': 1,
+        'AOSA Honors': 1,
+        'NOSA Honors': 1
+    };
+
     var dirtySectionButtons = {
         general: 'save-general-btn',
         flags: 'save-flags-btn',
         orgs: 'save-orgs-btn',
         extids: 'save-extids-btn',
+        publications: 'save-publications-btn',
         emails: 'saveEmailsBtn',
         phones: 'savePhonesBtn',
         aliases: 'saveAliasesBtn',
@@ -16,10 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
         degrees: 'saveDegreesBtn',
         awards: 'saveAwardsBtn',
         uh: 'save-uh-btn',
-        bioinfo: 'save-bioinfo-btn',
-        studentprofile: 'save-studentprofile-btn',
-        tabdegrees: ['save-facultydeg-btn', 'save-emeritusdeg-btn', 'save-residentdeg-btn'],
-        bio: 'save-bio-btn'
+        bioinfo: 'save-bioinfo-btn'
     };
 
     function setSectionDirty(section, isDirty) {
@@ -192,7 +202,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function toggleDisplayById(id, isVisible) {
         var el = document.getElementById(id);
         if (!el) return;
-        el.style.display = isVisible ? '' : 'none';
+        el.classList.toggle('d-none', !isVisible);
+        el.hidden = !isVisible;
     }
 
     function syncBiographicalDegreesAwardsVisibility(isVisible) {
@@ -295,9 +306,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 clearDirty('awards');
                 clearDirty('residencies');
             }
-            if (tabId === 'student-profile-tab') {
-                replaceContainerFromFresh(currentPane, freshPane, 'spAwardsContainer');
-                clearDirty('studentprofile');
+            if (tabId === 'publications-tab') {
+                replaceContainerFromFresh(currentPane, freshPane, 'publicationsPanels');
+                clearDirty('publications');
             }
         }).catch(function () {
             showSaveToast('Refresh failed. Please try again.', true);
@@ -308,14 +319,642 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ── Save toast helper ── */
     function showSaveToast(message, isError) {
-        var toastEl = document.getElementById('saveToast');
-        var toastBody = document.getElementById('saveToastBody');
-        if (!toastEl || !toastBody) return;
-        toastBody.textContent = message;
-        toastEl.classList.remove('text-bg-success', 'text-bg-danger');
-        toastEl.classList.add(isError ? 'text-bg-danger' : 'text-bg-success');
-        var toast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 3000 });
-        toast.show();
+        if (adminUI.showToast) {
+            adminUI.showToast(message, Object.assign({}, sharedToastOptions, {
+                tone: isError ? 'danger' : 'success'
+            }));
+        }
+    }
+
+    function showValidationError(message) {
+        showSaveToast(message, true);
+    }
+
+    function parseFlagIdList(value) {
+        return String(value || '')
+            .split(',')
+            .map(function (item) { return item.trim(); })
+            .filter(function (item) { return item.length > 0; });
+    }
+
+    function isAnyFlagChecked(flagIds) {
+        return (flagIds || []).some(function (id) {
+            var cb = document.querySelector('input[name="Flags"][value="' + id + '"]');
+            return cb && cb.checked;
+        });
+    }
+
+    function setTabVisibility(tabListId, tabButtonId, isVisible, onHide) {
+        var tabLi = document.getElementById(tabListId);
+        var tabBtn = document.getElementById(tabButtonId);
+        if (!tabLi || !tabBtn) {
+            return;
+        }
+
+        tabLi.classList.toggle('d-none', !isVisible);
+        if (!isVisible && tabBtn.classList.contains('active')) {
+            if (typeof onHide === 'function') {
+                onHide();
+            }
+
+            var generalTab = document.getElementById('general-tab');
+            if (generalTab && window.bootstrap && window.bootstrap.Tab) {
+                window.bootstrap.Tab.getOrCreateInstance(generalTab).show();
+            } else if (generalTab) {
+                generalTab.click();
+            }
+        }
+    }
+
+    function syncCurrentStudentGradYears() {
+        var curr = document.getElementById('currentGradYear');
+        var orig = document.getElementById('originalGradYear');
+        if (!curr || !orig) {
+            return;
+        }
+
+        var hasValue = curr.value.trim().length > 0;
+        orig.disabled = !hasValue;
+        if (!hasValue) {
+            orig.value = '';
+        }
+    }
+
+    function initUsersEditPageChrome() {
+        if (window.bootstrap) {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                window.bootstrap.Tooltip.getOrCreateInstance(el);
+            });
+        }
+
+        var tabList = document.getElementById('editTabs');
+        if (!tabList) {
+            return;
+        }
+
+        var requestedTabId = new URL(window.location.href).searchParams.get('tab') || '';
+        var requestedTab = requestedTabId ? document.getElementById(requestedTabId) : null;
+        if (requestedTab && requestedTab.getAttribute('data-bs-toggle') === 'tab' && window.bootstrap && window.bootstrap.Tab) {
+            window.bootstrap.Tab.getOrCreateInstance(requestedTab).show();
+        }
+
+        tabList.addEventListener('shown.bs.tab', function (event) {
+            var shownTab = event && event.target ? event.target : null;
+            if (!shownTab || !shownTab.id) {
+                return;
+            }
+
+            var nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set('tab', shownTab.id);
+            history.replaceState(null, '', nextUrl.toString());
+
+            window.dispatchEvent(new CustomEvent('users-edit-tab-selected', {
+                detail: { tabId: shownTab.id }
+            }));
+        });
+    }
+
+    function initRefreshPageButton() {
+        var refreshButton = document.getElementById('refreshPageBtn');
+        if (!refreshButton) {
+            return;
+        }
+
+        refreshButton.addEventListener('click', function () {
+            window.location.reload();
+        });
+    }
+
+    function initDataQualityPanelToggle() {
+        var panel = document.getElementById('dataQualityPanel');
+        var adminTab = document.getElementById('admin-tab');
+        var tabList = document.getElementById('editTabs');
+
+        if (!panel || !adminTab || !tabList) {
+            return;
+        }
+
+        function syncDataQualityPanel() {
+            var showPanel = adminTab.classList.contains('active');
+            panel.classList.toggle('d-none', !showPanel);
+        }
+
+        syncDataQualityPanel();
+        tabList.addEventListener('shown.bs.tab', syncDataQualityPanel);
+    }
+
+    function initFlagDrivenTabVisibility() {
+        var pageRoot = document.querySelector('.users-edit-page');
+        if (!pageRoot) {
+            return;
+        }
+
+        var emeritusFlagIds = parseFlagIdList(pageRoot.getAttribute('data-emeritus-flag-ids'));
+        var residentFlagIds = parseFlagIdList(pageRoot.getAttribute('data-resident-flag-ids'));
+        var publicFacingCb = document.querySelector('input[name="Flags"][data-flagname="public-facing"]');
+        var autoPublicFacingNames = ['clinical-attending', 'faculty-adjunct', 'faculty-fulltime', 'professor-emeritus', 'accepting-patients'];
+
+        function syncProfileTabs() {
+            setTabVisibility('emeritus-profile-tab-li', 'emeritus-profile-tab', isAnyFlagChecked(emeritusFlagIds));
+            setTabVisibility('resident-profile-tab-li', 'resident-profile-tab', isAnyFlagChecked(residentFlagIds));
+        }
+
+        document.querySelectorAll('input[name="Flags"]').forEach(function (cb) {
+            cb.addEventListener('change', syncProfileTabs);
+
+            if (!publicFacingCb) {
+                return;
+            }
+
+            var flagName = String(cb.getAttribute('data-flagname') || '').toLowerCase();
+            if (autoPublicFacingNames.indexOf(flagName) === -1) {
+                return;
+            }
+
+            cb.addEventListener('change', function () {
+                if (cb.checked) {
+                    publicFacingCb.checked = true;
+                    syncProfileTabs();
+                }
+            });
+        });
+
+        var currentGradYear = document.getElementById('currentGradYear');
+        if (currentGradYear) {
+            currentGradYear.addEventListener('input', syncCurrentStudentGradYears);
+        }
+
+        syncCurrentStudentGradYears();
+        syncProfileTabs();
+    }
+
+    function initFlagCardToggle() {
+        var flagsPane = document.getElementById('flags-pane');
+        if (!flagsPane) {
+            return;
+        }
+
+        flagsPane.addEventListener('click', function (event) {
+            var card = event.target.closest('.users-edit-flag-card');
+            if (!card || !flagsPane.contains(card)) {
+                return;
+            }
+
+            if (event.target.closest('input, label, a, button')) {
+                return;
+            }
+
+            var checkboxId = card.getAttribute('data-flag-checkbox-id');
+            if (!checkboxId) {
+                return;
+            }
+
+            var checkbox = document.getElementById(checkboxId);
+            if (!checkbox || checkbox.disabled) {
+                return;
+            }
+
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
+    function initDegreePanels() {
+        var prefixes = ['fac', 'emer', 'res'];
+
+        function updateComposite(prefix) {
+            var container = document.getElementById(prefix + '_degreesContainer');
+            var composite = document.getElementById(prefix + '_composite');
+            if (!container || !composite) {
+                return;
+            }
+
+            var names = [];
+            container.querySelectorAll('[data-field="deg_name"]').forEach(function (input) {
+                var value = input.value.trim();
+                if (value) {
+                    names.push(value);
+                }
+            });
+            composite.value = names.join(', ');
+        }
+
+        function reindexRows(prefix, container, countInput) {
+            var rows = container.querySelectorAll('.degree-row');
+            rows.forEach(function (row, index) {
+                var nameInput = row.querySelector('[data-field="deg_name"]');
+                var universityInput = row.querySelector('[data-field="deg_univ"]');
+                var yearInput = row.querySelector('[data-field="deg_year"]');
+                if (nameInput) { nameInput.name = prefix + '_deg_name_' + index; }
+                if (universityInput) { universityInput.name = prefix + '_deg_univ_' + index; }
+                if (yearInput) { yearInput.name = prefix + '_deg_year_' + index; }
+            });
+            countInput.value = rows.length;
+            updateComposite(prefix);
+        }
+
+        function makeRemovable(prefix, container, countInput, button) {
+            button.addEventListener('click', function () {
+                var row = button.closest('.degree-row');
+                if (row) {
+                    row.remove();
+                    reindexRows(prefix, container, countInput);
+                }
+            });
+        }
+
+        prefixes.forEach(function (prefix) {
+            var container = document.getElementById(prefix + '_degreesContainer');
+            var countInput = document.getElementById(prefix + '_degreeCount');
+            if (!container || !countInput) {
+                return;
+            }
+
+            container.querySelectorAll('.remove-degree-row').forEach(function (button) {
+                makeRemovable(prefix, container, countInput, button);
+            });
+
+            container.querySelectorAll('[data-field="deg_name"]').forEach(function (input) {
+                input.addEventListener('input', function () {
+                    updateComposite(prefix);
+                });
+            });
+        });
+
+        document.addEventListener('click', function (event) {
+            var addButton = event.target.closest('.add-degree-row');
+            if (!addButton) {
+                return;
+            }
+
+            var prefix = addButton.getAttribute('data-prefix');
+            var container = document.getElementById(prefix + '_degreesContainer');
+            var countInput = document.getElementById(prefix + '_degreeCount');
+            if (!prefix || !container || !countInput) {
+                return;
+            }
+
+            var index = parseInt(countInput.value, 10) || 0;
+            var row = document.createElement('div');
+            row.className = 'row g-2 mb-2 degree-row';
+            row.innerHTML = "<div class='col-md-4'><input class='form-control form-control-sm' name='" + prefix + "_deg_name_" + index + "' data-field='deg_name' placeholder='Degree (required)' required></div>" +
+                "<div class='col-md-4'><input class='form-control form-control-sm' name='" + prefix + "_deg_univ_" + index + "' data-field='deg_univ' placeholder='University'></div>" +
+                "<div class='col-md-2'><input class='form-control form-control-sm' name='" + prefix + "_deg_year_" + index + "' data-field='deg_year' placeholder='Year'></div>" +
+                "<div class='col-md-2'><button type='button' class='btn btn-sm btn-remove remove-degree-row w-100'><i class='bi bi-trash me-1'></i>Remove</button></div>";
+            container.appendChild(row);
+            countInput.value = index + 1;
+
+            var removeButton = row.querySelector('.remove-degree-row');
+            if (removeButton) {
+                makeRemovable(prefix, container, countInput, removeButton);
+            }
+            var nameInput = row.querySelector('[data-field="deg_name"]');
+            if (nameInput) {
+                nameInput.addEventListener('input', function () {
+                    updateComposite(prefix);
+                });
+            }
+            updateComposite(prefix);
+        });
+    }
+
+    function initRecordStatusToggle() {
+        var sw = document.getElementById('activeSwitch');
+        var label = document.getElementById('activeSwitchLabel');
+        var statusCard = document.querySelector('.users-edit-record-status');
+        if (!sw) {
+            return;
+        }
+
+        function setStatusCardState(isActive) {
+            if (!statusCard) {
+                return;
+            }
+            statusCard.classList.toggle('users-edit-record-status-active', !!isActive);
+            statusCard.classList.toggle('users-edit-record-status-inactive', !isActive);
+        }
+
+        function triggerStatusToggle() {
+            if (!sw.disabled) {
+                sw.click();
+            }
+        }
+
+        setStatusCardState(sw.checked);
+
+        if (statusCard) {
+            statusCard.addEventListener('click', function (event) {
+                if (event.target && event.target.closest('.form-check')) {
+                    return;
+                }
+                triggerStatusToggle();
+            });
+
+            statusCard.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    triggerStatusToggle();
+                }
+            });
+        }
+
+        sw.addEventListener('change', function () {
+            var body = new URLSearchParams();
+            body.append('userID', sw.dataset.userid);
+            body.append('active', sw.checked ? 1 : 0);
+            sw.disabled = true;
+
+            fetch('/admin/users/toggleActive.cfm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                credentials: 'same-origin',
+                body: body.toString()
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        if (label) {
+                            label.textContent = data.active ? 'Active' : 'Inactive';
+                        }
+                        setStatusCardState(data.active);
+                        return;
+                    }
+
+                    sw.checked = !sw.checked;
+                    setStatusCardState(sw.checked);
+                    showSaveToast('Could not update status: ' + (data.message || 'Unknown error'), true);
+                })
+                .catch(function () {
+                    sw.checked = !sw.checked;
+                    setStatusCardState(sw.checked);
+                    showSaveToast('Network error. Status was not saved.', true);
+                })
+                .finally(function () {
+                    sw.disabled = false;
+                });
+        });
+    }
+
+    function initEmailPrimaryValidation() {
+        var inputEl = document.getElementById('emailPrimary');
+        var errorEl = document.getElementById('emailPrimaryErr');
+        if (!inputEl || !errorEl) {
+            return;
+        }
+
+        function showError(message) {
+            inputEl.classList.add('is-invalid');
+            errorEl.textContent = message;
+        }
+
+        function clearError() {
+            inputEl.classList.remove('is-invalid');
+            errorEl.textContent = '';
+        }
+
+        function validatePrimary() {
+            var value = inputEl.value.trim().toLowerCase();
+            if (value && !value.endsWith('@uh.edu')) {
+                showError('Must be a @uh.edu address (e.g. jsmith@uh.edu).');
+                return false;
+            }
+
+            clearError();
+            return true;
+        }
+
+        inputEl.addEventListener('input', validatePrimary);
+        inputEl.addEventListener('blur', validatePrimary);
+    }
+
+    function initOrgRoleModal() {
+        var orgCheckboxes = Array.prototype.slice.call(document.querySelectorAll('input.org-checkbox'));
+        var modalEl = document.getElementById('orgRoleModal');
+        var modalSaveBtn = document.getElementById('save-orgRoleModal-btn');
+        var modalOrgName = document.getElementById('orgRoleModalOrgName');
+        var modalTitle = document.getElementById('modalRoleTitle');
+        var modalOrder = document.getElementById('modalRoleOrder');
+
+        if (!orgCheckboxes.length || !modalEl || !modalSaveBtn || !modalOrgName || !modalTitle || !modalOrder || !window.bootstrap) {
+            return;
+        }
+
+        var bsModal = new window.bootstrap.Modal(modalEl);
+        var byOrgId = {};
+        var childrenByParent = {};
+        var pendingCheckbox = null;
+
+        orgCheckboxes.forEach(function (checkbox) {
+            var orgId = checkbox.getAttribute('data-orgid') || '';
+            var parentId = checkbox.getAttribute('data-parentorgid') || '';
+            byOrgId[orgId] = checkbox;
+            if (!childrenByParent[parentId]) {
+                childrenByParent[parentId] = [];
+            }
+            childrenByParent[parentId].push(checkbox);
+        });
+
+        function getEditButton(orgId) {
+            var checkbox = byOrgId[orgId];
+            return checkbox ? checkbox.parentNode.querySelector('.org-role-edit') : null;
+        }
+
+        function setOrgRole(orgId, roleTitle, roleOrder) {
+            var titleEl = document.getElementById('roleTitle_' + orgId);
+            var orderEl = document.getElementById('roleOrder_' + orgId);
+            var checkbox = byOrgId[orgId];
+
+            if (!titleEl) {
+                titleEl = document.createElement('input');
+                titleEl.type = 'hidden';
+                titleEl.name = 'roleTitle_' + orgId;
+                titleEl.id = 'roleTitle_' + orgId;
+                if (checkbox) {
+                    checkbox.parentNode.appendChild(titleEl);
+                }
+            }
+
+            if (!orderEl) {
+                orderEl = document.createElement('input');
+                orderEl.type = 'hidden';
+                orderEl.name = 'roleOrder_' + orgId;
+                orderEl.id = 'roleOrder_' + orgId;
+                if (checkbox) {
+                    checkbox.parentNode.appendChild(orderEl);
+                }
+            }
+
+            titleEl.value = roleTitle;
+            orderEl.value = roleOrder;
+        }
+
+        function removeOrgRole(orgId) {
+            ['roleTitle_', 'roleOrder_'].forEach(function (prefix) {
+                var input = document.getElementById(prefix + orgId);
+                if (input) {
+                    input.remove();
+                }
+            });
+        }
+
+        function checkAncestors(checkbox) {
+            var parentId = checkbox.getAttribute('data-parentorgid') || '';
+            while (parentId && byOrgId[parentId]) {
+                byOrgId[parentId].checked = true;
+                parentId = byOrgId[parentId].getAttribute('data-parentorgid') || '';
+            }
+        }
+
+        function hasAnyCheckedDescendant(orgId) {
+            var stack = (childrenByParent[orgId] || []).slice();
+            while (stack.length) {
+                var child = stack.pop();
+                if (child.checked) {
+                    return true;
+                }
+                var grandchildren = childrenByParent[child.getAttribute('data-orgid') || ''] || [];
+                for (var index = 0; index < grandchildren.length; index++) {
+                    stack.push(grandchildren[index]);
+                }
+            }
+            return false;
+        }
+
+        function uncheckAncestorsIfNoCheckedChildren(checkbox) {
+            var parentId = checkbox.getAttribute('data-parentorgid') || '';
+            while (parentId && byOrgId[parentId]) {
+                if (!hasAnyCheckedDescendant(parentId)) {
+                    byOrgId[parentId].checked = false;
+                }
+                parentId = byOrgId[parentId].getAttribute('data-parentorgid') || '';
+            }
+        }
+
+        function openRoleModal(checkbox) {
+            var orgId = checkbox.getAttribute('data-orgid');
+            var orgName = checkbox.getAttribute('data-orgname') || '';
+            var titleEl = document.getElementById('roleTitle_' + orgId);
+            var orderEl = document.getElementById('roleOrder_' + orgId);
+            modalOrgName.textContent = orgName;
+            modalTitle.value = titleEl ? titleEl.value : '';
+            modalOrder.value = orderEl ? orderEl.value : '';
+            modalEl.setAttribute('data-current-orgid', orgId);
+            bsModal.show();
+        }
+
+        modalSaveBtn.addEventListener('click', function () {
+            var orgId = modalEl.getAttribute('data-current-orgid');
+            setOrgRole(orgId, modalTitle.value.trim(), modalOrder.value.trim());
+            var editButton = getEditButton(orgId);
+            if (editButton) {
+                editButton.classList.add('is-visible');
+            }
+            pendingCheckbox = null;
+            bsModal.hide();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            if (!pendingCheckbox) {
+                return;
+            }
+
+            var orgId = pendingCheckbox.getAttribute('data-orgid');
+            pendingCheckbox.checked = false;
+            uncheckAncestorsIfNoCheckedChildren(pendingCheckbox);
+            orgCheckboxes.forEach(function (checkbox) {
+                var editButton = getEditButton(checkbox.getAttribute('data-orgid'));
+                if (editButton) {
+                    editButton.classList.toggle('is-visible', checkbox.checked);
+                }
+            });
+            removeOrgRole(orgId);
+            pendingCheckbox = null;
+        });
+
+        document.querySelectorAll('.org-role-edit').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                var orgId = button.getAttribute('data-orgid');
+                var checkbox = byOrgId[orgId];
+                if (!checkbox) {
+                    return;
+                }
+                pendingCheckbox = null;
+                openRoleModal(checkbox);
+            });
+        });
+
+        orgCheckboxes.forEach(function (checkbox) {
+            if (checkbox.checked) {
+                checkAncestors(checkbox);
+            }
+
+            checkbox.addEventListener('change', function () {
+                var isParent = checkbox.getAttribute('data-isparent') === '1';
+                var hasRoles = checkbox.getAttribute('data-additionalroles') === '1';
+                if (checkbox.checked) {
+                    checkAncestors(checkbox);
+                    if (!isParent && hasRoles) {
+                        pendingCheckbox = checkbox;
+                        openRoleModal(checkbox);
+                    }
+                } else {
+                    uncheckAncestorsIfNoCheckedChildren(checkbox);
+                    if (!isParent && hasRoles) {
+                        var orgId = checkbox.getAttribute('data-orgid');
+                        var editButton = getEditButton(orgId);
+                        if (editButton) {
+                            editButton.classList.remove('is-visible');
+                        }
+                        removeOrgRole(orgId);
+                    }
+                }
+            });
+
+            var panelId = checkbox.getAttribute('data-panelid');
+            if (!panelId) {
+                return;
+            }
+
+            checkbox.addEventListener('change', function () {
+                if (!checkbox.checked) {
+                    return;
+                }
+
+                var panelEl = document.getElementById(panelId);
+                if (panelEl) {
+                    window.bootstrap.Collapse.getOrCreateInstance(panelEl, { toggle: false }).show();
+                }
+            });
+        });
+    }
+
+    function initBioEditor(rootEl) {
+        if (!adminUI.initPlainTextQuill) {
+            return;
+        }
+
+        var editorNodes = [];
+        if (rootEl) {
+            if (rootEl.classList && rootEl.classList.contains('users-edit-bio-editor')) {
+                editorNodes = [rootEl];
+            } else if (rootEl.querySelectorAll) {
+                editorNodes = Array.prototype.slice.call(rootEl.querySelectorAll('.users-edit-bio-editor'));
+            }
+        } else {
+            editorNodes = Array.prototype.slice.call(document.querySelectorAll('.users-edit-bio-editor'));
+        }
+
+        editorNodes.forEach(function (editorEl) {
+            if (!editorEl || editorEl.classList.contains('ql-container') || editorEl.getAttribute('data-bio-editor-initialized') === '1') {
+                return;
+            }
+
+            adminUI.initPlainTextQuill(editorEl, {
+                placeholder: 'Write a short bio...'
+            });
+            editorEl.setAttribute('data-bio-editor-initialized', '1');
+        });
     }
 
     /* ── Helper: AJAX save a section ── */
@@ -419,8 +1058,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveEmailModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.addr) { alert('Email address is required.'); return; }
-            if (/@uh\.edu\s*$/i.test(d.addr)) { alert('@uh.edu addresses cannot be added here.'); return; }
+            if (!d.addr) { showValidationError('Email address is required.'); return; }
+            if (/@uh\.edu\s*$/i.test(d.addr)) { showValidationError('@uh.edu addresses cannot be added here.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('emailEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -539,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('savePhoneModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.number) { alert('Phone number is required.'); return; }
+            if (!d.number) { showValidationError('Phone number is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('phoneEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -707,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveAliasModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.first && !d.last) { alert('First or Last name is required.'); return; }
+            if (!d.first && !d.last) { showValidationError('First or Last name is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('aliasEditIdx').value);
             var existingPrimary = '0';
@@ -952,7 +1591,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveDegreeModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.name) { alert('Degree name is required.'); return; }
+            if (!d.name) { showValidationError('Degree name is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('degreeEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -994,8 +1633,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!status) return Promise.resolve({ success: false, message: 'Save status unavailable' });
             return ajaxSave('degrees', body, status, function (data) {
                 /* Update composite degrees field if present */
-                var comp = document.getElementById('compositeDegreesField');
-                if (comp && data.composite) comp.value = data.composite;
+                var comp = document.getElementById('bio_composite');
+                if (comp && data.data && data.data.composite) comp.value = data.data.composite;
             }).then(function (data) {
                 if (data && data.success && options.hideModalOnSuccess) {
                     modal.hide();
@@ -1095,7 +1734,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveAwardModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.name) { alert('Award name is required.'); return; }
+            if (!d.name) { showValidationError('Award name is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('awardEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -1227,7 +1866,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveResidencyModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.location) { alert('Residency location is required.'); return; }
+            if (!d.location) { showValidationError('Residency location is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('residencyEditIdx').value, 10);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -1392,7 +2031,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('saveAddressBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.type) { alert('Address Type is required.'); return; }
+            if (!d.type) { showValidationError('Address Type is required.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('addrEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -1448,38 +2087,64 @@ document.addEventListener('DOMContentLoaded', function () {
        ══════════════════════════════════════════════════════════════ */
 
     function saveSectionAjax(section, body, statusEl, onSuccess) {
-        if (statusEl) { statusEl.textContent = ''; }
+        if (statusEl) {
+            statusEl.textContent = 'Saving...';
+            statusEl.classList.remove('text-danger', 'text-success');
+            statusEl.classList.add('text-muted');
+        }
         fetch('/admin/users/saveSection.cfm', { method: 'POST', body: body })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (data.success) {
+                    if (statusEl) {
+                        statusEl.textContent = data.message || 'Saved.';
+                        statusEl.classList.remove('text-muted', 'text-danger');
+                        statusEl.classList.add('text-success');
+                    }
                     showSaveToast('Saved successfully.');
                     clearDirty(section);
                     if (onSuccess) {
                         onSuccess(data);
                     }
                 } else {
+                    if (statusEl) {
+                        statusEl.textContent = data.message || 'Error saving.';
+                        statusEl.classList.remove('text-muted', 'text-success');
+                        statusEl.classList.add('text-danger');
+                    }
                     showSaveToast((data.message || 'Error saving.'), true);
                 }
             })
             .catch(function (err) {
+                if (statusEl) {
+                    statusEl.textContent = 'Network error.';
+                    statusEl.classList.remove('text-muted', 'text-success');
+                    statusEl.classList.add('text-danger');
+                }
                 showSaveToast('Network error: ' + (err && err.message ? err.message : 'Unknown'), true);
             });
     }
 
     var pageUserID = document.getElementById('pageUserID').value;
 
+    initUsersEditPageChrome();
+    initRefreshPageButton();
+    initDataQualityPanelToggle();
+    initFlagDrivenTabVisibility();
+    initFlagCardToggle();
+    initDegreePanels();
+    initRecordStatusToggle();
+    initEmailPrimaryValidation();
+    initOrgRoleModal();
+    initBioEditor();
+
     wireSectionDirty('general', document.getElementById('general-pane'));
     wireSectionDirty('flags', document.getElementById('flags-pane'));
     wireSectionDirty('orgs', document.getElementById('orgs-pane'));
     wireSectionDirty('extids', document.getElementById('extids-pane'));
+    wireSectionDirty('publications', document.getElementById('publications-pane'));
     wireSectionDirty('uh', document.getElementById('admin-pane'));
     wireSectionDirty('bioinfo', document.getElementById('bio-info-pane'));
-    wireSectionDirty('studentprofile', document.getElementById('student-profile-pane'));
-    wireSectionDirty('tabdegrees', document.getElementById('faculty-profile-pane'));
-    wireSectionDirty('tabdegrees', document.getElementById('emeritus-profile-pane'));
-    wireSectionDirty('tabdegrees', document.getElementById('resident-profile-pane'));
-    wireSectionDirty('bio', document.getElementById('bio-pane'));
 
     wireRepeaterDirty('emails', document.getElementById('emailsContainer'));
     wireRepeaterDirty('phones', document.getElementById('phonesContainer'));
@@ -1713,20 +2378,9 @@ document.addEventListener('DOMContentLoaded', function () {
             saveSectionAjax('flags', body, document.getElementById('save-flags-status'), function () {
                 var shouldShowDegreesAwards = shouldShowDegreesAwardsFromFlagsPane();
                 var shouldShowFacultyBio = shouldShowFacultyBioFromFlagsPane();
-                var hasFacultySection = !!document.getElementById('bioFacultySection');
 
                 syncBiographicalDegreesAwardsVisibility(shouldShowDegreesAwards);
                 syncBiographicalFacultyVisibility(shouldShowFacultyBio);
-
-                // Faculty bio editor is server-rendered only when faculty flags are present.
-                // If it needs to appear but doesn't exist in DOM yet, soft-reload to current page/tab.
-                if (shouldShowFacultyBio && !hasFacultySection) {
-                    var refreshedUrl = new URL(window.location.href);
-                    refreshedUrl.searchParams.set('tab', 'bio-info-tab');
-                    refreshedUrl.searchParams.set('_flagsUpdated', String(Date.now()));
-                    window.location.assign(refreshedUrl.toString());
-                    return;
-                }
 
                 if (shouldShowDegreesAwards) {
                     refreshTabData('bio-info-tab');
@@ -1807,9 +2461,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function normalizeLdapRow(row) {
         row = row || {};
         return {
-            displayName: row.displayName || row.DISPLAYNAME || '',
-            samAccountName: row.samAccountName || row.SAMACCOUNTNAME || '',
-            employeeID: row.employeeID || row.EMPLOYEEID || '',
+            displayName: row.displayName || row.displayname || row.DISPLAYNAME || '',
+            samAccountName: row.samAccountName || row.samaccountname || row.SAMACCOUNTNAME || '',
+            employeeID: row.employeeID || row.employeeid || row.EMPLOYEEID || '',
             mail: row.mail || row.MAIL || '',
             department: row.department || row.DEPARTMENT || '',
             title: row.title || row.TITLE || ''
@@ -1916,8 +2570,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return Promise.resolve({ success: false, message: 'No search terms available.', data: [] });
         }
         return fetchLdapTerm(terms[0]).then(function (payload) {
-            var ok   = payload && (payload.success === true || payload.SUCCESS === true);
-            var rows = payload ? (payload.data || payload.DATA || []) : [];
+            var ok   = payload && payload.success === true;
+            var rows = payload ? (payload.data || []) : [];
             if (ok && rows.length > 0) {
                 return payload;
             }
@@ -1947,9 +2601,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             fetchLdapSequential(searchTerms)
             .then(function (payload) {
-                var ok = payload && (payload.success === true || payload.SUCCESS === true);
-                var message = payload ? (payload.message || payload.MESSAGE) : '';
-                var rows = payload ? (payload.data || payload.DATA || []) : [];
+                var ok = payload && payload.success === true;
+                var message = payload ? (payload.message || '') : '';
+                var rows = payload ? (payload.data || []) : [];
 
                 if (!ok) {
                     extidsLdapRows = [];
@@ -2001,7 +2655,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     })
                     .then(function (r) { return r.json(); })
                     .then(function (payload) {
-                        if (payload && payload.success && payload.inserted) {
+                        if (payload && payload.success && payload.data && payload.data.inserted) {
                             setExtidsLdapStatus('Selected ' + (row.samAccountName || '') + ' and added email ' + row.mail + '.', false);
                         }
                     })
@@ -2045,6 +2699,397 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    var savePublicationsBtn = document.getElementById('save-publications-btn');
+    var publicationsPane = document.getElementById('publications-pane');
+
+    function buildPublicationsSaveBody(overrideShowcasedIDs) {
+        var pane = document.getElementById('publications-pane');
+        var body = new URLSearchParams();
+        var showcasedIDs = Array.isArray(overrideShowcasedIDs) ? overrideShowcasedIDs.slice() : [];
+        var orderMap = {};
+        var showcasedList = pane ? pane.querySelectorAll('.showcased-publication-item') : [];
+
+        if (!pane) {
+            return null;
+        }
+
+        if (!Array.isArray(overrideShowcasedIDs)) {
+            showcasedList.forEach(function (item) {
+                showcasedIDs.push(item.getAttribute('data-publication-id'));
+            });
+        }
+
+        showcasedIDs.forEach(function (publicationID, index) {
+            orderMap[String(publicationID)] = String(index + 1);
+        });
+
+        body.append('userID', pageUserID);
+        body.append('section', 'publications');
+        body.append('orcid_identifier', (pane.querySelector('[name="orcid_identifier"]') || {}).value || '');
+        body.append('orcid_url', (pane.querySelector('[name="orcid_url"]') || {}).value || '');
+        body.append('orcid_enabled', pane.querySelector('[name="orcid_enabled"]') && pane.querySelector('[name="orcid_enabled"]').checked ? '1' : '0');
+        body.append('showcased_publication_ids', showcasedIDs.join(','));
+        body.append('publication_display_order_json', JSON.stringify(orderMap));
+
+        return body;
+    }
+
+    function persistPublicationShowcase(showcasedIDs) {
+        var body = buildPublicationsSaveBody(showcasedIDs);
+        var statusEl = document.getElementById('save-publications-status');
+
+        if (!body) {
+            return;
+        }
+
+        saveSectionAjax('publications', body, statusEl, function () {
+            refreshTabData('publications-tab');
+        });
+    }
+
+    if (savePublicationsBtn) {
+        savePublicationsBtn.addEventListener('click', function () {
+            var pane = document.getElementById('publications-pane');
+            var body = buildPublicationsSaveBody();
+
+            if (!pane || !body) {
+                return;
+            }
+
+            saveSectionAjax('publications', body, document.getElementById('save-publications-status'));
+        });
+    }
+
+    if (publicationsPane) {
+        publicationsPane.addEventListener('click', function (event) {
+            var moveBtn = event.target.closest('.publication-showcase-move-btn');
+            var showcasedPanel = publicationsPane.querySelector('#showcasedPublicationsList');
+            var maxSource = publicationsPane.querySelector('#publicationsPanels');
+            var maxCount = maxSource ? parseInt(maxSource.getAttribute('data-max-showcased') || '10', 10) || 10 : 10;
+            var showcasedIDs = [];
+            var publicationID = '';
+
+            if (!moveBtn || !showcasedPanel) {
+                return;
+            }
+
+            publicationID = moveBtn.getAttribute('data-publication-id') || '';
+            showcasedPanel.querySelectorAll('.showcased-publication-item').forEach(function (item) {
+                showcasedIDs.push(item.getAttribute('data-publication-id'));
+            });
+
+            if (moveBtn.getAttribute('data-direction') === 'add') {
+                if (showcasedIDs.indexOf(publicationID) === -1) {
+                    if (maxCount > 0 && showcasedIDs.length >= maxCount) {
+                        showSaveToast('You can showcase at most ' + maxCount + ' publications.', true);
+                        return;
+                    }
+                    showcasedIDs.push(publicationID);
+                }
+            } else {
+                showcasedIDs = showcasedIDs.filter(function (id) {
+                    return id !== publicationID;
+                });
+            }
+
+            persistPublicationShowcase(showcasedIDs);
+        });
+    }
+
+    var fetchOrcidBtn = document.getElementById('fetch-orcid-btn');
+    var fetchOrcidStatus = document.getElementById('fetch-orcid-status');
+    var orcidIdentifierInput = document.getElementById('orcidIdentifier');
+    var limitRecentPublicationYears = document.getElementById('limitRecentPublicationYears');
+
+    function syncOrcidFetchButtonState() {
+        if (!fetchOrcidBtn || !orcidIdentifierInput) {
+            return;
+        }
+        fetchOrcidBtn.disabled = !(orcidIdentifierInput.value || '').trim();
+    }
+
+    if (orcidIdentifierInput) {
+        syncOrcidFetchButtonState();
+        orcidIdentifierInput.addEventListener('input', syncOrcidFetchButtonState);
+    }
+
+    if (fetchOrcidBtn) {
+        fetchOrcidBtn.addEventListener('click', function () {
+            var orcidValue = (orcidIdentifierInput ? orcidIdentifierInput.value : '').trim();
+
+            fetchOrcidBtn.disabled = true;
+
+            function doFetch() {
+                var body = new URLSearchParams();
+                body.append('userID', pageUserID);
+                body.append('serviceCode', 'orcid');
+                body.append('limitRecentYears', limitRecentPublicationYears && limitRecentPublicationYears.checked ? '1' : '0');
+
+                if (fetchOrcidStatus) {
+                    fetchOrcidStatus.textContent = 'Fetching ORCID works...';
+                }
+
+                fetch('/admin/users/fetchPublications.cfm', {
+                    method: 'POST',
+                    body: body,
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        if (fetchOrcidStatus) {
+                            fetchOrcidStatus.textContent = 'Fetched ' + (data.data && data.data.recordsFetched ? data.data.recordsFetched : 0) + ' ORCID work(s). Refreshing...';
+                        }
+                        showSaveToast(data.message || 'ORCID publications fetched.');
+                        window.location.reload();
+                        return;
+                    }
+
+                    if (fetchOrcidStatus) {
+                        fetchOrcidStatus.textContent = data.message || 'ORCID fetch failed.';
+                    }
+                    showSaveToast(data.message || 'ORCID fetch failed.', true);
+                    syncOrcidFetchButtonState();
+                })
+                .catch(function (err) {
+                    if (fetchOrcidStatus) {
+                        fetchOrcidStatus.textContent = 'Network error during ORCID fetch.';
+                    }
+                    showSaveToast('Network error: ' + (err && err.message ? err.message : 'Unknown'), true);
+                    syncOrcidFetchButtonState();
+                });
+            }
+
+            // If the ORCID field has a value, save it first so the fetch always
+            // uses the ID currently visible in the field, not a stale saved value.
+            if (orcidValue) {
+                var saveBody = buildPublicationsSaveBody();
+                if (fetchOrcidStatus) {
+                    fetchOrcidStatus.textContent = 'Saving ORCID...';
+                }
+
+                fetch('/admin/users/saveSection.cfm', { method: 'POST', body: saveBody })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.success) {
+                        if (fetchOrcidStatus) {
+                            fetchOrcidStatus.textContent = data.message || 'Could not save ORCID before fetching.';
+                        }
+                        showSaveToast(data.message || 'Could not save ORCID before fetching.', true);
+                        syncOrcidFetchButtonState();
+                        return;
+                    }
+                    clearDirty('publications');
+                    doFetch();
+                })
+                .catch(function (err) {
+                    if (fetchOrcidStatus) {
+                        fetchOrcidStatus.textContent = 'Network error saving ORCID.';
+                    }
+                    showSaveToast('Network error: ' + (err && err.message ? err.message : 'Unknown'), true);
+                    syncOrcidFetchButtonState();
+                });
+            } else {
+                doFetch();
+            }
+        });
+    }
+
+    /* ── Dropbox Folder Verify / Create (SuperAdmin) ── */
+    var dropboxConfirmModalEl = document.getElementById('dropboxConfirmModal');
+    var dropboxConfirmModal   = dropboxConfirmModalEl ? new bootstrap.Modal(dropboxConfirmModalEl) : null;
+    var _dropboxConfirmCb     = null;
+
+    function showDropboxConfirm(title, bodyHtml, onConfirm) {
+        var titleEl = document.getElementById('dropboxConfirmModalLabel');
+        var bodyEl  = document.getElementById('dropboxConfirmModalBody');
+        if (titleEl) titleEl.textContent = title;
+        if (bodyEl)  bodyEl.innerHTML    = bodyHtml;
+        _dropboxConfirmCb = onConfirm;
+        if (dropboxConfirmModal) dropboxConfirmModal.show();
+    }
+
+    var dropboxConfirmBtn = document.getElementById('dropboxConfirmModalBtn');
+    if (dropboxConfirmBtn) {
+        dropboxConfirmBtn.addEventListener('click', function () {
+            if (dropboxConfirmModal) dropboxConfirmModal.hide();
+            if (_dropboxConfirmCb) { var cb = _dropboxConfirmCb; _dropboxConfirmCb = null; cb(); }
+        });
+    }
+
+    var verifyDropboxBtn = document.getElementById('verifyDropboxFolderBtn');
+    if (verifyDropboxBtn) {
+        verifyDropboxBtn.addEventListener('click', function () {
+            var btn        = this;
+            var statusEl   = document.getElementById('dropboxFolderCheckStatus');
+            var resultEl   = document.getElementById('dropboxFolderCheckResult');
+            var targetUID  = btn.dataset.userid;
+
+            btn.disabled = true;
+            if (statusEl) statusEl.textContent = 'Checking…';
+            if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('d-none'); }
+
+            var body = new URLSearchParams();
+            body.append('userID', targetUID);
+
+            fetch('/admin/users/check_dropbox_folder.cfm', { method: 'POST', body: body })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (statusEl) statusEl.textContent = '';
+                if (!resultEl) return;
+
+                var html = '';
+                if (!data.success) {
+                    html = '<div class="alert alert-danger py-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>' + (data.message || 'An error occurred.') + '</div>';
+                } else if (!data.data || !data.data.primaryFolder) {
+                    html = '<div class="alert alert-secondary py-2 mb-0"><i class="bi bi-info-circle me-1"></i>' + (data.message || 'Could not determine folder name.') + '</div>';
+                } else if (data.data.exists) {
+                    var publishLabel = data.data.publishExists ? '<span class="text-success small ms-2"><i class="bi bi-check-circle me-1"></i>publish present</span>' : '<span class="text-warning small ms-2"><i class="bi bi-exclamation-circle me-1"></i>publish missing</span>';
+                    html = '<div class="alert alert-success d-flex align-items-center gap-3 py-2 mb-0">'
+                         + '<i class="bi bi-folder-check fs-5 flex-shrink-0"></i>'
+                         + '<div><strong>Folder Available</strong> <code class="ms-1">' + (data.data.folderPath || '') + '</code>' + publishLabel + '</div>'
+                         + '<a href="/admin/user-media/sources.cfm?userid=' + targetUID + '" class="btn btn-sm btn-ui-outline ms-auto" target="_blank"><i class="bi bi-card-image me-1"></i>User-Media</a>'
+                         + '</div>';
+                } else if (data.data.legacyExists) {
+                    html = '<div class="alert alert-warning d-flex align-items-center gap-3 py-2 mb-0">'
+                         + '<i class="bi bi-folder-symlink fs-5 flex-shrink-0"></i>'
+                         + '<div>'
+                         + '<strong>Legacy Folder Found</strong>'
+                         + ' <code class="ms-1">' + (data.data.legacyFolderPath || '') + '</code>'
+                         + '<div class="text-muted small mt-1">Rename to <code>' + (data.data.folderPath || '') + '</code></div>'
+                         + '</div>'
+                         + '<button type="button" id="renameDropboxFolderBtn" class="btn btn-sm btn-ui-outline ms-auto"'
+                         + ' data-userid="' + targetUID + '" data-frompath="' + (data.data.legacyFolderPath || '') + '" data-topath="' + (data.data.folderPath || '') + '">'
+                         + '<i class="bi bi-pencil-square me-1"></i>Rename to Convention</button>'
+                         + '</div>';
+                } else {
+                    html = '<div class="alert alert-warning d-flex align-items-center gap-3 py-2 mb-0">'
+                         + '<i class="bi bi-folder-x fs-5 flex-shrink-0"></i>'
+                         + '<div><strong>Folder Missing</strong> <code class="ms-1">' + (data.data.folderPath || '') + '</code></div>'
+                         + '<button type="button" id="createDropboxFolderBtn" class="btn btn-sm btn-ui-add ms-auto"'
+                         + ' data-userid="' + targetUID + '" data-folderpath="' + (data.data.folderPath || '') + '">'
+                         + '<i class="bi bi-folder-plus me-1"></i>Create Folder</button>'
+                         + '</div>';
+                }
+                resultEl.innerHTML = html;
+                resultEl.classList.remove('d-none');
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                if (statusEl) statusEl.textContent = '';
+                if (resultEl) {
+                    resultEl.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Network error: ' + (err && err.message ? err.message : 'Unknown') + '</div>';
+                    resultEl.classList.remove('d-none');
+                }
+            });
+        });
+
+        // Delegated click for the Create Folder button (injected dynamically)
+        var dropboxResultEl = document.getElementById('dropboxFolderCheckResult');
+        if (dropboxResultEl) {
+            dropboxResultEl.addEventListener('click', function (e) {
+                // Rename legacy folder to primary convention
+                var renameBtn = e.target.closest('#renameDropboxFolderBtn');
+                if (renameBtn) {
+                    var targetUID = renameBtn.dataset.userid;
+                    var fromPath  = renameBtn.dataset.frompath || '';
+                    var toPath    = renameBtn.dataset.topath   || '';
+
+                    showDropboxConfirm(
+                        'Rename Folder',
+                        'Rename <code>' + fromPath + '</code><br>to <code>' + toPath + '</code> in Dropbox?',
+                        function () {
+                    renameBtn.disabled = true;
+                    renameBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Renaming…';
+
+                    var body = new URLSearchParams();
+                    body.append('userID', targetUID);
+
+                    fetch('/admin/users/rename_dropbox_folder.cfm', { method: 'POST', body: body })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (!data.success) {
+                            renameBtn.disabled = false;
+                            renameBtn.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Rename to Convention';
+                            var errDiv = document.createElement('div');
+                            errDiv.className = 'alert alert-danger py-2 mt-2 mb-0';
+                            errDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + (data.message || 'Rename failed.');
+                            dropboxResultEl.appendChild(errDiv);
+                            return;
+                        }
+                        var publishLabel = data.data.publishCreated ? '<span class="text-success small ms-2"><i class="bi bi-check-circle me-1"></i>publish present</span>' : '<span class="text-muted small ms-2">publish already existed</span>';
+                        dropboxResultEl.innerHTML = '<div class="alert alert-success d-flex align-items-center gap-3 py-2 mb-0">'
+                            + '<i class="bi bi-folder-check fs-5 flex-shrink-0"></i>'
+                            + '<div><strong>Folder Available</strong> <code class="ms-1">' + (data.data.toPath || '') + '</code>' + publishLabel + '</div>'
+                            + '<a href="/admin/user-media/sources.cfm?userid=' + targetUID + '" class="btn btn-sm btn-ui-outline ms-auto" target="_blank"><i class="bi bi-card-image me-1"></i>User-Media</a>'
+                            + '</div>';
+                        showSaveToast('Dropbox folder renamed successfully.');
+                    })
+                    .catch(function (err) {
+                        renameBtn.disabled = false;
+                        renameBtn.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Rename to Convention';
+                        var errDiv = document.createElement('div');
+                        errDiv.className = 'alert alert-danger py-2 mt-2 mb-0';
+                        errDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Network error: ' + (err && err.message ? err.message : 'Unknown');
+                        dropboxResultEl.appendChild(errDiv);
+                    });
+                        } // end showDropboxConfirm callback
+                    );
+                    return;
+                }
+
+                var createBtn = e.target.closest('#createDropboxFolderBtn');
+                if (!createBtn) return;
+
+                var targetUID  = createBtn.dataset.userid;
+                var folderPath = createBtn.dataset.folderpath || '';
+
+                showDropboxConfirm(
+                    'Create Folder',
+                    'Create <code>' + folderPath + '</code> and a <code>publish</code> subfolder in Dropbox?',
+                    function () {
+                createBtn.disabled = true;
+                createBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Creating…';
+
+                var body = new URLSearchParams();
+                body.append('userID', targetUID);
+
+                fetch('/admin/users/create_dropbox_folder.cfm', { method: 'POST', body: body })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.success) {
+                        createBtn.disabled = false;
+                        createBtn.innerHTML = '<i class="bi bi-folder-plus me-1"></i>Create Folder';
+                        var errDiv = document.createElement('div');
+                        errDiv.className = 'alert alert-danger py-2 mt-2 mb-0';
+                        errDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + (data.message || 'Create failed.');
+                        dropboxResultEl.appendChild(errDiv);
+                        return;
+                    }
+                    // Replace result with "Folder Available" state
+                    var publishLabel = data.data.publishCreated ? '<span class="text-success small ms-2"><i class="bi bi-check-circle me-1"></i>publish present</span>' : '<span class="text-warning small ms-2"><i class="bi bi-exclamation-circle me-1"></i>publish missing</span>';
+                    dropboxResultEl.innerHTML = '<div class="alert alert-success d-flex align-items-center gap-3 py-2 mb-0">'
+                        + '<i class="bi bi-folder-check fs-5 flex-shrink-0"></i>'
+                        + '<div><strong>Folder Available</strong> <code class="ms-1">' + (data.data.folderPath || '') + '</code>' + publishLabel + '</div>'
+                        + '<a href="/admin/user-media/sources.cfm?userid=' + targetUID + '" class="btn btn-sm btn-ui-outline ms-auto" target="_blank"><i class="bi bi-card-image me-1"></i>User-Media</a>'
+                        + '</div>';
+                    showSaveToast('Dropbox folder created successfully.');
+                })
+                .catch(function (err) {
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = '<i class="bi bi-folder-plus me-1"></i>Create Folder';
+                    var errDiv = document.createElement('div');
+                    errDiv.className = 'alert alert-danger py-2 mt-2 mb-0';
+                    errDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Network error: ' + (err && err.message ? err.message : 'Unknown');
+                    dropboxResultEl.appendChild(errDiv);
+                });
+                    } // end showDropboxConfirm callback
+                );
+            });
+        }
+    }
+
     /* ── UH Admin tab (SuperAdmin) ── */
     var saveUhBtn = document.getElementById('save-uh-btn');
     if (saveUhBtn) {
@@ -2066,7 +3111,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (copyAddrBtn) {
         copyAddrBtn.addEventListener('click', function () {
             var raw = (document.getElementById('officeMailingAddress').value || '').trim();
-            if (!raw) { alert('Office Mailing Address is empty.'); return; }
+            if (!raw) { showValidationError('Office Mailing Address is empty.'); return; }
 
             /* Parse: "4349 Martin Luther King Blvd Health 1 RM 230 Houston, TX 77204-2020" */
             var parsed = { type: 'Office', addr1: '', addr2: '', city: '', state: '', zip: '',
@@ -2208,10 +3253,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                         bootstrap.Modal.getInstance(document.getElementById('addressModal')).hide();
                     } else {
-                        alert('Error: ' + (data.message || 'Save failed.'));
+                        showSaveToast('Error: ' + (data.message || 'Save failed.'), true);
                     }
                 })
-                .catch(function (err) { alert('Network error: ' + err.message); })
+                .catch(function (err) { showSaveToast('Network error: ' + err.message, true); })
                 .finally(function () {
                     saveToDbBtn.disabled = false;
                     saveToDbBtn.textContent = 'Save to Database';
@@ -2256,85 +3301,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* ── Student Profile tab ── */
-    var saveStudentBtn = document.getElementById('save-studentprofile-btn');
-    if (saveStudentBtn) {
-        saveStudentBtn.addEventListener('click', function () {
-            var pane = document.getElementById('student-profile-pane');
-            var body = new URLSearchParams();
-            body.append('userID', pageUserID);
-            body.append('section', 'studentprofile');
-            ['CurrentGradYear','OriginalGradYear','sp_first_externship','sp_second_externship','sp_commencement_age','sp_dissertation_thesis'].forEach(function (f) {
-                var el = pane.querySelector('[name="' + f + '"]');
-                body.append(f, el ? el.value : '');
-            });
-            /* sp degrees */
-            var countEl = pane.querySelector('[id="sp_degreeCount"]');
-            var spCount = countEl ? parseInt(countEl.value, 10) || 0 : 0;
-            body.append('sp_degree_count', spCount);
-            for (var i = 0; i < spCount; i++) {
-                var n = pane.querySelector('[name="sp_deg_name_' + i + '"]');
-                var u = pane.querySelector('[name="sp_deg_univ_' + i + '"]');
-                var y = pane.querySelector('[name="sp_deg_year_' + i + '"]');
-                var isuhco  = pane.querySelector('[name="sp_deg_isuhco_' + i + '"]');
-                var enrolled = pane.querySelector('[name="sp_deg_enrolled_' + i + '"]');
-                var haschange = pane.querySelector('[name="sp_deg_haschange_' + i + '"]');
-                var origexpgrad = pane.querySelector('[name="sp_deg_origexpgrad_' + i + '"]');
-                var expgrad = pane.querySelector('[name="sp_deg_expgrad_' + i + '"]');
-                var program = pane.querySelector('[name="sp_deg_program_' + i + '"]');
-                body.append('sp_deg_name_' + i, n ? n.value : '');
-                body.append('sp_deg_univ_' + i, u ? u.value : '');
-                body.append('sp_deg_year_' + i, y ? y.value : '');
-                body.append('sp_deg_isuhco_' + i, (isuhco && isuhco.checked) ? '1' : '0');
-                body.append('sp_deg_enrolled_' + i, (enrolled && enrolled.checked) ? '1' : '0');
-                body.append('sp_deg_haschange_' + i, (haschange && haschange.checked) ? '1' : '0');
-                body.append('sp_deg_origexpgrad_' + i, origexpgrad ? origexpgrad.value : '');
-                body.append('sp_deg_expgrad_' + i, expgrad ? expgrad.value : '');
-                body.append('sp_deg_program_' + i, program ? program.value : '');
-            }
-            saveSectionAjax('studentprofile', body, document.getElementById('save-studentprofile-status'));
-        });
-    }
-
-    /* ── Faculty / Emeritus / Resident degree tabs ── */
-    function setupDegreeTabSave(btnId, statusId, prefix) {
-        var btn = document.getElementById(btnId);
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-            var body = new URLSearchParams();
-            body.append('userID', pageUserID);
-            body.append('section', 'tabdegrees');
-            body.append('prefix', prefix);
-            var countEl = document.getElementById(prefix + '_degreeCount');
-            var count = countEl ? parseInt(countEl.value, 10) || 0 : 0;
-            body.append(prefix + '_degree_count', count);
-            for (var i = 0; i < count; i++) {
-                var n = document.querySelector('[name="' + prefix + '_deg_name_' + i + '"]');
-                var u = document.querySelector('[name="' + prefix + '_deg_univ_' + i + '"]');
-                var y = document.querySelector('[name="' + prefix + '_deg_year_' + i + '"]');
-                var isuhco    = document.querySelector('[name="' + prefix + '_deg_isuhco_' + i + '"]');
-                var enrolled  = document.querySelector('[name="' + prefix + '_deg_enrolled_' + i + '"]');
-                var haschange = document.querySelector('[name="' + prefix + '_deg_haschange_' + i + '"]');
-                var origexpgrad = document.querySelector('[name="' + prefix + '_deg_origexpgrad_' + i + '"]');
-                var expgrad   = document.querySelector('[name="' + prefix + '_deg_expgrad_' + i + '"]');
-                var program   = document.querySelector('[name="' + prefix + '_deg_program_' + i + '"]');
-                body.append(prefix + '_deg_name_' + i, n ? n.value : '');
-                body.append(prefix + '_deg_univ_' + i, u ? u.value : '');
-                body.append(prefix + '_deg_year_' + i, y ? y.value : '');
-                body.append(prefix + '_deg_isuhco_' + i, (isuhco && isuhco.checked) ? '1' : '0');
-                body.append(prefix + '_deg_enrolled_' + i, (enrolled && enrolled.checked) ? '1' : '0');
-                body.append(prefix + '_deg_haschange_' + i, (haschange && haschange.checked) ? '1' : '0');
-                body.append(prefix + '_deg_origexpgrad_' + i, origexpgrad ? origexpgrad.value : '');
-                body.append(prefix + '_deg_expgrad_' + i, expgrad ? expgrad.value : '');
-                body.append(prefix + '_deg_program_' + i, program ? program.value : '');
-            }
-            saveSectionAjax('tabdegrees', body, document.getElementById(statusId));
-        });
-    }
-    setupDegreeTabSave('save-facultydeg-btn', 'save-facultydeg-status', 'fac');
-    setupDegreeTabSave('save-emeritusdeg-btn', 'save-emeritusdeg-status', 'emer');
-    setupDegreeTabSave('save-residentdeg-btn', 'save-residentdeg-status', 'res');
-
     /* ── UHCO degree field toggles (inline degree rows in all tab panels) ── */
     document.addEventListener('change', function (e) {
         var row = e.target.closest('.degree-row');
@@ -2371,20 +3337,5 @@ document.addEventListener('DOMContentLoaded', function () {
             if (origExpEl) origExpEl.disabled = !e.target.checked;
         }
     });
-
-    /* ── Bio tab ── */
-    var saveBioBtn = document.getElementById('save-bio-btn');
-    if (saveBioBtn) {
-        saveBioBtn.addEventListener('click', function () {
-            var body = new URLSearchParams();
-            body.append('userID', pageUserID);
-            body.append('section', 'bio');
-            var editorEl = document.getElementById('bio-editor');
-            var html = editorEl ? editorEl.querySelector('.ql-editor').innerHTML : '';
-            if (html === '<p><br></p>') html = '';
-            body.append('bioContent', html);
-            saveSectionAjax('bio', body, document.getElementById('save-bio-status'));
-        });
-    }
 
 });

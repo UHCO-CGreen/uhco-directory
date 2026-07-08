@@ -8,10 +8,10 @@
 			<p class="text-muted mb-4">Your current permission set does not allow access to this page.</p>
 
 			<div class="d-flex flex-wrap gap-2">
-				<a href="#request.webRoot#/admin/dashboard.cfm" class="btn btn-primary">
+				<a href="#request.webRoot#/admin/dashboard.cfm" class="btn btn-ui-go">
 					<i class="bi bi-house-door me-1"></i>Go to Dashboard
 				</a>
-				<a href="#request.webRoot#/admin/logout.cfm" class="btn btn-outline-secondary">
+				<a href="#request.webRoot#/admin/logout.cfm" class="btn btn-ui-cancel">
 					<i class="bi bi-box-arrow-right me-1"></i>Logout
 				</a>
 			</div>
@@ -24,7 +24,7 @@
 				<form method="post" action="#request.webRoot#/admin/settings/admin-users/save.cfm" class="mb-0">
 					<input type="hidden" name="action" value="clearImpersonation">
 					<input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
-					<button type="submit" class="btn btn-warning">
+					<button type="submit" class="btn btn-ui-warning">
 						<i class="bi bi-x-octagon me-1"></i>Stop Impersonating
 					</button>
 				</form>

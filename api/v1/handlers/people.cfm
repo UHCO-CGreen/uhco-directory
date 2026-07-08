@@ -2,6 +2,7 @@
 <cfset auth.requireAuth("read")>
 
 <cfset dirService = createObject("component", "cfc.directory_service").init()>
+<cfset publicationsService = createObject("component", "cfc.publications_service").init()>
 
 <!--- Query params --->
 <cfset search      = trim(url.search ?: "")>
@@ -79,6 +80,15 @@
     offset  : offset,
     data    : result.data
 }>
+
+<!--- Strip flat name/contact fields — structured data is in NAMES/ADDRESSES/DEGREES envelopes --->
+<cfset stripFields = ["FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PREFERREDNAME", "MAIDENNAME", "EMAILPRIMARY", "PHONE", "OFFICE_MAILING_ADDRESS", "CURRENT_MAILING_ADDRESS", "ADDRESS"]>
+<cfloop array="#payload.data#" item="personRow">
+    <cfloop array="#stripFields#" item="fieldKey">
+        <cfset structDelete(personRow, fieldKey)>
+    </cfloop>
+    <cfset personRow["SHOWCASED_PUBLICATIONS"] = publicationsService.getShowcasedPublications(val(personRow.USERID ?: 0)).data>
+</cfloop>
 
 <cfset auth.sendResponse(payload)>
 <cfabort>

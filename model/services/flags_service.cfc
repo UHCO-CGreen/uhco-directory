@@ -56,37 +56,101 @@ component output="false" singleton {
         return { success=true, message="Flag removed." };
     }
 
-    public struct function createFlag( required string flagName ) {
+    public struct function createFlag( required string flagName, string flagDescription="" ) {
         var name = trim(flagName);
-        
+        var description = trim(flagDescription);
+
         if (!len(name)) {
             return { success=false, message="Flag name is required." };
         }
-        
-        var newID = variables.FlagsDAO.createFlag(name);
-        
-        return { 
-            success=true, 
-            message="Flag created.", 
-            flagID=newID 
+
+        var newID = variables.FlagsDAO.createFlag(name, description);
+
+        try {
+            if (structKeyExists(application, "changeLogSvc") AND isObject(application.changeLogSvc)) {
+                var clGroupID = application.changeLogSvc.beginGroup("flag_def", toString(newID), "Flag Definitions", "Created flag: #name#");
+                application.changeLogSvc.logDirectChange(
+                    groupID    = clGroupID,
+                    tableName  = "UserFlags",
+                    pkColumn   = "FlagID",
+                    recordID   = toString(newID),
+                    action     = "INSERT",
+                    afterData  = { FLAGID=newID, FLAGNAME=name, FLAGDESCRIPTION=description }
+                );
+            }
+        } catch (any ignore) {}
+
+        return {
+            success=true,
+            message="Flag created.",
+            flagID=newID
         };
     }
 
-    public struct function updateFlag( required numeric flagID, required string flagName ) {
+    public struct function updateFlag( required numeric flagID, required string flagName, string flagDescription="" ) {
         var name = trim(flagName);
-        
+        var description = trim(flagDescription);
+
         if (!len(name)) {
             return { success=false, message="Flag name is required." };
         }
-        
-        variables.FlagsDAO.updateFlag(flagID, name);
-        
+
+        var beforeRows = [];
+        var clGroupID  = "";
+        try {
+            if (structKeyExists(application, "changeLogSvc") AND isObject(application.changeLogSvc)) {
+                clGroupID  = application.changeLogSvc.beginGroup("flag_def", toString(arguments.flagID), "Flag Definitions", "Updated flag #arguments.flagID#");
+                beforeRows = variables.FlagsDAO.getFlagByID(arguments.flagID);
+                beforeRows = isArray(beforeRows) ? beforeRows : (structCount(beforeRows) ? [beforeRows] : []);
+            }
+        } catch (any ignore) {}
+
+        variables.FlagsDAO.updateFlag(flagID, name, description);
+
+        try {
+            if (len(clGroupID)) {
+                application.changeLogSvc.logDirectChange(
+                    groupID    = clGroupID,
+                    tableName  = "UserFlags",
+                    pkColumn   = "FlagID",
+                    recordID   = toString(arguments.flagID),
+                    action     = "UPDATE",
+                    beforeData = arrayLen(beforeRows) ? beforeRows[1] : {},
+                    afterData  = { FLAGID=arguments.flagID, FLAGNAME=name, FLAGDESCRIPTION=description }
+                );
+            }
+        } catch (any ignore) {}
+
         return { success=true, message="Flag updated." };
     }
 
     public struct function deleteFlag( required numeric flagID ) {
+        var beforeRows = [];
+        var clGroupID  = "";
+        try {
+            if (structKeyExists(application, "changeLogSvc") AND isObject(application.changeLogSvc)) {
+                clGroupID  = application.changeLogSvc.beginGroup("flag_def", toString(arguments.flagID), "Flag Definitions", "Deleted flag #arguments.flagID#");
+                beforeRows = variables.FlagsDAO.getFlagByID(arguments.flagID);
+                beforeRows = isArray(beforeRows) ? beforeRows : (structCount(beforeRows) ? [beforeRows] : []);
+            }
+        } catch (any ignore) {}
+
         variables.FlagsDAO.removeAllAssignmentsForFlag(flagID);
         variables.FlagsDAO.deleteFlag(flagID);
+
+        try {
+            if (len(clGroupID)) {
+                application.changeLogSvc.logDirectChange(
+                    groupID    = clGroupID,
+                    tableName  = "UserFlags",
+                    pkColumn   = "FlagID",
+                    recordID   = toString(arguments.flagID),
+                    action     = "DELETE",
+                    beforeData = arrayLen(beforeRows) ? beforeRows[1] : {}
+                );
+            }
+        } catch (any ignore) {}
+
         return { success=true, message="Flag deleted." };
     }
 

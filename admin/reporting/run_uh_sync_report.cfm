@@ -26,22 +26,14 @@
     <cfset triggeredBy = trim(form.triggeredBy)>
 </cfif>
 
+<cfinclude template="/admin/settings/scheduled-tasks/tasks/_scheduled_task_auth.cfm">
+
 <cfset returnJson = structKeyExists(url, "format") AND trim(url.format) EQ "json">
 
 <!--- ── API credentials ── --->
-<cfset uhApiToken  = structKeyExists(application, "uhApiToken")  ? trim(application.uhApiToken  ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken  = trim(server.system.environment["UH_API_TOKEN"])>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
-    </cfif>
-</cfif>
-<cfif uhApiToken  EQ ""><cfset uhApiToken  = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6"></cfif>
-<cfif uhApiSecret EQ ""><cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR"></cfif>
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
 
 <!--- ── State variables ── --->
 <cfset runID          = 0>
@@ -51,7 +43,13 @@
 <cfset totalNew       = 0>
 <cfset success        = false>
 <cfset errorMsg       = "">
+<cfset runDurationMs  = 0>
+<cfset runStartedAt   = 0>
 
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cfset errorMsg = "UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET.">
+<cfelse>
+<cfset runStartedAt = getTickCount()>
 <cftry>
 
     <!--- ── Initialise DAOs ── --->
@@ -127,22 +125,70 @@
     <!--- ── Helper: get a value from a person struct trying multiple key names ── --->
     <!--- (inline function so it's available without a CFC dependency)            --->
     <cfscript>
+        function uhSyncNormalizeOfficeMailingAddress(any value="") {
+            var normalized = toString(arguments.value ?: "");
+
+            normalized = reReplace(normalized, "[\r\n\t]+", " ", "all");
+            normalized = reReplace(normalized, "\s{2,}", " ", "all");
+
+            return trim(normalized);
+        }
+
+        function uhSyncFindValueByKeyDeep(any node="", required string keyName) {
+            var keys = [];
+            var currentKey = "";
+            var foundValue = "";
+            var index = 1;
+
+            if (isNull(arguments.node)) {
+                return "";
+            }
+
+            if (isStruct(arguments.node)) {
+                keys = structKeyArray(arguments.node);
+
+                for (index = 1; index <= arrayLen(keys); index++) {
+                    currentKey = keys[index];
+                    if (compareNoCase(currentKey, arguments.keyName) EQ 0) {
+                        if (isSimpleValue(arguments.node[currentKey])) {
+                            return toString(arguments.node[currentKey] ?: "");
+                        }
+                        if (isBoolean(arguments.node[currentKey])) {
+                            return arguments.node[currentKey] ? "true" : "false";
+                        }
+                    }
+                }
+
+                for (index = 1; index <= arrayLen(keys); index++) {
+                    foundValue = uhSyncFindValueByKeyDeep(arguments.node[keys[index]], arguments.keyName);
+                    if (len(trim(toString(foundValue)))) {
+                        return foundValue;
+                    }
+                }
+            } else if (isArray(arguments.node)) {
+                for (index = 1; index <= arrayLen(arguments.node); index++) {
+                    foundValue = uhSyncFindValueByKeyDeep(arguments.node[index], arguments.keyName);
+                    if (len(trim(toString(foundValue)))) {
+                        return foundValue;
+                    }
+                }
+            }
+
+            return "";
+        }
+
         function uhSyncGetVal(required struct person, required string keysCsv) {
             var names = listToArray(arguments.keysCsv);
             var i = 1;
             var v = "";
+
             for (i = 1; i <= arrayLen(names); i++) {
-                var k = trim(names[i]);
-                // Case-insensitive struct key lookup
-                var allKeys = structKeyArray(arguments.person);
-                var j = 1;
-                for (j = 1; j <= arrayLen(allKeys); j++) {
-                    if (compareNoCase(allKeys[j], k) EQ 0) {
-                        v = toString(arguments.person[allKeys[j]] ?: "");
-                        if (len(trim(v))) { return trim(v); }
-                    }
+                v = uhSyncFindValueByKeyDeep(arguments.person, trim(names[i]));
+                if (len(trim(toString(v)))) {
+                    return trim(toString(v));
                 }
             }
+
             return "";
         }
     </cfscript>
@@ -151,7 +197,7 @@
     <!--- NOTE: We do NOT use getPeople() for gone/comparison detection because the  --->
     <!--- bulk endpoint can return a scoped/filtered subset (see uh_people_db_not_in_api.cfm). --->
     <!--- False "gone" flags result when a user exists in the API but wasn't in the   --->
-    <!--- bulklist. We use getPerson() individually instead (same approach as uh_sync.cfm). --->
+    <!--- bulklist. We use getPerson() individually instead (same approach as the per-user sync comparison logic). --->
     <cfset apiIdSet = {}>
 
     <cfloop from="1" to="#arrayLen(apiPeople)#" index="p">
@@ -208,7 +254,7 @@
             <cfset personFound = left(personResp.statusCode ?: "", 3) EQ "200">
 
             <cfif personFound>
-                <!--- Unwrap the nested person struct (same logic as uh_sync.cfm).
+                    <!--- Unwrap the nested person struct (same logic as the per-user sync comparison code).
                       Guard every branch with isStruct() — rawPD.data can be an array
                       or simple value in some API responses, which would pass apPerson
                       as a non-struct and crash uhSyncGetVal. --->
@@ -255,6 +301,11 @@
                 <cfset localVal = trim(toString(localRow[fm.localCol] ?: ""))>
                 <cfset apiVal   = uhSyncGetVal(apPerson, fm.apiKeys)>
 
+                <cfif fm.localCol EQ "Office_Mailing_Address">
+                    <cfset localVal = uhSyncNormalizeOfficeMailingAddress(localVal)>
+                    <cfset apiVal = uhSyncNormalizeOfficeMailingAddress(apiVal)>
+                </cfif>
+
                 <!--- Only flag a diff when:
                       (a) the API returned a non-empty value, AND
                       (b) that value differs from the local value (case-insensitive for email) --->
@@ -294,15 +345,16 @@
 
             <!---
                 Only record new users that belong to UHCO.
-                Division : H04012
+                Division : H0412
                 Department: H0113 or H0115
                 Campus   : HR730
                 Anyone outside these is from a different unit and should be ignored.
             --->
-            <cfset newDivision = uhSyncGetVal(ap, "division")>
-            <cfset newCampus   = uhSyncGetVal(ap, "campus")>
+            <cfset newDivision = uCase(trim(uhSyncGetVal(ap, "division")))>
+            <cfset newDept     = uCase(trim(newDept))>
+            <cfset newCampus   = uCase(trim(uhSyncGetVal(ap, "campus")))>
             <cfset isUHCO = (
-                newDivision EQ "H04012"
+                newDivision EQ "H0412"
                 AND listFindNoCase("H0113,H0115", newDept)
                 AND newCampus   EQ "HR730"
             )>
@@ -331,13 +383,24 @@
     </cfloop>
 
     <!--- ── Persist totals ── --->
-    <cfset uhSyncDAO.updateRunTotals(runID, totalCompared, totalDiffs, totalGone, totalNew)>
+    <cfset runDurationMs = max(0, getTickCount() - runStartedAt)>
+    <cfset uhSyncDAO.updateRunTotals(runID, totalCompared, totalDiffs, totalGone, totalNew, runDurationMs)>
     <cfset success = true>
 
 <cfcatch type="any">
+    <cfif runStartedAt GT 0>
+        <cfset runDurationMs = max(0, getTickCount() - runStartedAt)>
+    </cfif>
+    <cfif runID GT 0>
+        <cftry>
+            <cfset uhSyncDAO.updateRunTotals(runID, totalCompared, totalDiffs, totalGone, totalNew, runDurationMs)>
+        <cfcatch></cfcatch>
+        </cftry>
+    </cfif>
     <cfset errorMsg = cfcatch.message & " — " & cfcatch.detail>
 </cfcatch>
 </cftry>
+</cfif>
 
 <!--- ── Respond ── --->
 <cfif returnJson>
@@ -349,6 +412,7 @@
         totalDiffs    : totalDiffs,
         totalGone     : totalGone,
         totalNew      : totalNew,
+        durationMs    : runDurationMs,
         triggeredBy   : triggeredBy,
         error         : errorMsg
     })#</cfoutput>

@@ -1,9 +1,9 @@
-<!---
+﻿<!---
     Admin Roles — list, create, edit, delete roles.
     Permission: settings.admin_roles.manage.
 --->
 
-<cfif NOT request.hasPermission("settings.admin_roles.manage")>
+<cfif NOT request.isSuperAdmin()>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -41,6 +41,28 @@
     <cfset rolePermissionLookupByID[toString(roleRow.ROLE_ID)] = currentRolePermissionLookup>
 </cfloop>
 
+<!--- Sort params --->
+<cfset allowedRoleSortCols = ["ROLE_ID","ROLE_NAME"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedRoleSortCols, url.sortCol) GT 0) ? url.sortCol : "ROLE_NAME">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfscript>
+    arraySort(roles, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function roleSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        return "?sortCol=" & col & "&sortDir=" & dir;
+    }
+    function roleSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -59,19 +81,6 @@
 <cfif len(sectionStatus)>
     <div class="mb-3">
         <span class="badge bg-warning text-dark">Currently in: #sectionStatus#</span>
-    </div>
-</cfif>
-
-<cfif len(msgParam)>
-    <div class="alert alert-success alert-dismissible fade show mt-3">
-        #encodeForHTML(msgParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
-<cfif len(errParam)>
-    <div class="alert alert-danger alert-dismissible fade show mt-3">
-        #encodeForHTML(errParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 </cfif>
 
@@ -99,11 +108,11 @@
                        placeholder="e.g. REPORT_ADMIN" required>
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn <cfif structCount(editRole)>btn-ui-save<cfelse>btn-ui-add</cfif>">
                     <cfif structCount(editRole)>Update<cfelse>Create</cfif>
                 </button>
                 <cfif structCount(editRole)>
-                    <a href="/admin/settings/admin-roles/" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="/admin/settings/admin-roles/" class="btn btn-ui-cancel">Cancel</a>
                 </cfif>
             </div>
         </form>
@@ -145,7 +154,7 @@
                     </cfloop>
                 </div>
                 <div class="mt-3">
-                    <button type="submit" class="btn btn-primary">Save Default Permissions</button>
+                    <button type="submit" class="btn btn-ui-save">Save Default Permissions</button>
                 </div>
             </form>
         <cfelse>
@@ -160,11 +169,11 @@
     <div class="card-body">
         <h5 class="mb-3 settings-section-title"><i class="bi bi-list-ul me-2"></i>All Roles</h5>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 settings-table">
+            <table class="table table-sm table-hover align-middle mb-0 settings-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Role Name</th>
+                        <th><a href="#roleSortLink('ROLE_ID')#" class="settings-sort-link">ID#roleSortArrow('ROLE_ID')#</a></th>
+                        <th><a href="#roleSortLink('ROLE_NAME')#" class="settings-sort-link">Role Name#roleSortArrow('ROLE_NAME')#</a></th>
                         <th>Default Permissions</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -190,20 +199,20 @@
                         </td>
                         <td class="text-end">
                             <div class="settings-action-group">
-                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit Role" data-bs-toggle="tooltip" data-bs-title="Edit Role" aria-label="Edit Role">
+                            <a href="/admin/settings/admin-roles/?edit=#r.ROLE_ID#" class="btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit" title="Edit Role" data-bs-toggle="tooltip" data-bs-title="Edit Role" aria-label="Edit Role">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif r.ROLE_NAME NEQ "SUPER_ADMIN">
                                 <form method="post" action="/admin/settings/admin-roles/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deleteRole">
                                     <input type="hidden" name="roleID" value="#r.ROLE_ID#">
-                                    <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Delete Role" data-bs-toggle="tooltip" data-bs-title="Delete Role" aria-label="Delete Role"
-                                            onclick="return confirm('Delete role #encodeForJavaScript(r.ROLE_NAME)#? This will remove it from all users.')">
+                                    <button type="submit" class="btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete" title="Delete Role" data-bs-toggle="tooltip" data-bs-title="Delete Role" aria-label="Delete Role"
+                                            data-confirm="Delete role #encodeForJavaScript(r.ROLE_NAME)#? This will remove it from all users.">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             <cfelse>
-                                <button class="btn btn-sm btn-outline-secondary" disabled title="SUPER_ADMIN cannot be deleted">
+                                <button class="btn btn-sm btn-ui-cancel" disabled title="SUPER_ADMIN cannot be deleted">
                                     <i class="bi bi-lock"></i>
                                 </button>
                             </cfif>
@@ -218,11 +227,11 @@
 </div>
 
 <div class="mt-3 d-flex flex-wrap gap-2">
-    <a href="/admin/settings/admin-users/" class="btn btn-outline-secondary">
+    <a href="/admin/settings/admin-users/" class="btn btn-ui-go">
         <i class="bi bi-people me-1"></i>Back to Admin Users
     </a>
     <cfif request.hasPermission("settings.admin_permissions.manage")>
-        <a href="/admin/settings/admin-permissions/" class="btn btn-outline-secondary">
+        <a href="/admin/settings/admin-permissions/" class="btn btn-ui-go">
             <i class="bi bi-sliders me-1"></i>Manage Permission Definitions
         </a>
     </cfif>
@@ -230,6 +239,23 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(msgParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(msgParam)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

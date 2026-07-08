@@ -2,10 +2,18 @@ component output="false" singleton {
 
     variables.maxTestUserCount = 10;
 
+    private string function normalizeOfficeMailingAddress( any value = "" ) {
+        var normalized = toString(arguments.value ?: "");
+
+        normalized = reReplace(normalized, "[\r\n\t]+", " ", "all");
+        normalized = reReplace(normalized, "\s{2,}", " ", "all");
+
+        return trim(normalized);
+    }
+
     
     public any function init() {
         variables.UsersDAO = createObject("component", "dao.users_DAO").init();
-        variables.AppConfigService = createObject("component", "cfc.appConfig_service").init();
         return this;
     }
 
@@ -19,6 +27,8 @@ component output="false" singleton {
             return { success=false, message="User not found.", data={} };
         }
 
+        _getDependency("nameResolutionService", "cfc.nameResolution_service").attachPrimaryNameEnvelopeToRow(user);
+
         return { success=true, data=user };
     }
 
@@ -28,6 +38,8 @@ component output="false" singleton {
         if ( structIsEmpty( user ) ) {
             return { success=false, message="User not found.", data={} };
         }
+
+        _getDependency("nameResolutionService", "cfc.nameResolution_service").attachPrimaryNameEnvelopeToRow(user);
 
         return { success=true, data=user };
     }
@@ -54,7 +66,7 @@ component output="false" singleton {
         data.DivisionName = trim( data.DivisionName ?: "" );
         data.Department = trim( data.Department ?: "" );
         data.DepartmentName = trim( data.DepartmentName ?: "" );
-        data.Office_Mailing_Address = trim( data.Office_Mailing_Address ?: "" );
+        data.Office_Mailing_Address = normalizeOfficeMailingAddress( data.Office_Mailing_Address ?: "" );
         data.Mailcode = trim( data.Mailcode ?: "" );
 
         // Validate
@@ -93,7 +105,7 @@ component output="false" singleton {
         data.DivisionName = trim( data.DivisionName ?: "" );
         data.Department = trim( data.Department ?: "" );
         data.DepartmentName = trim( data.DepartmentName ?: "" );
-        data.Office_Mailing_Address = trim( data.Office_Mailing_Address ?: "" );
+        data.Office_Mailing_Address = normalizeOfficeMailingAddress( data.Office_Mailing_Address ?: "" );
         data.Mailcode = trim( data.Mailcode ?: "" );
 
         if ( len( data.EmailPrimary ?: "" ) && !isValid( "email", data.EmailPrimary ) ) {
@@ -113,10 +125,26 @@ component output="false" singleton {
         variables.UsersDAO.updateTitle1Field( userID, trim(arguments.title1 ?: "") );
     }
 
+    public void function updateDropboxFolderPath( required numeric userID, required string folderPath ) {
+        variables.UsersDAO.updateDropboxFolderPath( userID, trim(arguments.folderPath ?: "") );
+    }
+
     public void function setUserActive( required numeric userID, required boolean active ) {
         variables.UsersDAO.setUserActive(
             userID = arguments.userID,
             active = arguments.active
+        );
+    }
+
+    public void function updateDemographics(
+        required numeric userID,
+        string dob = "",
+        string gender = ""
+    ) {
+        variables.UsersDAO.updateDemographics(
+            userID = arguments.userID,
+            dob = arguments.dob,
+            gender = arguments.gender
         );
     }
 
@@ -133,7 +161,7 @@ component output="false" singleton {
             return { success=false, message="User not found." };
         }
 
-        variables.UsersDAO.deleteUser(
+        _getDependency("userDeletionService", "cfc.userDeletion_service").deleteUser(
             userID = userID,
             purgeDuplicatePairs = arguments.forceDeleteRelatedDuplicatePairs
         );
@@ -145,16 +173,16 @@ component output="false" singleton {
     }
 
     public boolean function isTestModeEnabled() {
-        return _configValueToBoolean( variables.AppConfigService.getValue( "test_mode.enabled", "0" ) );
+        return _configValueToBoolean( _getDependency("AppConfigService", "cfc.appConfig_service").getValue( "test_mode.enabled", "0" ) );
     }
 
     public void function setTestModeEnabled( required boolean enabled ) {
-        variables.AppConfigService.setValue( "test_mode.enabled", arguments.enabled ? "1" : "0" );
+        _getDependency("AppConfigService", "cfc.appConfig_service").setValue( "test_mode.enabled", arguments.enabled ? "1" : "0" );
     }
 
     public struct function generateTestUsers( numeric count = 0 ) {
         var generationCount = variables.maxTestUserCount;
-        var staleMonths = val( variables.AppConfigService.getValue( "dashboard.stale_months", "6" ) );
+        var staleMonths = val( _getDependency("AppConfigService", "cfc.appConfig_service").getValue( "dashboard.stale_months", "6" ) );
         var createdUsers = [];
         var totalTestUsers = 0;
         var existingTestUsers = variables.UsersDAO.getTestUserCount();
@@ -198,7 +226,7 @@ component output="false" singleton {
     }
 
     public struct function resetTestUsers() {
-        var staleMonths = val( variables.AppConfigService.getValue( "dashboard.stale_months", "6" ) );
+        var staleMonths = val( _getDependency("AppConfigService", "cfc.appConfig_service").getValue( "dashboard.stale_months", "6" ) );
         var existingTestUsers = variables.UsersDAO.getTestUserCount();
 
         if ( staleMonths LT 1 ) {
@@ -232,7 +260,7 @@ component output="false" singleton {
 
         for ( var targetUserID in targetUserIDs ) {
             if ( val( targetUserID ) GT 0 ) {
-                variables.UsersDAO.deleteUser( val( targetUserID ) );
+                _getDependency("userDeletionService", "cfc.userDeletion_service").deleteUser( val( targetUserID ) );
                 deletedCount++;
             }
         }
@@ -247,7 +275,14 @@ component output="false" singleton {
 
     
     public array function listUsers() {
-        return variables.UsersDAO.getAllUsers();
+        var rows = variables.UsersDAO.getAllUsers();
+        _attachCurrentNameEnvelopeToRows(rows);
+        return rows;
+    }
+
+    public array function listUsersForAdminIndex() {
+        var rows = variables.UsersDAO.getAdminListUsers();
+        return rows;
     }
 
     public struct function searchUsers(
@@ -260,7 +295,7 @@ component output="false" singleton {
         numeric maxRows     = 50,
         numeric startRow    = 1
     ) {
-        return variables.UsersDAO.searchUsers(
+        var result = variables.UsersDAO.searchUsers(
             searchTerm   = arguments.searchTerm,
             filterFlag   = arguments.filterFlag,
             filterOrg    = arguments.filterOrg,
@@ -270,11 +305,90 @@ component output="false" singleton {
             maxRows      = arguments.maxRows,
             startRow     = arguments.startRow
         );
+
+        if ( structKeyExists(result, "data") AND isArray(result.data) ) {
+            _getDependency("nameResolutionService", "cfc.nameResolution_service").attachPrimaryNameEnvelopeToRows(result.data);
+
+            var userIDs = [];
+            for ( var row in result.data ) {
+                if ( structKeyExists(row, "USERID") AND isNumeric(row.USERID) ) {
+                    arrayAppend(userIDs, val(row.USERID));
+                }
+            }
+            var emailsMap    = _getDependency("EmailsDAO", "dao.emails_DAO").getPrimaryEmailsMap(userIDs);
+            var phonesMap    = _getDependency("PhoneDAO", "dao.phone_DAO").getPrimaryPhonesMap(userIDs);
+            var addressesMap = _getDependency("AddressesDAO", "dao.addresses_DAO").getPrimaryAddressesMap(userIDs);
+            var degreesMap   = _getDependency("DegreesDAO", "dao.degrees_DAO").getDegreesMap(userIDs);
+            var flagsMap     = _getDependency("flagsService", "cfc.flags_service").getAllUserFlagMap();
+            var orgsMap      = _getDependency("organizationsService", "cfc.organizations_service").getAllUserOrgMap();
+
+            for ( var row in result.data ) {
+                var uKey = toString(val(row.USERID ?: 0));
+                row["FLAGS"]        = structKeyExists(flagsMap, uKey)     ? flagsMap[uKey]       : [];
+                row["ORGANIZATIONS"] = structKeyExists(orgsMap, uKey)      ? orgsMap[uKey]        : [];
+                row["PRIMARYEMAIL"] = structKeyExists(emailsMap, uKey)    ? emailsMap[uKey]      : {};
+                row["PRIMARYPHONE"] = structKeyExists(phonesMap, uKey)    ? phonesMap[uKey]      : {};
+                row["ADDRESSES"]    = structKeyExists(addressesMap, uKey) ? [addressesMap[uKey]] : [];
+                row["DEGREES"]      = structKeyExists(degreesMap, uKey)   ? degreesMap[uKey]     : [];
+
+                var degParts = [];
+                for ( var deg in row["DEGREES"] ) {
+                    var dn = trim(deg.DEGREENAME ?: "");
+                    if ( len(dn) ) arrayAppend(degParts, dn);
+                }
+                row["COMBINEDDEGREES"] = arrayToList(degParts, ", ");
+            }
+        }
+
+        return result;
+    }
+
+    private void function _attachCurrentNameEnvelopeToRows( required array rows ) {
+        for ( var i = 1; i <= arrayLen(arguments.rows); i++ ) {
+            _attachCurrentNameEnvelopeToRow(arguments.rows[i]);
+        }
+    }
+
+    private void function _attachCurrentNameEnvelopeToRow( required struct row ) {
+        var first = trim(arguments.row.FIRSTNAME ?: "");
+        var middle = trim(arguments.row.MIDDLENAME ?: "");
+        var last = trim(arguments.row.LASTNAME ?: "");
+        var parts = [];
+
+        if ( len(first) ) {
+            arrayAppend(parts, first);
+        }
+        if ( len(middle) ) {
+            arrayAppend(parts, middle);
+        }
+        if ( len(last) ) {
+            arrayAppend(parts, last);
+        }
+
+        arguments.row["FULLNAME"] = arrayToList(parts, " ");
+        arguments.row["NAMES"] = [
+            {
+                ALIASID = 0,
+                FIRST = first,
+                MIDDLE = middle,
+                LAST = last,
+                FULL = arguments.row["FULLNAME"],
+                PRIMARY = true
+            }
+        ];
     }
 
     private boolean function _configValueToBoolean( required string value ) {
         var normalizedValue = lCase( trim( arguments.value ?: "" ) );
         return listFindNoCase( "1,true,yes,on", normalizedValue ) GT 0;
+    }
+
+    private any function _getDependency( required string key, required string componentPath ) {
+        if ( !structKeyExists(variables, arguments.key) OR !isObject(variables[arguments.key]) ) {
+            variables[arguments.key] = createObject("component", arguments.componentPath).init();
+        }
+
+        return variables[arguments.key];
     }
 
 }

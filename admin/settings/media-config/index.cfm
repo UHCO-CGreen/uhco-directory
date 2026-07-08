@@ -133,7 +133,7 @@
                     </div>
                 </div>
                 <div class="mt-auto">
-                    <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-primary">
+                    <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-ui-go">
                         <i class="bi bi-pencil-square me-1"></i> Manage Patterns
                     </a>
                 </div>
@@ -167,7 +167,7 @@
                     </div>
                 </div>
                 <div class="mt-auto">
-                    <a href="/admin/settings/media-config/variant-types.cfm" class="btn btn-success">
+                    <a href="/admin/settings/media-config/variant-types.cfm" class="btn btn-ui-go">
                         <i class="bi bi-pencil-square me-1"></i> Manage Variant Types
                     </a>
                 </div>
@@ -185,12 +185,6 @@
         <h5 class="mb-0"><i class="bi bi-cloud-arrow-down me-2"></i>Dropbox Source Settings</h5>
     </div>
     <div class="card-body">
-        <cfif len(actionMessage)>
-            <div class="alert #actionMessageClass# alert-dismissible fade show" role="alert">
-                #encodeForHTML(actionMessage)#
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        </cfif>
         <form method="post">
             <input type="hidden" name="formAction" value="saveDropboxSettings">
             <div class="mb-3">
@@ -267,7 +261,7 @@
                     Example: <code>profile, alumni, dean, marketing</code>.
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-ui-save">
                 <i class="bi bi-save me-1"></i>Save Dropbox Settings
             </button>
         </form>
@@ -276,6 +270,21 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfif len(actionMessage)>
+<cfset toastTone = actionMessageClass CONTAINS "success" ? "success" : (actionMessageClass CONTAINS "warning" ? "warning" : "danger")>
+</cfif>
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: '#toastTone#' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

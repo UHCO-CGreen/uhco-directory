@@ -15,6 +15,15 @@
 <cfparam name="url.uhApiId"  default="">
 <cfparam name="url.returnTo" default="">
 
+<cfset quarantineMode = "redirect">
+<cfset quarantineReturnTo = "/admin/users/index.cfm">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
+<cfif NOT request.hasPermission("users.edit") OR NOT request.canCreateUsers()>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    <cfabort>
+</cfif>
+
 <cfset datasource = request.datasource>
 
 <!--- Validate returnTo: root-relative only, no open-redirect --->
@@ -47,21 +56,13 @@
 </cfif>
 
 <!--- API credentials --->
-<cfset uhApiToken  = structKeyExists(application, "uhApiToken")  ? trim(application.uhApiToken  ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken  = trim(server.system.environment["UH_API_TOKEN"])>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
-    </cfif>
-</cfif>
-<cfif uhApiToken EQ "">
-    <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-</cfif>
-<cfif uhApiSecret EQ "">
-    <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
+
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cflocation url="#returnTo##sep#err=#urlEncodedFormat('UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.')#" addtoken="false">
+    <cfabort>
 </cfif>
 
 <!--- Fetch person from UH API --->

@@ -1,15 +1,7 @@
-<!--- ── API credentials ── --->
-<cfset uhApiToken  = structKeyExists(application, "uhApiToken")  ? trim(application.uhApiToken  ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken  = trim(server.system.environment["UH_API_TOKEN"])>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
-    </cfif>
-</cfif>
+﻿<!--- ── API credentials ── --->
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
 <!--- ── Search parameters from form ── --->
 <cfset paramQ          = structKeyExists(url, "q")          ? trim(url.q)          : "">
 <cfset paramDivision   = structKeyExists(url, "division")   ? trim(url.division)   : "">
@@ -206,8 +198,8 @@
             </div>
             <div class='row g-3 align-items-center'>
                 <div class='col-auto'>
-                    <button type='submit' class='btn btn-primary'>Search</button>
-                    #(len(paramQ) OR paramDepartment NEQ 'H0113' ? "<a href='?department=H0113' class='btn btn-outline-secondary ms-1'>Reset</a>" : "")#
+                    <button type='submit' class='btn btn-ui-filter'>Search</button>
+                    #(len(paramQ) OR paramDepartment NEQ 'H0113' ? "<a href='?department=H0113' class='btn btn-ui-clear ms-1'>Reset</a>" : "")#
                 </div>
             </div>
         </form>
@@ -239,7 +231,7 @@
 <div class='card mb-4'>
     <div class='card-header d-flex justify-content-between align-items-center'>
         <strong>Authentication &amp; Request Debug</strong>
-        <button class='btn btn-sm btn-outline-secondary' type='button' data-bs-toggle='collapse' data-bs-target='##debugCollapse'>Toggle</button>
+        <button class='btn btn-sm btn-ui-cancel' type='button' data-bs-toggle='collapse' data-bs-target='##debugCollapse'>Toggle</button>
     </div>
     <div class='collapse' id='debugCollapse'>
         <div class='card-body bg-light admin-debug-body-sm'>
@@ -256,7 +248,7 @@
 ">
 
 <cfset pageScripts = "
-<script>
+<cfoutput><script nonce='#encodeForHTMLAttribute(request.cspNonce ?: '')#'></cfoutput>
 document.addEventListener('DOMContentLoaded', function () {
     const studentCheckbox = document.getElementById('studentInput');
     const staffCheckbox   = document.getElementById('staffInput');

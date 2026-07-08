@@ -350,6 +350,11 @@ component extends="dao.BaseDAO" output="false" singleton {
                     WHERE ua.UserID = u.UserID
                       AND ua.IsActive = 1
                     ORDER BY
+                                                CASE
+                                                        WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                            OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                        THEN 0 ELSE 1
+                                                END,
                         CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                         ISNULL(ua.SortOrder, 999999),
                         ua.AliasID
@@ -435,6 +440,11 @@ component extends="dao.BaseDAO" output="false" singleton {
                 WHERE ua.UserID = u.UserID
                   AND ua.IsActive = 1
                 ORDER BY
+                                        CASE
+                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                THEN 0 ELSE 1
+                                        END,
                     CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID
@@ -513,6 +523,11 @@ component extends="dao.BaseDAO" output="false" singleton {
                     WHERE ua.UserID = u.UserID
                       AND ua.IsActive = 1
                     ORDER BY
+                                                CASE
+                                                        WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                            OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                        THEN 0 ELSE 1
+                                                END,
                         CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                         ISNULL(ua.SortOrder, 999999),
                         ua.AliasID
@@ -626,6 +641,11 @@ component extends="dao.BaseDAO" output="false" singleton {
                 WHERE ua.UserID = u.UserID
                   AND ua.IsActive = 1
                 ORDER BY
+                                        CASE
+                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                THEN 0 ELSE 1
+                                        END,
                     CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID

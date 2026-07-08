@@ -1,0 +1,133 @@
+.dashboard-shell {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.dashboard-title {
+	margin-bottom: 0;
+}
+
+.dashboard-subtitle {
+	max-width: 56rem;
+	color: var(--bs-secondary-color);
+}
+
+.dashboard-card {
+	border: 0;
+	border-radius: 1rem;
+	overflow: visible;
+}
+
+.dashboard-card .card-body {
+	min-height: 100%;
+}
+
+.dashboard-card-title {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 0.35rem;
+}
+
+.dashboard-card-title .bi {
+	color: var(--bs-primary);
+}
+
+.dashboard-card-text {
+	margin-bottom: 0;
+	color: var(--bs-secondary-color);
+}
+
+.dashboard-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.dashboard-status-card {
+	border-width: 1px;
+}
+
+.dashboard-status-card .card-body {
+	align-items: flex-start;
+}
+
+.dashboard-status-copy {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.dashboard-status-copy small {
+	display: block;
+	line-height: 1.45;
+}
+
+.dashboard-summary-grid {
+	display: grid;
+	gap: 1rem;
+	align-items: stretch;
+	grid-template-columns: 1fr;
+}
+
+.dashboard-summary-cell {
+	display: flex;
+}
+
+@media (min-width: 1200px) {
+	.dashboard-summary-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.dashboard-summary-panel {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+}
+
+.dashboard-summary-table-wrap {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.dashboard-summary-panel .table-responsive {
+	min-height: 100%;
+}
+
+.dashboard-summary-panel .table {
+	margin-bottom: 0;
+}
+
+.dashboard-summary-footer {
+	margin-top: auto;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--bs-border-color);
+}
+
+// Stat panels (dashboard statistics row)
+.stat-panel-card {
+	border: 0;
+	border-radius: 1rem;
+}
+
+.stat-panel-icon {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.4rem;
+	flex-shrink: 0;
+}
+
+.stat-panel-icon--primary   { background: rgba(13, 110, 253, 0.12); color: #0d6efd; }
+.stat-panel-icon--info      { background: rgba(13, 202, 240, 0.12); color: #0dcaf0; }
+.stat-panel-icon--success   { background: rgba(25, 135,  84, 0.12); color: #198754; }
+.stat-panel-icon--warning   { background: rgba(255, 193,  7, 0.12); color: #ffc107; }
+.stat-panel-icon--danger    { background: rgba(220,  53, 69, 0.12); color: #dc3545; }
+.stat-panel-icon--secondary { background: rgba(108, 117, 125, 0.12); color: #6c757d; }
+.stat-panel-icon--purple    { background: rgba(111,  66, 193, 0.12); color: #6f42c1; }
+.stat-panel-icon--teal      { background: rgba( 32, 201, 151, 0.12); color: #20c997; }
+.stat-panel-icon--orange    { background: rgba(253, 126,  20, 0.12); color: #fd7e14; }

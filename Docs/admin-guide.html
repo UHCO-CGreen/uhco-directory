@@ -1,0 +1,569 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UHCO Ident &mdash; Admin Guide</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <div class="hero-card">
+        <div class="eyebrow">Admin Guide</div>
+        <h1>UHCO Identity Admin</h1>
+        <p>A summary of what the admin interface lets you do, how access is granted, and which areas require specific permissions. This is not a step-by-step guide &mdash; it is an overview of capabilities and their gates.</p>
+        <div class="hero-meta">
+          <span>Role-based access</span>
+          <span>CougarNet login</span>
+          <span>Permission-gated sections</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container layout">
+    <aside class="sidebar">
+      <h2>Contents</h2>
+      <ul class="toc">
+        <li><a href="#access">1. Getting Access</a></li>
+        <li><a href="#dashboard">2. Dashboard</a></li>
+        <li><a href="#users">3. Managing Users</a></li>
+        <li><a href="#media">4. User Media &amp; Photos</a></li>
+        <li><a href="#userreview">5. UserReview Submissions</a></li>
+        <li><a href="#directory">6. Directory Structure</a></li>
+        <li><a href="#reporting">7. Reporting</a></li>
+        <li><a href="#settings">8. Settings</a></li>
+        <li><a href="#permissions">9. Permission Reference</a></li>
+      </ul>
+    </aside>
+
+    <div class="content">
+
+      <!-- ═══════════════════════════════════════════ 1. Getting Access -->
+      <section class="card" id="access">
+        <h2>1. Getting Access</h2>
+        <p>All admin accounts are created manually by a <code>SUPER_ADMIN</code> or a user with <code>settings.admin_users.manage</code>. There is no self-registration.</p>
+        <h3>Login</h3>
+        <p>You sign in with your CougarNet username and password at <code>/admin/login.cfm</code>. Credentials are validated against the CougarNet Active Directory (LDAP); no separate admin password is set. A Windows SSO option is implemented but currently disabled pending a production server configuration change.</p>
+        <h3>What You Need Before You Can Log In</h3>
+        <ul>
+          <li>An <strong>AdminUser</strong> record must exist in the system with your CougarNet username.</li>
+          <li>That account must have at least one <strong>role</strong> assigned (or a direct permission grant) that includes <code>admin.view</code>.</li>
+          <li>Your CougarNet account must be active and non-expired in Active Directory.</li>
+        </ul>
+        <h3>Accessing the Admin</h3>
+        <p>The UHCO Identity Admin can be reached via direct access.</p>
+          <ul>
+            <li>Direct: <a href="https://portal.opt.uh.edu/admin" target="_blank">https://portal.opt.uh.edu/admin/</a></li>
+            <li>MyUHCO V2: <a href="https://myuhco.opt.uh.edu" target="_blank">https://myuhco.opt.uh.edu/</a> <Br/> <code>MyUHCO and UHCO_Identity share login credentials</code></li>
+          </ul>
+        <h3>Roles vs. Permissions</h3>
+        <p>Access is controlled by two layers. <strong>Roles</strong> are named groups (e.g., <code>USER_ADMIN</code>, <code>OD_STUDENT_ADMIN</code>) that carry a set of permission keys. <strong>Permissions</strong> are the actual string keys checked throughout the application. You can also have individual permission grants or denials applied directly to your account on top of whatever your roles provide.</p>
+        <h3>Scoped Roles</h3>
+        <p>Several roles restrict which user records you can see and edit based on the user's flags and organization memberships. If you have a scoped role, users outside your scope are invisible to you across all list views, search results, and profile access.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Role</th><th>Who You Can Access</th></tr></thead>
+            <tbody>
+              <tr><td><code>SUPER_ADMIN</code></td><td>All users, including test users. Unlocks duplicate report and impersonation.</td></tr>
+              <tr><td><code>USER_ADMIN</code></td><td>User can manage all user record types.</td></tr>
+              <tr><td><code>OD_STUDENT_ADMIN</code></td><td>User can manage OD Program records.</td></tr>
+              <tr><td><code>PHD_MS_STUDENT_ADMIN</code></td><td>User can view/manage PhD or MS records.</td></tr>
+              <tr><td><code>ALUMNI_ADMIN</code></td><td>User can view/manage Alumni records</td></tr>
+              <tr><td><code>CLINICAL_FACULTY_ADMIN</code></td><td>User can view/manage Clinical Sciences Faculty records.</td></tr>
+              <tr><td><code>CLINICAL_STAFF_ADMIN</code></td><td>User can view/manage Optometry Clinic Staff records.</td></tr>
+              <tr><td><code>COLLEGE_STAFF_ADMIN</code></td><td>User can view/manage College Staff records.</td></tr>
+              <tr><td><code>RESEARCH_FACULTY_ADMIN</code></td><td>User can view/manage Vision Science Faculty records.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 2. Dashboard -->
+      <section class="card" id="dashboard">
+        <h2>2. Dashboard</h2>
+        <p>The dashboard at <code>/admin/</code> is your landing page after login. It requires <code>admin.view</code>.</p>
+        <p>It shows status badges for ongoing system health areas. The badges you see depend on your permissions:</p>
+        <ul>
+          <li><strong>Data Quality</strong> &mdash; shows the issue count from the most recent audit run. Visible to all admins.</li>
+          <li><strong>UH Sync</strong> &mdash; shows how many pending diffs, gone, or new records were found in the last sync. Visible to all admins.</li>
+          <li><strong>Duplicate Users</strong> &mdash; shows the number of unresolved candidate duplicate pairs. Visible to <code>SUPER_ADMIN</code> only.</li>
+        </ul>
+        <p>Each badge links to its respective report. The dashboard also provides quick-navigation links to the main areas you have access to.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 3. Managing Users -->
+      <section class="card" id="users">
+        <h2>3. Managing Users</h2>
+        <p>User management lives under <code>/admin/users/</code>. What you can do there depends on your permission grants and your role scope.</p>
+        <div class="grid two">
+          <div>
+            <h3>Viewing Users</h3>
+            <p>Requires <code>users.view</code>. You can browse the directory, search by name or email, filter by tab (Faculty, Staff, Students, Alumni, Inactive), and open individual user profiles. Users outside your role scope are not shown.</p>
+          </div>
+          <div>
+            <h3>Editing Users</h3>
+            <p>Requires <code>users.edit</code>. You can modify a user's profile fields, names, contact info, titles, organizations, flags, external IDs, addresses, academic info, degrees, and bio. Creating new user records additionally requires the <code>canCreateUsers</code> policy check (tied to unrestricted roles).</p>
+          </div>
+        </div>
+        <div class="grid two">
+          <div>
+            <h3>Deleting Users</h3>
+            <p>Requires <code>users.delete</code>. Hard-deletes the user record and all dependent rows. A confirmation step is shown before the delete executes.</p>
+          </div>
+          <div>
+            <h3>Merging Duplicates</h3>
+            <p>Requires <code>users.edit</code>. Merges two user records into one. Force-deleting the leftover duplicate pair record additionally requires the <code>SUPER_ADMIN</code> role.</p>
+          </div>
+        </div>
+        <h3>Other Per-User Actions</h3>
+        <ul>
+          <li><strong>UH Sync (single user)</strong> &mdash; compare this user's local data against the UH Directory API and resolve field differences. Requires <code>users.edit</code>.</li>
+          <li><strong>Quick-sync a single field</strong> &mdash; AJAX refresh of one field from the upstream UH API without leaving the profile. Requires <code>users.edit</code>.</li>
+          <li><strong>Fetch publications</strong> &mdash; trigger an on-demand ORCID or PubMed pull for this user. Requires <code>users.edit</code>.</li>
+          <li><strong>Data quality exclusions</strong> &mdash; suppress known-acceptable DQ issues for this user. Requires <code>users.edit</code>.</li>
+          <li><strong>LDAP lookup</strong> &mdash; search CougarNet AD to verify account state and external IDs. Requires <code>users.view</code>.</li>
+          <li><strong>UH API person search</strong> &mdash; look up someone in the UH Directory API to pre-fill a new import. Requires <code>users.edit</code>.</li>
+        </ul>
+        <h3>Needs Attention View</h3>
+        <p>A dedicated tab surfaces users carrying flags like <code>Admin - Check</code> or <code>No UH</code>. Visible with <code>users.view</code>; limited to your role scope.</p>
+        <h3>Capturable User Fields</h3>
+        <p>The fields below represent everything that can be stored against a user record. They are grouped by the edit form section that saves them. All require <code>users.edit</code>.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Group</th><th>Fields</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>General / Identity</strong></td>
+                <td>First Name, Middle Name, Last Name, Prefix, Suffix, Pronouns, Title 1, Title 2, Title 3</td>
+                <td>Written to the primary alias record. A single middle initial is auto-suffixed with a period.</td>
+              </tr>
+              <tr>
+                <td><strong>Name Aliases</strong></td>
+                <td>First Name, Middle Name, Last Name, Alias Type, Source System, Active, Primary flag &mdash; multiple rows per user</td>
+                <td>Each alias has a typed label (e.g., Primary, Preferred, LDAP, UH API). Exactly one alias must be marked primary.</td>
+              </tr>
+              <tr>
+                <td><strong>UH / Office</strong></td>
+                <td>Primary Email, UH API ID, Room, Building, Campus, Division, Division Name, Department, Department Name, Office Mailing Address, Mailcode, Notes</td>
+                <td>Notes is an internal-only admin field, not exposed in the API. UH API ID links this record to the upstream UH Directory.</td>
+              </tr>
+              <tr>
+                <td><strong>Secondary Emails</strong></td>
+                <td>Email Address, Email Type, Primary flag &mdash; multiple rows per user</td>
+                <td>Plain <code>@uh.edu</code> addresses are blocked; <code>@central.uh.edu</code> and <code>@cougarnet.uh.edu</code> are permitted.</td>
+              </tr>
+              <tr>
+                <td><strong>Phone Numbers</strong></td>
+                <td>Phone Number, Phone Type, Primary flag &mdash; multiple rows per user</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><strong>Addresses</strong></td>
+                <td>Address Type, Address Line 1, Address Line 2, City, State, Zip, Building, Room, Mail Code, Primary flag &mdash; multiple rows per user</td>
+                <td>An address with type <em>Hometown</em> also syncs City and State into the student profile's Hometown fields.</td>
+              </tr>
+              <tr>
+                <td><strong>Flags</strong></td>
+                <td>One or more flags from the active flag list (e.g., Faculty-Fulltime, Staff, Current-Student, Alumni)</td>
+                <td>Flag definitions are managed separately under <a href="#directory">Directory Structure</a>.</td>
+              </tr>
+              <tr>
+                <td><strong>Organizations</strong></td>
+                <td>One or more organization memberships; each with an optional Role Title and Role Order</td>
+                <td>Organization definitions are managed separately under <a href="#directory">Directory Structure</a>.</td>
+              </tr>
+              <tr>
+                <td><strong>External IDs</strong></td>
+                <td>One value per configured external system (e.g., CougarNet, PeopleSoft, legacy system IDs)</td>
+                <td>The set of available fields is dynamic and driven by the external system definitions.</td>
+              </tr>
+              <tr>
+                <td><strong>Degrees</strong></td>
+                <td>Degree records &mdash; multiple per user; contextual tabs for Faculty, Emeritus, and Residency degree sets</td>
+                <td>Saving degrees also rebuilds the free-text <code>Degrees</code> composite string shown throughout the directory.</td>
+              </tr>
+              <tr>
+                <td><strong>Biographical Info</strong></td>
+                <td>Date of Birth, Gender, Current Grad Year, Original Grad Year, First Externship, Second Externship, Commencement Age, Dissertation / Thesis</td>
+                <td>Grad years and externship fields feed the student profile and QuickPull API responses.</td>
+              </tr>
+              <tr>
+                <td><strong>Awards</strong></td>
+                <td>Award Name, Award Type &mdash; multiple rows per user</td>
+                <td>Used in graduation ceremony QuickPull displays.</td>
+              </tr>
+              <tr>
+                <td><strong>Residencies</strong></td>
+                <td>Location, Specialty, Starting Year, Is UHCO, Is Current &mdash; multiple rows per user</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><strong>Bio</strong></td>
+                <td>Rich-text biography (HTML)</td>
+                <td>Content is sanitized on save to a safe tag whitelist. Exposed via <code>GET /api/v1/people/{id}/bio</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>Publications</strong></td>
+                <td>ORCID iD, PubMed author settings, showcased publication selections</td>
+                <td>Source profiles are saved here; actual publication records are fetched on demand from ORCID and PubMed.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 4. Media -->
+      <section class="card" id="media">
+        <h2>4. User Media &amp; Photos</h2>
+        <p>Photo management lives under <code>/admin/user-media/</code> and uses a three-step pipeline: source assignment, variant generation, then publishing.</p>
+        <div class="grid two">
+          <div>
+            <h3>Viewing</h3>
+            <p>Requires <code>media.view</code>. You can see the published image count, which users have unpublished variants waiting, and browse individual user photo statuses.</p>
+          </div>
+          <div>
+            <h3>Managing Sources &amp; Variants</h3>
+            <p>Requires <code>media.edit</code>. You can assign a Dropbox path or upload as a user's source image, trigger variant generation per variant type, and initiate bulk image transfers from Dropbox.</p>
+          </div>
+        </div>
+        <div class="grid two">
+          <div>
+            <h3>Publishing</h3>
+            <p>Requires <code>media.publish</code>. Moves generated variant files from the temp directory to the public <code>/_published_images/</code> folder and updates the live image URLs in the database.</p>
+          </div>
+          <div>
+            <h3>Unpublishing</h3>
+            <p>Requires <code>media.unpublish</code>. Removes an image from public availability without deleting the variant record.</p>
+          </div>
+        </div>
+        <div class="note">
+          <strong>Variant configuration</strong> (defining variant type names, dimensions, and processing modes) is separate and requires <code>settings.media_config.manage</code> under Settings.
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 5. UserReview -->
+      <section class="card" id="userreview">
+        <h2>5. UserReview Submissions</h2>
+        <p>UserReview is the self-service flow where directory users submit proposed profile changes that an admin must approve before they go live. The admin side lives under <code>/admin/user-review/</code>.</p>
+        <div class="grid two">
+          <div>
+            <h3>Reviewing Submissions</h3>
+            <p>Requires <code>users.approve_user_review</code>. You can see all pending and recently reviewed submissions, approve or reject an entire submission, or resolve individual fields within a submission. Discarding a field requires a written reason that is surfaced back to the submitter.</p>
+          </div>
+          <div>
+            <h3>Configuring UserReview</h3>
+            <p>Requires <code>settings.user_review.manage</code>. You can enable or disable the UserReview feature, configure which user flag types are eligible to submit, and adjust form field availability settings.</p>
+          </div>
+        </div>
+        <p>Having only one of the two permissions narrows the UserReview settings page to just what you can act on. Having both shows the full combined view.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 6. Directory Structure -->
+      <section class="card" id="directory">
+        <h2>6. Directory Structure</h2>
+        <p>The organizational building blocks of the directory &mdash; flags, organizations, and external system definitions &mdash; each have their own gated admin areas.</p>
+        <div class="grid two">
+          <div>
+            <h3>Flags</h3>
+            <p>Managed at <code>/admin/settings/flags/</code>. Requires <code>flags.manage</code>. You can create, edit, reorder, and retire flag definitions. The <em>Protected</em> setting on a flag controls whether it is hidden from API responses unless the caller presents a valid secret. Flag names are referenced directly by the scoped-role system, so renames affect access control.</p>
+          </div>
+          <div>
+            <h3>Organizations</h3>
+            <p>Managed at <code>/admin/settings/orgs/</code>. Requires <code>orgs.manage</code>. You can create, edit, reorder, and retire organizations. The parent-org relationship defines the hierarchy shown in the API and browsing views. Organization names are referenced by scoped roles, so renames affect which users those roles can access.</p>
+          </div>
+        </div>
+        <div>
+          <h3>External Systems</h3>
+          <p>Managed at <code>/admin/settings/external/</code>. Requires <code>external_ids.manage</code>. External systems are the labels (e.g., CougarNet, PeopleSoft) attached to external ID values stored per user. Creating or editing system definitions here affects how external IDs are displayed and resolved throughout the app.</p>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 7. Reporting -->
+      <section class="card" id="reporting">
+        <h2>7. Reporting</h2>
+        <p>Reports are accessible from the <code>/admin/reporting/</code> area and from the dashboard. Most reports are read-only views of data that is populated by scheduled or manually triggered jobs.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Report</th>
+                <th>What it Shows</th>
+                <th>Gate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Data Quality</td>
+                <td>Missing fields, duplicate emails/IDs, invalid org/flag assignments, and other per-user issues from the most recent audit run.</td>
+                <td>Accessible to all authenticated admins (<code>admin.view</code>).</td>
+              </tr>
+              <tr>
+                <td>UH Sync</td>
+                <td>Field-by-field differences between local records and the UH Directory API from the most recent sync run, plus records that have disappeared or newly appeared upstream.</td>
+                <td><code>settings.uh_sync.view</code></td>
+              </tr>
+              <tr>
+                <td>Duplicate Users</td>
+                <td>Candidate pairs of user records that appear to be the same person, with a merge action.</td>
+                <td><code>SUPER_ADMIN</code> role only.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Running Reports Manually</h3>
+        <p>Data Quality and UH Sync reports have a "Run Now" button that triggers a fresh job in-process. The same jobs can be scheduled through the ColdFusion Scheduler. Running them manually requires the same permission as viewing the report. The duplicate scan is triggered from the Duplicate Users report page and is also <code>SUPER_ADMIN</code>-only.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 8. Settings -->
+      <section class="card" id="settings">
+        <h2>8. Settings</h2>
+        <p>The settings hub at <code>/admin/settings/</code> is visible if you hold any settings-related permission. Each sub-section has its own guard; you are redirected to Unauthorized if you navigate directly to a section you lack permission for.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Section</th>
+                <th>What You Can Do</th>
+                <th>Required Permission</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Admin Roles</td>
+                <td>Create, rename, and delete admin roles.</td>
+                <td><code>settings.admin_roles.manage</code></td>
+              </tr>
+              <tr>
+                <td>Admin Users</td>
+                <td>Create admin accounts, assign roles, and (as SUPER_ADMIN) impersonate other admins.</td>
+                <td><code>settings.admin_users.manage</code></td>
+              </tr>
+              <tr>
+                <td>Admin Permissions</td>
+                <td>Attach or detach permission keys from roles.</td>
+                <td><code>settings.admin_permissions.manage</code></td>
+              </tr>
+              <tr>
+                <td>User Permissions</td>
+                <td>Grant or deny individual permission keys directly to a specific admin user, outside their role membership.</td>
+                <td><code>settings.user_permissions.manage</code></td>
+              </tr>
+              <tr>
+                <td>App Config</td>
+                <td>View and edit database-backed application settings (LDAP config, Dropbox credentials, publication rules, dashboard thresholds). Manage test-user generation and test mode toggle.</td>
+                <td><code>settings.app_config.manage</code></td>
+              </tr>
+              <tr>
+                <td>Media Config</td>
+                <td>Define image variant types (dimensions, processing mode), manage filename patterns for published images.</td>
+                <td><code>settings.media_config.manage</code></td>
+              </tr>
+              <tr>
+                <td>API Tokens &amp; Secrets</td>
+                <td>Create, revoke, and delete API tokens and secrets. Use the Quick Test Credential Generator for short-lived development credentials.</td>
+                <td><code>settings.api.manage</code></td>
+              </tr>
+              <tr>
+                <td>UserReview</td>
+                <td>Configure the UserReview feature and/or review pending submissions (see <a href="#userreview">Section 5</a>).</td>
+                <td><code>settings.user_review.manage</code> and/or <code>users.approve_user_review</code></td>
+              </tr>
+              <tr>
+                <td>Migrations</td>
+                <td>Configure and execute the graduation migration that moves current students to alumni status.</td>
+                <td><code>settings.migrations.manage</code></td>
+              </tr>
+              <tr>
+                <td>Import</td>
+                <td>Upload and process CSV bulk imports to create new user records in batch.</td>
+                <td><code>settings.import.manage</code></td>
+              </tr>
+              <tr>
+                <td>Rosters</td>
+                <td>Upload enrollment roster files and compare them against the current directory to find additions and departures.</td>
+                <td><code>settings.rosters.manage</code></td>
+              </tr>
+              <tr>
+                <td>Bulk Exclusions</td>
+                <td>Apply or remove data-quality exclusions across multiple users at once.</td>
+                <td><code>settings.bulk_exclusions.manage</code></td>
+              </tr>
+              <tr>
+                <td>Query Builder</td>
+                <td>Run pre-approved parameterized queries against the directory database for ad hoc analysis.</td>
+                <td><code>settings.query_builder.use</code></td>
+              </tr>
+              <tr>
+                <td>Scheduled Tasks</td>
+                <td>View task status and manually trigger scheduled jobs (Data Quality, UH Sync, Grad Migration).</td>
+                <td><code>settings.scheduled_tasks.manage</code></td>
+              </tr>
+              <tr>
+                <td>UH Sync History</td>
+                <td>Browse past sync runs, field-level diffs, and the lists of gone and new upstream records.</td>
+                <td><code>settings.uh_sync.view</code></td>
+              </tr>
+              <tr>
+                <td>Workflows</td>
+                <td>Configure workflow-level settings that affect automated processing pipelines.</td>
+                <td><code>settings.workflows.manage</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 9. Permission Reference -->
+      <section class="card" id="permissions">
+        <h2>9. Permission Reference</h2>
+        <p>This table lists every permission key checked in the admin interface, what it unlocks, and where it is most visible. Permissions are assigned to roles; individual overrides are managed in User Permissions settings.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Permission Key</th>
+                <th>Unlocks</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>admin.view</code></td>
+                <td>Basic admin access: login, dashboard, navigation. Required for all admin use.</td>
+              </tr>
+              <tr>
+                <td><code>users.view</code></td>
+                <td>User list pages, search, profile view, and LDAP lookup tool. Scoped by role.</td>
+              </tr>
+              <tr>
+                <td><code>users.edit</code></td>
+                <td>Create (with policy check) and edit user records: names, contact, titles, orgs, flags, external IDs, addresses, academic info, bio, degrees, DQ exclusions, per-user UH sync, per-user publications fetch.</td>
+              </tr>
+              <tr>
+                <td><code>users.delete</code></td>
+                <td>Delete a user record and all dependent data.</td>
+              </tr>
+              <tr>
+                <td><code>users.approve_user_review</code></td>
+                <td>Review, approve, and reject UserReview submissions.</td>
+              </tr>
+              <tr>
+                <td><code>flags.manage</code></td>
+                <td>Create, edit, reorder, and retire flag definitions.</td>
+              </tr>
+              <tr>
+                <td><code>orgs.manage</code></td>
+                <td>Create, edit, reorder, and retire organization definitions.</td>
+              </tr>
+              <tr>
+                <td><code>external_ids.manage</code></td>
+                <td>Create, edit, and delete external system definitions.</td>
+              </tr>
+              <tr>
+                <td><code>media.view</code></td>
+                <td>View published image counts, user photo status, and variant health across all users.</td>
+              </tr>
+              <tr>
+                <td><code>media.edit</code></td>
+                <td>Assign source images, trigger variant generation, and run bulk Dropbox transfers.</td>
+              </tr>
+              <tr>
+                <td><code>media.publish</code></td>
+                <td>Publish generated variant files to the public image directory.</td>
+              </tr>
+              <tr>
+                <td><code>media.unpublish</code></td>
+                <td>Remove an image from public availability.</td>
+              </tr>
+              <tr>
+                <td><code>settings.view</code></td>
+                <td>Access the settings hub landing page without any specific settings sub-section permission.</td>
+              </tr>
+              <tr>
+                <td><code>settings.admin_roles.manage</code></td>
+                <td>Create, rename, and delete admin roles.</td>
+              </tr>
+              <tr>
+                <td><code>settings.admin_users.manage</code></td>
+                <td>Create admin user accounts and assign roles to them.</td>
+              </tr>
+              <tr>
+                <td><code>settings.admin_permissions.manage</code></td>
+                <td>Attach and detach permission keys from roles. Visible on the Admin Roles page as an inline panel.</td>
+              </tr>
+              <tr>
+                <td><code>settings.user_permissions.manage</code></td>
+                <td>Add direct per-user permission grants or denials on top of role membership.</td>
+              </tr>
+              <tr>
+                <td><code>settings.app_config.manage</code></td>
+                <td>Edit database-backed application config (LDAP, Dropbox, publications, dashboard settings). Manage test mode and test user generation.</td>
+              </tr>
+              <tr>
+                <td><code>settings.media_config.manage</code></td>
+                <td>Define and edit image variant types and filename patterns.</td>
+              </tr>
+              <tr>
+                <td><code>settings.api.manage</code></td>
+                <td>Create, revoke, and delete API tokens and secrets. Access the quick test credential generator.</td>
+              </tr>
+              <tr>
+                <td><code>settings.user_review.manage</code></td>
+                <td>Configure the UserReview feature settings (enabled state, eligible flags, form options).</td>
+              </tr>
+              <tr>
+                <td><code>settings.migrations.manage</code></td>
+                <td>Configure and execute the graduation migration.</td>
+              </tr>
+              <tr>
+                <td><code>settings.import.manage</code></td>
+                <td>Upload and run CSV bulk imports.</td>
+              </tr>
+              <tr>
+                <td><code>settings.rosters.manage</code></td>
+                <td>Upload enrollment roster files and run comparisons.</td>
+              </tr>
+              <tr>
+                <td><code>settings.bulk_exclusions.manage</code></td>
+                <td>Apply and remove data-quality exclusions in bulk.</td>
+              </tr>
+              <tr>
+                <td><code>settings.query_builder.use</code></td>
+                <td>Use the ad hoc query builder tool.</td>
+              </tr>
+              <tr>
+                <td><code>settings.scheduled_tasks.manage</code></td>
+                <td>View scheduled task status and manually trigger jobs.</td>
+              </tr>
+              <tr>
+                <td><code>settings.uh_sync.view</code></td>
+                <td>Browse UH sync run history, field diffs, and gone/new record lists.</td>
+              </tr>
+              <tr>
+                <td><code>settings.workflows.manage</code></td>
+                <td>Configure workflow processing pipeline settings.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Role-Only Gates</h3>
+        <p>Two capabilities are checked against the <strong>role</strong> directly rather than a permission key, and cannot be granted via per-user permission overrides:</p>
+        <ul>
+          <li><strong><code>SUPER_ADMIN</code> role</strong> &mdash; duplicate users report, force-deletion of duplicate pair records, impersonation of other admin users, and direct triggering of certain scheduled tasks.</li>
+        </ul>
+        <div class="note">
+          <strong>How gates are enforced:</strong> every admin page checks permissions at the top of the file using <code>request.hasPermission()</code> or <code>application.authService.hasRole()</code>. A failed check immediately redirects to <code>/admin/unauthorized.cfm</code>. The navigation sidebar also hides links to sections you cannot access, so most users will never encounter an unauthorized page in normal use.
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>UHCO Ident Admin Guide &mdash; for system architecture and API reference see <a href="index.html">System Documentation</a>.</p>
+    </div>
+  </footer>
+</body>
+</html>

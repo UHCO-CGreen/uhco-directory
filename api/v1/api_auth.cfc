@@ -11,13 +11,11 @@ component output="false" {
 
         var tokenService = createObject("component", "cfc.token_service").init();
 
-        // Extract Bearer token from Authorization header or ?token= query param
+        // Extract Bearer token from the Authorization header only.
         var authHeader = CGI.HTTP_AUTHORIZATION ?: "";
         var rawToken   = "";
         if (reFindNoCase("^Bearer\s+\S+", trim(authHeader))) {
             rawToken = trim(reReplaceNoCase(authHeader, "^Bearer\s+", ""));
-        } else if (len(trim(url.token ?: ""))) {
-            rawToken = trim(url.token);
         } else {
             sendError(401, "Missing or malformed Authorization header. Expected: Bearer <token>");
         }
@@ -66,11 +64,9 @@ component output="false" {
      */
     public array function checkSecret() {
         var raw = "";
-        // Accept X-API-Secret header (preferred) or ?secret= query param
+        // Accept X-API-Secret header only.
         if (len(trim(CGI.HTTP_X_API_SECRET ?: ""))) {
             raw = trim(CGI.HTTP_X_API_SECRET);
-        } else if (len(trim(url.secret ?: ""))) {
-            raw = trim(url.secret);
         }
         if (!len(raw)) return [];
 

@@ -4,6 +4,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         super.init();        return this;
     }
 
+    public array function getFlagByID( required numeric flagID ) {
+        var qry = executeQueryWithRetry(
+            "SELECT FlagID, FlagName, FlagDescription FROM UserFlags WHERE FlagID = :id",
+            { id={ value=arguments.flagID, cfsqltype="cf_sql_integer" } },
+            { datasource=variables.datasource, timeout=30 }
+        );
+        return queryToArray(qry);
+    }
+
     public array function getAllFlags() {
         var qry = executeQueryWithRetry(
             "SELECT * FROM UserFlags ORDER BY FlagName",
@@ -53,25 +62,29 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
-    public numeric function createFlag( required string flagName ) {
+    public numeric function createFlag( required string flagName, string flagDescription="" ) {
         var q = executeQueryWithRetry(
             "
-            INSERT INTO UserFlags (FlagName)
-            VALUES (:flagName);
+            INSERT INTO UserFlags (FlagName, FlagDescription)
+            VALUES (:flagName, :flagDescription);
             SELECT SCOPE_IDENTITY() AS newID;
             ",
-            { flagName={ value=trim(flagName), cfsqltype="cf_sql_varchar" } },
+            {
+                flagName={ value=trim(flagName), cfsqltype="cf_sql_varchar" },
+                flagDescription={ value=trim(flagDescription), cfsqltype="cf_sql_longvarchar" }
+            },
             { datasource=variables.datasource, timeout=30 }
         );
         return q.newID;
     }
 
-    public void function updateFlag( required numeric flagID, required string flagName ) {
+    public void function updateFlag( required numeric flagID, required string flagName, string flagDescription="" ) {
         executeQueryWithRetry(
-            "UPDATE UserFlags SET FlagName = :flagName WHERE FlagID = :id",
+            "UPDATE UserFlags SET FlagName = :flagName, FlagDescription = :flagDescription WHERE FlagID = :id",
             {
                 id={ value=flagID, cfsqltype="cf_sql_integer" },
-                flagName={ value=trim(flagName), cfsqltype="cf_sql_varchar" }
+                flagName={ value=trim(flagName), cfsqltype="cf_sql_varchar" },
+                flagDescription={ value=trim(flagDescription), cfsqltype="cf_sql_longvarchar" }
             },
             { datasource=variables.datasource, timeout=30 }
         );

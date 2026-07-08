@@ -102,6 +102,51 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    public struct function getDegreesMap( array userIDs = [] ) {
+        var map = {};
+        var dedupedIDs = [];
+        var seen = {};
+        for ( var rawID in arguments.userIDs ) {
+            if ( isNumeric(rawID) ) {
+                var numericID = val(rawID);
+                var idKey = toString(numericID);
+                if ( numericID GT 0 AND !structKeyExists(seen, idKey) ) {
+                    seen[idKey] = true;
+                    arrayAppend(dedupedIDs, numericID);
+                }
+            }
+        }
+        if ( !arrayLen(dedupedIDs) ) return map;
+
+        var inClause = "";
+        var params = {};
+        for ( var i = 1; i <= arrayLen(dedupedIDs); i++ ) {
+            if ( i GT 1 ) inClause &= ",";
+            inClause &= ":uid" & i;
+            params["uid" & i] = { value=dedupedIDs[i], cfsqltype="cf_sql_integer" };
+        }
+
+        var qry = executeQueryWithRetry(
+            "SELECT DegreeID, UserID, DegreeName, University, GraduationYear,
+                    IsUHCO, IsEnrolled, HasYearChange, OriginalExpectedGradYear,
+                    ExpectedGradYear, Program
+             FROM UserDegrees
+             WHERE UserID IN (#inClause#)
+             ORDER BY UserID, DegreeID",
+            params,
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+
+        for ( var row in qry ) {
+            var key = toString(row.USERID);
+            if ( !structKeyExists(map, key) ) {
+                map[key] = [];
+            }
+            arrayAppend(map[key], row);
+        }
+        return map;
+    }
+
     public void function deleteAllForUser( required numeric userID ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
         executeQueryWithRetry( "DELETE FROM UserDegrees WHERE UserID = :id", idParam, { datasource=variables.datasource, timeout=30 } );
@@ -119,6 +164,35 @@ component extends="dao.BaseDAO" output="false" singleton {
         return listFindNoCase("1,true,yes,on", trim(arguments.rawValue ?: "")) GT 0;
     }
 
+    private array function _normalizeUserIDs( required array userIDs ) {
+        var normalized = [];
+        var seen = {};
+        var rawUserID = "";
+        var numericUserID = 0;
+        var userKey = "";
+
+        for ( rawUserID in arguments.userIDs ) {
+            if ( !isNumeric(rawUserID) ) {
+                continue;
+            }
+
+            numericUserID = val(rawUserID);
+            if ( numericUserID LTE 0 ) {
+                continue;
+            }
+
+            userKey = toString(numericUserID);
+            if ( structKeyExists(seen, userKey) ) {
+                continue;
+            }
+
+            seen[userKey] = true;
+            arrayAppend(normalized, numericUserID);
+        }
+
+        return normalized;
+    }
+
     /**
      * Return all UHCO degree rows across all users for bulk map building.
      * Used by academic_service.getAllAcademicInfoMap().
@@ -134,6 +208,59 @@ component extends="dao.BaseDAO" output="false" singleton {
             { datasource=variables.datasource, timeout=60, fetchSize=2000 }
         );
         return queryToArray(qry);
+    }
+
+    public array function getUHCODegreesForUsers( required array userIDs ) {
+        var normalizedUserIDs = _normalizeUserIDs(arguments.userIDs);
+        var results = [];
+        var maxIDsPerBatch = 1000;
+        var batchStart = 0;
+        var batchEnd = 0;
+        var batchUserIDs = [];
+        var params = {};
+        var inClause = "";
+        var idx = 0;
+        var qry = "";
+        var row = "";
+
+        if ( !arrayLen(normalizedUserIDs) ) {
+            return [];
+        }
+
+        for ( batchStart = 1; batchStart LTE arrayLen(normalizedUserIDs); batchStart += maxIDsPerBatch ) {
+            batchEnd = min(batchStart + maxIDsPerBatch - 1, arrayLen(normalizedUserIDs));
+            batchUserIDs = [];
+            params = {};
+            inClause = "";
+
+            for ( idx = batchStart; idx LTE batchEnd; idx++ ) {
+                arrayAppend(batchUserIDs, normalizedUserIDs[idx]);
+            }
+
+            for ( idx = 1; idx LTE arrayLen(batchUserIDs); idx++ ) {
+                if ( idx GT 1 ) {
+                    inClause &= ",";
+                }
+                inClause &= ":uid" & idx;
+                params["uid" & idx] = { value=batchUserIDs[idx], cfsqltype="cf_sql_integer" };
+            }
+
+            qry = executeQueryWithRetry(
+                "SELECT UserID, IsEnrolled, ExpectedGradYear, GraduationYear, Program
+                 FROM   UserDegrees
+                 WHERE  UserID IN (#inClause#)
+                   AND (IsUHCO = 1 OR Program IN ('OD', 'MS', 'PhD'))
+                 ORDER BY UserID, DegreeID",
+                params,
+                { datasource=variables.datasource, timeout=60, fetchSize=1000 }
+            );
+
+            for ( row in queryToArray(qry) ) {
+                arrayAppend(results, row);
+            }
+        }
+
+        return results;
     }
 
     /**

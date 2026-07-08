@@ -41,7 +41,7 @@
         <cfif structKeyExists(request, "windowsSSOEnabled") AND request.windowsSSOEnabled>
           <!--- Windows SSO option (revealed after successful probe) --->
           <div id="windows-sso-section" class="mb-4" style="display:none;">
-            <a href="auth_windows_start.cfm" class="btn btn-outline-secondary d-grid w-100">
+            <a href="auth_windows_start.cfm" class="btn btn-ui-go d-grid w-100">
               <span><i class="bi bi-windows me-2"></i>Login via Windows (SSO)</span>
             </a>
             <div class="text-center mt-2">
@@ -57,14 +57,19 @@
           
           <!-- Username -->
           <div class="mb-3">
-            <label for="username" class="form-label">COUGARNET ID</label>
-            <input
-              type="text"
+            <label for="username" class="form-label">COUGARNET</label>
+            
+            <div class="input-group mb-3">
+              <input type="text"
               class="form-control"
               id="username"
               name="username"
-              required
-            >
+              aria-label="username"
+              aria-describedby="cougarnet"
+              required>
+              <span class="input-group-text" id="cougarnet">@cougarnet.uh.edu</span>
+            </div>
+
             <div class="invalid-feedback">
               Please enter your COUGARNET.
             </div>
@@ -83,7 +88,7 @@
                 required
               >
               <button
-                class="btn btn-secondary text-dark"
+                class="btn btn-ui-cancel text-dark"
                 type="button"
                 id="togglePassword"
                 aria-label="Show password"
@@ -97,7 +102,7 @@
           </div>
 
           <div class="d-grid">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-ui-go">
               Login via Cougarnet
             </button>
           </div>
@@ -106,7 +111,7 @@
 
         <cfif structKeyExists(request, "windowsSSOEnabled") AND request.windowsSSOEnabled>
           <div class="text-center mt-3">
-            <button type="button" class="btn btn-link btn-sm text-muted" id="checkWindowsBtn">
+            <button type="button" class="btn btn-ui-help btn-sm" id="checkWindowsBtn">
               Check Windows Login Availability
             </button>
             <div id="windows-probe-msg" class="small mt-1" style="display:none;"></div>
@@ -120,7 +125,7 @@
   <!-- Bootstrap JS (optional, only needed for some components) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <script>
+  <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
 
     document.getElementById("username").focus();
 

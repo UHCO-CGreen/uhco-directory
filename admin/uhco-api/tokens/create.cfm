@@ -1,7 +1,11 @@
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset content = "
 <h1>New API Token</h1>
 
-<form method='post' action='/admin/tokens/saveToken.cfm' class='mt-4 admin-form-max-680'>
+<form method='post' action='/admin/settings/uhco-api/tokens/saveToken.cfm' class='mt-4 admin-form-max-680'>
 
     <div class='mb-3'>
         <label class='form-label fw-semibold'>Token Name <span class='text-danger'>*</span></label>
@@ -37,7 +41,7 @@
 
     <div class='mb-4 border rounded p-3 bg-light'>
         <div class='form-check form-switch'>
-            <input class='form-check-input' type='checkbox' id='createSecretCheck' name='createSecret' value='1' onchange='toggleSecretPanel(this)'>
+            <input class='form-check-input' type='checkbox' id='createSecretCheck' name='createSecret' value='1' data-toggle-panel="secretPanel">
             <label class='form-check-label fw-semibold' for='createSecretCheck'>Also create a secret for this token</label>
         </div>
         <div class='form-text mt-1'>Generates a matching API Secret so this token can also access protected data (Current-Student, Alumni, Academic Programs orgs).</div>
@@ -79,15 +83,9 @@
         The raw token (and secret, if requested) will be displayed <strong>once</strong> immediately after creation. Copy them before leaving the page.
     </div>
 
-    <button class='btn btn-primary'>Generate Token</button>
-    <a href='/admin/tokens/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
+    <button class='btn btn-ui-add'>Generate Token</button>
+    <a href='/admin/settings/uhco-api/tokens/index.cfm' class='btn btn-ui-cancel ms-2'>Cancel</a>
 </form>
-
-<script>
-function toggleSecretPanel(cb) {
-    document.getElementById('secretPanel').style.display = cb.checked ? 'block' : 'none';
-}
-</script>
 ">
 
 <cfinclude template="/admin/layout.cfm">

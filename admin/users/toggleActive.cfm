@@ -40,24 +40,26 @@
 
 <cfset targetUserID = val(form.userID)>
 <cfset newActive    = val(form.active)>
-<cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-
-<cfset testModeEnabled = usersService.isTestModeEnabled()>
-<cfif (NOT canViewTestUsers) AND (NOT testModeEnabled)>
-    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
-    <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
-    <cfset isTestUser = false>
-    <cfloop array="#targetUserFlags#" index="targetFlag">
-        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
-            <cfset isTestUser = true>
-            <cfbreak>
-        </cfif>
-    </cfloop>
-    <cfif isTestUser>
-        <cfoutput>{"success":false,"message":"Unauthorized."}</cfoutput>
-        <cfabort>
+<cfif NOT request.canAccessUserByID(targetUserID)>
+    <cfoutput>{"success":false,"message":"Unauthorized."}</cfoutput>
+    <cfabort>
+</cfif>
+<cfset _taFlagsSvc = createObject("component", "cfc.flags_service").init()>
+<cfset _taFlags = _taFlagsSvc.getUserFlags(targetUserID).data>
+<cfset _taIsAlumni = false>
+<cfset _taIsFaculty = false>
+<cfloop array="#_taFlags#" index="_taf">
+    <cfif compareNoCase(trim(_taf.FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _taIsAlumni = true>
     </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_taf.FLAGNAME ?: ""))>
+        <cfset _taIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _taIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_taIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cfheader statuscode="403" statustext="Forbidden">
+    <cfoutput>{"success":false,"message":"Access denied."}</cfoutput>
+    <cfabort>
 </cfif>
 
 <cftry>

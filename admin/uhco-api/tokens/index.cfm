@@ -1,3 +1,7 @@
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset tokenService = createObject("component", "cfc.token_service").init()>
 <cfset tokens = tokenService.getAllTokens()>
 
@@ -6,7 +10,7 @@
 <p class='text-muted'>Tokens grant external applications access to the directory API. The raw token is shown only once at creation.</p>
 
 <div class='mb-3'>
-    <a href='/admin/tokens/create.cfm' class='btn btn-ui-add'><i class='bi bi-plus-lg me-1'></i>New Token</a>
+    <a href='/admin/settings/uhco-api/tokens/create.cfm' class='btn btn-ui-add'><i class='bi bi-plus-lg me-1'></i>New Token</a>
 </div>
 ">
 
@@ -62,16 +66,16 @@
         ">
 
         <cfif isActive AND !isExpired>
-            <cfset content &= "<form method='post' action='/admin/tokens/revokeToken.cfm' class='d-inline' onsubmit=""return confirm('Revoke this token? The application will immediately lose access.')"">
+            <cfset content &= "<form method='post' action='/admin/settings/uhco-api/tokens/revokeToken.cfm' class='d-inline' data-confirm=""Revoke this token? The application will immediately lose access?"">
                 <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                <button class='btn btn-sm btn-outline-warning'>Revoke</button>
+                <button class='btn btn-sm btn-ui-warning'>Revoke</button>
             </form>">
         </cfif>
 
         <cfset content &= "
-                <form method='post' action='/admin/tokens/deleteToken.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this token record?')"">
+                <form method='post' action='/admin/settings/uhco-api/tokens/deleteToken.cfm' class='d-inline ms-1' data-confirm=""Permanently delete this token record?"">
                     <input type='hidden' name='tokenID' value='#t.TOKENID#'>
-                    <button class='btn btn-sm btn-outline-danger'>Delete</button>
+                    <button class='btn btn-sm btn-ui-delete'>Delete</button>
                 </form>
             </td>
         </tr>

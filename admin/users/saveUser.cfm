@@ -1,4 +1,4 @@
-<cfif NOT request.hasPermission("users.edit")>
+﻿<cfif NOT request.hasPermission("users.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -58,12 +58,35 @@
 }>
 <cfset isCreate = NOT (structKeyExists(form, "UserID") AND isNumeric(form.UserID) AND val(form.UserID) GT 0)>
 
+<cfif isCreate AND NOT request.canCreateUsers()>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfif len(trim(userData.MiddleName)) EQ 1 AND reFind("^[A-Za-z]$", trim(userData.MiddleName))>
     <cfset userData.MiddleName = trim(userData.MiddleName) & ".">
 </cfif>
 
 <cfif NOT isCreate>
     <cfset userID = val(form.UserID)>
+    <cfif NOT request.canAccessUserByID(userID)>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+    </cfif>
+    <cfset _suFlagsSvc = createObject("component", "cfc.flags_service").init()>
+    <cfset _suFlags = _suFlagsSvc.getUserFlags(userID).data>
+    <cfset _suIsAlumni = false>
+    <cfset _suIsFaculty = false>
+    <cfloop array="#_suFlags#" index="_suf">
+        <cfif compareNoCase(trim(_suf.FLAGNAME ?: ""), "Alumni") EQ 0>
+            <cfset _suIsAlumni = true>
+        </cfif>
+        <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_suf.FLAGNAME ?: ""))>
+            <cfset _suIsFaculty = true>
+        </cfif>
+    </cfloop>
+    <cfif _suIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_suIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+        <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+        <cfabort>
+    </cfif>
     <cfset result = usersService.updateUser(userID, userData)>
 <cfelse>
     <cfset result = usersService.createUser(userData)>
@@ -97,7 +120,7 @@
 </head>
 <body>
     <p>User saved. Opening edit view...</p>
-    <script>
+    <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
     (function () {
         var targetUrl = '#encodeForJavaScript(editUrl)#';
         try {

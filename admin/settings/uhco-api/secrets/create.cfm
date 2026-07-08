@@ -50,8 +50,8 @@
         The raw secret will be displayed <strong>once</strong> immediately after creation. Copy it before leaving the page.
     </div>
 
-    <button class='btn btn-primary'>Generate Secret</button>
-    <a href='/admin/settings/uhco-api/secrets/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
+    <button class='btn btn-ui-add'>Generate Secret</button>
+    <a href='/admin/settings/uhco-api/secrets/index.cfm' class='btn btn-ui-cancel ms-2'>Cancel</a>
 </form>
 ">
 

@@ -1,12 +1,3 @@
-@use "./shared/brand" as brand;
-@use "bootstrap/scss/bootstrap" with (
-  $primary: brand.$primary,
-  $secondary: brand.$secondary,
-  $success: brand.$success,
-  $danger: brand.$danger,
-  $info: brand.$info,
-  $warning: brand.$warning
-);
-
-@use "./shared/base";
-@use "./api/docs";
+// Legacy compatibility entrypoint.
+// Source of truth lives under assets/css/src/apps/uhco-identity/.
+@use "../css/src/apps/uhco-identity/api";

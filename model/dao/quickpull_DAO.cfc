@@ -4,24 +4,107 @@ component extends="dao.BaseDAO" output="false" singleton {
         super.init();        return this;
     }
 
+    private string function _preferredNamePresentSql( required string aliasPrefix ) {
+        return "(
+                    LEN(LTRIM(RTRIM(ISNULL(#arguments.aliasPrefix#.FirstName, '')))) > 0
+                    OR LEN(LTRIM(RTRIM(ISNULL(#arguments.aliasPrefix#.MiddleName, '')))) > 0
+                    OR LEN(LTRIM(RTRIM(ISNULL(#arguments.aliasPrefix#.LastName, '')))) > 0
+                )";
+    }
+
+    private void function _applyPreferredNameToRows( required array rows ) {
+        for ( var i = 1; i <= arrayLen(arguments.rows); i++ ) {
+            _applyPreferredNameToRow( arguments.rows[i] );
+        }
+    }
+
+    private void function _applyPreferredNameToRow( required struct row ) {
+        var baseFirst = trim(arguments.row.FIRSTNAME ?: "");
+        var baseMiddle = trim(arguments.row.MIDDLENAME ?: "");
+        var baseLast = trim(arguments.row.LASTNAME ?: "");
+        var preferredFirst = trim(arguments.row.PREFERREDFIRSTNAME ?: "");
+        var preferredMiddle = trim(arguments.row.PREFERREDMIDDLENAME ?: "");
+        var preferredLast = trim(arguments.row.PREFERREDLASTNAME ?: "");
+        var preferredDisplayName = trim(arguments.row.PREFERREDDISPLAYNAME ?: "");
+        var hasPreferredName = len(trim(arguments.row.PREFERREDFIRSTNAME ?: ""))
+            OR len(trim(arguments.row.PREFERREDMIDDLENAME ?: ""))
+            OR len(trim(arguments.row.PREFERREDLASTNAME ?: ""));
+        var first = hasPreferredName ? preferredFirst : baseFirst;
+        var middle = hasPreferredName ? preferredMiddle : baseMiddle;
+        var last = hasPreferredName ? preferredLast : baseLast;
+
+        // Never blank a populated base component when preferred alias only has partial split-name data.
+        if ( !len(first) AND len(baseFirst) ) {
+            first = baseFirst;
+        }
+        if ( !len(middle) AND len(baseMiddle) ) {
+            middle = baseMiddle;
+        }
+        if ( !len(last) AND len(baseLast) ) {
+            last = baseLast;
+        }
+
+        // Final fallback for legacy aliases that only store DisplayName.
+        if ( !len(first) AND !len(middle) AND !len(last) AND len(preferredDisplayName) ) {
+            var normalizedDisplay = reReplace(trim(preferredDisplayName), "\s+", " ", "all");
+            var displayParts = listToArray(normalizedDisplay, " ");
+            var partCount = arrayLen(displayParts);
+
+            if ( partCount EQ 1 ) {
+                first = displayParts[1];
+            } else if ( partCount EQ 2 ) {
+                first = displayParts[1];
+                last = displayParts[2];
+            } else if ( partCount GT 2 ) {
+                first = displayParts[1];
+                last = displayParts[partCount];
+                var middleParts = [];
+                for ( var idx = 2; idx < partCount; idx++ ) {
+                    arrayAppend(middleParts, displayParts[idx]);
+                }
+                middle = arrayToList(middleParts, " ");
+            }
+        }
+
+        arguments.row["FIRSTNAME"] = first;
+        arguments.row["MIDDLENAME"] = middle;
+        arguments.row["LASTNAME"] = last;
+
+        structDelete(arguments.row, "PREFERREDFIRSTNAME", false);
+        structDelete(arguments.row, "PREFERREDMIDDLENAME", false);
+        structDelete(arguments.row, "PREFERREDLASTNAME", false);
+        structDelete(arguments.row, "PREFERREDDISPLAYNAME", false);
+    }
+
     /**
      * Users with the Clinical-Attending flag.
      * Returns: UserID, FirstName, MiddleName, LastName, Degrees (display string from Users table)
      */
     public array function getAttendingUsers() {
+        var preferredNamePresentSql = _preferredNamePresentSql( "pa" );
         var qry = executeQueryWithRetry(
             "SELECT u.UserID,
-                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
-                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
-                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.FirstName AS FirstName,
+                    u.MiddleName AS MiddleName,
+                    u.LastName AS LastName,
+                    COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '') AS PreferredLastName,
+                                        COALESCE(pa.DisplayName, '') AS PreferredDisplayName,
                     u.Degrees
              FROM   Users u
                     OUTER APPLY (
-                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                                                SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName, ua.DisplayName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
                           AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
+                                                        CASE
+                                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.MiddleName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                                THEN 0 ELSE 1
+                                                        END,
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
@@ -41,11 +124,14 @@ component extends="dao.BaseDAO" output="false" singleton {
                        WHERE  ufaTest.UserID = u.UserID
                          AND  ufTest.FlagName = 'TEST_USER'
                       )
-             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
+                         ORDER BY CASE WHEN #preferredNamePresentSql# THEN pa.LastName ELSE u.LastName END,
+                                            CASE WHEN #preferredNamePresentSql# THEN pa.FirstName ELSE u.FirstName END",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
-        return queryToArray(qry);
+                var rows = queryToArray(qry);
+                _applyPreferredNameToRows( rows );
+                return rows;
     }
 
     /**
@@ -59,11 +145,16 @@ component extends="dao.BaseDAO" output="false" singleton {
         string lastNameStart = "",
         string lastNameFinish = ""
     ) {
+        var preferredNamePresentSql = _preferredNamePresentSql( "pa" );
         var qry = executeQueryWithRetry(
             "SELECT u.UserID,
-                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
-                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
-                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.FirstName AS FirstName,
+                    u.MiddleName AS MiddleName,
+                    u.LastName AS LastName,
+                    COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '') AS PreferredLastName,
+                    COALESCE(pa.DisplayName, '') AS PreferredDisplayName,
                     programAgg.ProgramList AS Program,
                     usp.FirstExternship,
                     usp.SecondExternship,
@@ -91,11 +182,17 @@ component extends="dao.BaseDAO" output="false" singleton {
                         ).value('.', 'nvarchar(max)'), 1, 2, '')
                     ) programAgg
                     OUTER APPLY (
-                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                                                SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName, ua.DisplayName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
                           AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
+                                                        CASE
+                                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.MiddleName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                                THEN 0 ELSE 1
+                                                        END,
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
@@ -126,8 +223,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                AND  (
                         :lastNameStart = ''
                         OR (
-                            LEFT(UPPER(LTRIM(COALESCE(pa.LastName, u.LastName))), 1) >= :lastNameStart
-                            AND LEFT(UPPER(LTRIM(COALESCE(pa.LastName, u.LastName))), 1) <= :lastNameFinish
+                            LEFT(UPPER(LTRIM(CASE WHEN #preferredNamePresentSql# THEN pa.LastName ELSE u.LastName END)), 1) >= :lastNameStart
+                            AND LEFT(UPPER(LTRIM(CASE WHEN #preferredNamePresentSql# THEN pa.LastName ELSE u.LastName END)), 1) <= :lastNameFinish
                         )
                     )
                AND  EXISTS (
@@ -144,7 +241,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                                                 WHERE  ufaTest.UserID = u.UserID
                                                     AND  ufTest.FlagName = 'TEST_USER'
                                         )
-                         ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
+                         ORDER BY CASE WHEN #preferredNamePresentSql# THEN pa.LastName ELSE u.LastName END,
+                                  CASE WHEN #preferredNamePresentSql# THEN pa.FirstName ELSE u.FirstName END",
             {
                 gradYear = { value=arguments.gradYear, cfsqltype="cf_sql_integer" },
                 programName = { value=arguments.programName, cfsqltype="cf_sql_varchar" },
@@ -153,7 +251,9 @@ component extends="dao.BaseDAO" output="false" singleton {
             },
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
-        return queryToArray(qry);
+        var rows = queryToArray(qry);
+        _applyPreferredNameToRows( rows );
+        return rows;
     }
 
     /**
@@ -161,11 +261,16 @@ component extends="dao.BaseDAO" output="false" singleton {
      * Returns base fields; degrees, awards, and images are fetched separately.
      */
     public array function getGraduateUser( required numeric userID ) {
+        var rows = [];
         var qry = executeQueryWithRetry(
             "SELECT u.UserID,
-                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
-                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
-                    COALESCE(pa.LastName, u.LastName) AS LastName,
+                    u.FirstName AS FirstName,
+                    u.MiddleName AS MiddleName,
+                    u.LastName AS LastName,
+                    COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '') AS PreferredLastName,
+                    COALESCE(pa.DisplayName, '') AS PreferredDisplayName,
                     uai.CurrentGradYear,
                     usp.FirstExternship, usp.SecondExternship,
                     usp.HometownCity, usp.HometownState
@@ -173,11 +278,17 @@ component extends="dao.BaseDAO" output="false" singleton {
                     LEFT JOIN UserAcademicInfo    uai ON u.UserID = uai.UserID
                     LEFT JOIN UserStudentProfile  usp ON u.UserID = usp.UserID
                     OUTER APPLY (
-                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                                                SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName, ua.DisplayName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
                           AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
+                                                        CASE
+                                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.MiddleName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                                THEN 0 ELSE 1
+                                                        END,
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
@@ -201,7 +312,9 @@ component extends="dao.BaseDAO" output="false" singleton {
             { userID = { value=arguments.userID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30, fetchSize=10 }
         );
-        return queryToArray(qry);
+        rows = queryToArray(qry);
+        _applyPreferredNameToRows( rows );
+        return rows;
     }
 
     /**
@@ -209,18 +322,29 @@ component extends="dao.BaseDAO" output="false" singleton {
      * Returns: UserID, FirstName, MiddleName, LastName
      */
     public array function getDeansUsers() {
+        var preferredNamePresentSql = _preferredNamePresentSql( "pa" );
         var qry = executeQueryWithRetry(
             "SELECT u.UserID,
-                    COALESCE(pa.FirstName, u.FirstName) AS FirstName,
-                    COALESCE(pa.MiddleName, u.MiddleName) AS MiddleName,
-                    COALESCE(pa.LastName, u.LastName) AS LastName
+                    u.FirstName AS FirstName,
+                    u.MiddleName AS MiddleName,
+                    u.LastName AS LastName,
+                    COALESCE(pa.FirstName, '') AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '') AS PreferredLastName
+                                        ,COALESCE(pa.DisplayName, '') AS PreferredDisplayName
              FROM   Users u
                     OUTER APPLY (
-                        SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                                                SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName, ua.DisplayName
                         FROM UserAliases ua
                         WHERE ua.UserID = u.UserID
                           AND ISNULL(ua.IsActive, 1) = 1
                         ORDER BY
+                                                        CASE
+                                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.MiddleName, '')))) > 0
+                                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                                THEN 0 ELSE 1
+                                                        END,
                             CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                             ISNULL(ua.SortOrder, 2147483647),
                             ua.AliasID
@@ -240,11 +364,14 @@ component extends="dao.BaseDAO" output="false" singleton {
                        WHERE  ufaTest.UserID = u.UserID
                          AND  ufTest.FlagName = 'TEST_USER'
                       )
-             ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
+                         ORDER BY CASE WHEN #preferredNamePresentSql# THEN pa.LastName ELSE u.LastName END,
+                                            CASE WHEN #preferredNamePresentSql# THEN pa.FirstName ELSE u.FirstName END",
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=500 }
         );
-        return queryToArray(qry);
+                var rows = queryToArray(qry);
+                _applyPreferredNameToRows( rows );
+                return rows;
     }
 
     /**

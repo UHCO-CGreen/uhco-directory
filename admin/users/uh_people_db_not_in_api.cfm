@@ -6,6 +6,10 @@
 <cfparam name="form.stagingID" default="0">
 <cfparam name="form.userID" default="0">
 
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/users/index.cfm">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
 <cfif NOT request.hasPermission("users.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -26,9 +30,7 @@
 <cfset pageMessageClass = "alert-info">
 
 <cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabled = usersService.isTestModeEnabled()>
-<cfset hideTestUsersForAdmin = (NOT canViewTestUsers) AND (NOT testModeEnabled)>
+<cfset hideTestUsersForAdmin = request.shouldExcludeTestUsers()>
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset localUsersForActions = usersService.listUsers()>
 <cfset userByApiId = {}>
@@ -62,20 +64,14 @@
     <cfset noUhUserMap[toString(noUhAssignments.UserID)] = true>
 </cfloop>
 
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken = trim(server.system.environment["UH_API_TOKEN"] )>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"] )>
-    </cfif>
-</cfif>
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
 
-<cfif uhApiToken EQ "">
-    <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-</cfif>
-<cfif uhApiSecret EQ "">
-    <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cfset content = "<h1>UH People Reverse Compare</h1><div class='alert alert-danger'>UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.</div>">
+    <cfinclude template="/admin/layout.cfm">
+    <cfabort>
 </cfif>
 
 <cfif form.ignoreFromStaging EQ "1" AND isNumeric(form.stagingID) AND val(form.stagingID) GT 0>
@@ -99,18 +95,8 @@
     <cfset deletedUser = false>
 
     <cfif targetUserID GT 0>
-        <cfif hideTestUsersForAdmin>
-            <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
-            <cfset isTestUser = false>
-            <cfloop array="#targetUserFlags#" index="targetFlag">
-                <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
-                    <cfset isTestUser = true>
-                    <cfbreak>
-                </cfif>
-            </cfloop>
-            <cfif isTestUser>
-                <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
-            </cfif>
+        <cfif NOT request.canAccessUserByID(targetUserID)>
+            <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
         </cfif>
 
         <cfset deleteUserResult = usersService.deleteUser(targetUserID)>
@@ -317,8 +303,8 @@
             </div>
         </div>
         <div class='col-md-4 text-md-end'>
-            <button type='submit' class='btn btn-primary'>Run Reverse Compare</button>
-            <button type='submit' name='viewStaging' value='1' class='btn btn-outline-secondary'>View DB-Not-API Staging</button>
+            <button type='submit' class='btn btn-ui-filter'>Run Reverse Compare</button>
+            <button type='submit' name='viewStaging' value='1' class='btn btn-ui-go'>View DB-Not-API Staging</button>
         </div>
     </div>
 </form>
@@ -427,14 +413,14 @@
                                 <input type='hidden' name='viewStaging' value='1'>
                                 <input type='hidden' name='ignoreFromStaging' value='1'>
                                 <input type='hidden' name='stagingID' value='#stagingDbOnly.StagingID#'>
-                                <button type='submit' class='btn btn-sm btn-outline-secondary'>Ignore</button>
+                                <button type='submit' class='btn btn-sm btn-ui-cancel'>Ignore</button>
                             </form>
                             <form method='post' class='admin-inline-form'>
                                 <input type='hidden' name='viewStaging' value='1'>
                                 <input type='hidden' name='deleteFromStaging' value='1'>
                                 <input type='hidden' name='stagingID' value='#stagingDbOnly.StagingID#'>
                                 <input type='hidden' name='userID' value='#resolvedUserID#'>
-                                <button type='submit' class='btn btn-sm btn-outline-danger' onclick='return confirm(""This permanently deletes the user from the Users table and removes the staging record. Continue?"");'>Delete</button>
+                                <button type='submit' class='btn btn-sm btn-ui-delete' data-confirm="This permanently deletes the user from the Users table and removes the staging record. Continue?">Delete</button>
                             </form>
                         </td>
                     </tr>

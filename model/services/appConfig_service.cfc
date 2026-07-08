@@ -25,7 +25,9 @@ component output="false" singleton {
 
     public void function setValue(
         required string configKey,
-        required string configValue
+        required string configValue,
+        string description = "",
+        string category    = ""
     ) {
         var valueToStore = trim(arguments.configValue);
 
@@ -33,7 +35,44 @@ component output="false" singleton {
             valueToStore = encryptValue(arguments.configKey, valueToStore);
         }
 
-        variables.AppConfigDAO.setConfigValue( arguments.configKey, valueToStore );
+        variables.AppConfigDAO.setConfigValue(
+            configKey   = arguments.configKey,
+            configValue = valueToStore,
+            description = arguments.description,
+            category    = arguments.category
+        );
+    }
+
+    public void function addKey(
+        required string configKey,
+        required string configValue,
+        string category    = "",
+        string description = ""
+    ) {
+        var normalizedKey = trim(arguments.configKey);
+
+        if ( !len(normalizedKey) ) {
+            throw(message="Config key is required.");
+        }
+        if ( len(normalizedKey) GT 100 ) {
+            throw(message="Config key must be 100 characters or fewer.");
+        }
+        if ( !reFind("^[a-z0-9][a-z0-9._]*$", normalizedKey) ) {
+            throw(message="Config key must be lowercase alphanumeric with dots or underscores only (e.g. dashboard.page_size).");
+        }
+        if ( len(trim(arguments.description)) GT 500 ) {
+            throw(message="Description must be 500 characters or fewer.");
+        }
+        if ( len(trim(arguments.category)) GT 100 ) {
+            throw(message="Category must be 100 characters or fewer.");
+        }
+
+        variables.AppConfigDAO.addConfigKey(
+            configKey   = normalizedKey,
+            configValue = trim(arguments.configValue),
+            category    = trim(arguments.category),
+            description = trim(arguments.description)
+        );
     }
 
     public array function getAll() {
@@ -47,6 +86,8 @@ component output="false" singleton {
             } else {
                 row.CONFIGVALUE_DISPLAY = row.CONFIGVALUE ?: "";
             }
+            row.DESCRIPTION = trim(row.DESCRIPTION ?: "");
+            row.CATEGORY    = trim(row.CATEGORY ?: "");
         }
 
         return rows;

@@ -1,5 +1,19 @@
 <cfcomponent displayname="AuthService" output="false">
 
+  <cffunction name="_getLdapAuthGateway" access="private" returntype="any" output="false">
+    <cfif NOT structKeyExists(variables, "ldapAuthGateway")>
+      <cfset variables.ldapAuthGateway = createObject("component", "cfc.ldapAuthGateway_service").init()>
+    </cfif>
+    <cfreturn variables.ldapAuthGateway>
+  </cffunction>
+
+  <cffunction name="_getAdminSessionsDAO" access="private" returntype="any" output="false">
+    <cfif NOT structKeyExists(variables, "adminSessionsDAO")>
+      <cfset variables.adminSessionsDAO = createObject("component", "dao.adminSessions_DAO").init()>
+    </cfif>
+    <cfreturn variables.adminSessionsDAO>
+  </cffunction>
+
   <cffunction name="_getAdminAuthDAO" access="private" returntype="any" output="false">
     <cfif NOT structKeyExists(variables, "adminAuthDAO")>
       <cfset variables.adminAuthDAO = createObject("component", "dao.adminAuth_DAO").init()>
@@ -119,19 +133,16 @@
       message = "",
       user    = {}
     }>
+    <cfset var ldapGateway = _getLdapAuthGateway()>
+    <cfset var GetUserInfo = "">
 
     <cftry>
-      <cfldap
-        action="QUERY"
-        name="GetUserInfo"
-        attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials"
-        start="DC=cougarnet,DC=uh,DC=edu"
-        scope="SUBTREE"
-        filter="(&(objectClass=User)(objectCategory=Person)(sAMAccountName=#arguments.username#)(|(memberOf=CN=OPT-ASC,OU=ASC USERS,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-STAFF,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-OPTOMETRY,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-FACULTY-1,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2022,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2023,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2024,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2025,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2026,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)))"
-        maxrows="1"
-        server="cougarnet.uh.edu"
-        username="COUGARNET\#arguments.username#"
-        password="#arguments.password#">
+      <cfset GetUserInfo = ldapGateway.queryUserByCredentials(
+        username = arguments.username,
+        password = arguments.password,
+        attributes = "displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials",
+        allowedGroupDNs = ldapGateway.getAdminAllowedGroupDNs()
+      )>
   
       <!--- Authorization check --->
       <cfif GetUserInfo.recordCount EQ 0>
@@ -216,19 +227,19 @@
         >
         <cfif cfcatch.message CONTAINS "error code 49">
           <cfif cfcatch.message CONTAINS "52e">
-            <cfset result.message = "Invalid credentials. Please check your username or password and try again.">
+            <cfset result.message = "Error 52e: Invalid credentials. Please check your username or password and try again.">
           <cfelseif cfcatch.message CONTAINS "525">
-            <cfset result.message = "User not found. Please check your username and try again.">
+            <cfset result.message = "Error 525: User not found. Please check your username and try again.">
           <cfelseif cfcatch.message CONTAINS "530">
-            <cfset result.message = "Not permitted to log on at this time. Please contact your IT admin.">
+            <cfset result.message = "Error 530: Not permitted to log on at this time. Please contact your IT admin.">
           <cfelseif cfcatch.message CONTAINS "532">
-            <cfset result.message = "Password expired. Please change your password before attempting to log in again.">
+            <cfset result.message = "Error 532: Password expired. Please change your password before attempting to log in again.">
           <cfelseif cfcatch.message CONTAINS "533">
-            <cfset result.message = "Account disabled. Please contact your IT admin.">
+            <cfset result.message = "Error 533: Account disabled. Please contact your IT admin.">
           <cfelseif cfcatch.message CONTAINS "701">
-            <cfset result.message = "Account expired. Please contact your IT admin.">
+            <cfset result.message = "Error 701: Account expired. Please contact your IT admin.">
           <cfelseif cfcatch.message CONTAINS "773">
-            <cfset result.message = "You must reset your password before logging in.">
+            <cfset result.message = "Error 773: You must reset your password before logging in.">
           <cfelse>
             <cfset result.message = "Login failed (code 49). Please try again.">
           </cfif>
@@ -240,6 +251,101 @@
 
     </cftry>
 
+  </cffunction>
+
+  <cffunction
+    name="authenticateTrustedLaunch"
+    access="public"
+    returntype="struct"
+    output="false"
+  >
+    <cfargument name="username" type="string" required="true">
+    <cfargument name="canonicalUserID" type="numeric" required="false" default="0">
+    <cfargument name="displayName" type="string" required="false" default="">
+    <cfargument name="email" type="string" required="false" default="">
+    <cfargument name="department" type="string" required="false" default="">
+    <cfargument name="title" type="string" required="false" default="">
+    <cfargument name="authType" type="string" required="false" default="myuhco-token">
+
+    <cfset var result = {
+      success = false,
+      message = "",
+      user = {}
+    }>
+    <cfset var adminAuthDAO = _getAdminAuthDAO()>
+    <cfset var normalizedUsername = lCase(trim(arguments.username & ""))>
+    <cfset var accessUser = {}>
+    <cfset var authorization = {}>
+    <cfset var effectiveDisplayName = trim(arguments.displayName & "")>
+
+    <cfif NOT len(normalizedUsername)>
+      <cfset result.message = "Trusted launch username is required.">
+      <cfreturn result>
+    </cfif>
+
+    <cftry>
+      <cfset accessUser = adminAuthDAO.getUserByCougarnet(normalizedUsername)>
+
+      <cfif NOT structCount(accessUser) OR NOT val(accessUser.IS_ACTIVE)>
+        <cfset result.message = "User not authorized - Not found in access list">
+        <cfreturn result>
+      </cfif>
+
+      <cfset authorization = _loadAuthorizationContext(val(accessUser.USER_ID))>
+
+      <cfif arrayLen(authorization.roles) EQ 0>
+        <cfset result.message = "User not authorized - No access role assigned">
+        <cfreturn result>
+      </cfif>
+
+      <cfif NOT len(effectiveDisplayName)>
+        <cfset effectiveDisplayName = normalizedUsername>
+      </cfif>
+
+      <cfset result.success = true>
+      <cfset result.user = {
+        adminUserID = val(accessUser.USER_ID),
+        userID = int(val(arguments.canonicalUserID)),
+        username = normalizedUsername,
+        displayName = effectiveDisplayName,
+        email = trim(arguments.email & ""),
+        department = trim(arguments.department & ""),
+        title = trim(arguments.title & ""),
+        authType = trim(arguments.authType & ""),
+        loginAt = now(),
+        roles = authorization.roles,
+        roleIDs = authorization.roleIDs,
+        permissions = authorization.permissions,
+        actualRoles = authorization.roles,
+        actualRoleIDs = authorization.roleIDs,
+        actualPermissions = authorization.permissions,
+        actualIsSuperAdmin = authorization.isSuperAdmin,
+        isSuperAdmin = authorization.isSuperAdmin
+      }>
+
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "TRUSTED_LAUNCH",
+          adminUserID = val(accessUser.USER_ID),
+          username    = normalizedUsername,
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+          details     = "authType=#trim(arguments.authType & "")#"
+        )>
+      </cfif>
+
+      <cfreturn result>
+
+      <cfcatch type="any">
+        <cflog
+          file="auth-login"
+          type="error"
+          text="TRUSTED LAUNCH AUTH ERROR | user=#normalizedUsername# | #cfcatch.message# | #cfcatch.detail#"
+        >
+        <cfset result.message = "Trusted launch authentication failed.">
+        <cfreturn result>
+      </cfcatch>
+    </cftry>
   </cffunction>
 
     <cffunction
@@ -419,6 +525,16 @@
 
       <cfset result.success = true>
       <cfset result.message = "Now impersonating role '" & role.ROLE_NAME & "'.">
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService) AND structKeyExists(session, "user") AND val(session.user.adminUserID ?: 0)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "IMPERSONATE_START",
+          adminUserID = session.user.adminUserID,
+          username    = session.user.username ?: "",
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+          details     = "type=role|roleID=#arguments.roleID#|label=#role.ROLE_NAME#"
+        )>
+      </cfif>
       <cfreturn result>
     </cffunction>
 
@@ -479,6 +595,16 @@
 
       <cfset result.success = true>
       <cfset result.message = "Now impersonating custom permissions.">
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService) AND structKeyExists(session, "user") AND val(session.user.adminUserID ?: 0)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "IMPERSONATE_START",
+          adminUserID = session.user.adminUserID,
+          username    = session.user.username ?: "",
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+          details     = "type=permissions|count=#selectedCount#"
+        )>
+      </cfif>
       <cfreturn result>
     </cffunction>
 
@@ -536,6 +662,16 @@
 
       <cfset result.success = true>
       <cfset result.message = "Now impersonating " & labelStr & ".">
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService) AND structKeyExists(session, "user") AND val(session.user.adminUserID ?: 0)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "IMPERSONATE_START",
+          adminUserID = session.user.adminUserID,
+          username    = session.user.username ?: "",
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+          details     = "type=user|targetUserID=#arguments.userID#|label=#labelStr#"
+        )>
+      </cfif>
       <cfreturn result>
     </cffunction>
 
@@ -630,6 +766,16 @@
 
       <cfset result.success = true>
       <cfset result.message = "Now impersonating " & labelStr & ".">
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService) AND structKeyExists(session, "user") AND val(session.user.adminUserID ?: 0)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "IMPERSONATE_START",
+          adminUserID = session.user.adminUserID,
+          username    = session.user.username ?: "",
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+          details     = "type=role+extra|roleID=#arguments.roleID#|label=#labelStr#"
+        )>
+      </cfif>
       <cfreturn result>
     </cffunction>
 
@@ -646,6 +792,16 @@
         session.user.actualPermissions,
         session.user.actualIsSuperAdmin
       )>
+
+      <cfif structKeyExists(application, "authAuditService") AND isObject(application.authAuditService) AND val(session.user.adminUserID ?: 0)>
+        <cfset application.authAuditService.log(
+          source      = "admin",
+          eventType   = "IMPERSONATE_END",
+          adminUserID = session.user.adminUserID,
+          username    = session.user.username ?: "",
+          ipAddress   = left(trim(cgi.remote_addr & ""), 50)
+        )>
+      </cfif>
 
       <cfreturn true>
     </cffunction>
@@ -706,7 +862,19 @@
         >
         <cfargument name="user" type="struct" required="true">
 
+        <cfset sessionRotate()>
+        <cfif structKeyExists(session, "adminCsrfToken")>
+          <cfset structDelete(session, "adminCsrfToken", false)>
+        </cfif>
         <cfset session.user = _normalizeSessionUser(arguments.user)>
+        <cftry>
+          <cfset _getAdminSessionsDAO().createSession(
+            adminUserID = val(session.user.adminUserID ?: 0),
+            ipAddress   = left(trim(cgi.remote_addr & ""), 50),
+            userAgent   = left(trim(cgi.http_user_agent & ""), 500)
+          )>
+        <cfcatch type="any"></cfcatch>
+        </cftry>
     </cffunction>
 
     <cffunction
@@ -715,12 +883,19 @@
         returntype="void"
         output="false"
         >
+        <!--- Close DB session rows before clearing the in-memory session --->
+        <cfif structKeyExists(session, "user") AND val(session.user.adminUserID ?: 0)>
+            <cftry>
+                <cfset _getAdminSessionsDAO().closeSessionsForUser(val(session.user.adminUserID))>
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+        </cfif>
+
         <!--- Clear user session data --->
         <cfif structKeyExists(session, "user")>
             <cfset structDelete(session, "user")>
         </cfif>
 
-        <!--- Optional but recommended: rotate session ID --->
         <cfset sessionInvalidate()>
         </cffunction>
 

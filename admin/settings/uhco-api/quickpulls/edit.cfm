@@ -199,17 +199,10 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
         <div class="text-muted font-monospace mb-2">#encodeForHTML(quickpull.endpoint)#</div>
         <p class="text-muted mb-0">Default return items stay in place. Select the additional fields this quickpull should append.</p>
     </div>
-    <a href="index.cfm" class="btn btn-outline-secondary">
+    <a href="index.cfm" class="btn btn-ui-cancel">
         <i class="bi bi-arrow-left me-1"></i>Back to Quickpulls
     </a>
 </div>
-
-<cfif len(actionMessage)>
-    <div class="alert alert-success">#encodeForHTML(actionMessage)#</div>
-</cfif>
-<cfif len(actionError)>
-    <div class="alert alert-danger">#encodeForHTML(actionError)#</div>
-</cfif>
 
 <div class="card shadow-sm mb-4 settings-shell settings-reference-card">
     <div class="card-body">
@@ -393,13 +386,30 @@ if (config.appendFlags AND !isDefaultReturnItem(defaultReturnItemSet, "Organizat
     </div>
 
     <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save Quickpull Settings</button>
-        <a href="index.cfm" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-ui-save"><i class="bi bi-save me-1"></i>Save Quickpull Settings</button>
+        <a href="index.cfm" class="btn btn-ui-cancel">Cancel</a>
     </div>
 </form>
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(actionError)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionError)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

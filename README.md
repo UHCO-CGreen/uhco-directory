@@ -99,6 +99,8 @@ For local styling work:
 8. Run `npm install` once at the repository root.
 9. Run `npm run build` to copy vendor assets and compile CSS bundles.
 10. Use `npm run watch:styles` during active Sass development.
+11. Active CSS source of truth lives under [assets/css/src](assets/css/src).
+12. Legacy files under [assets/scss](assets/scss) are compatibility shims or reference material and should not receive new styling work.
 
 If application state needs to be rebuilt after config changes, the app supports `?reinit=true` in requests via [Application.cfc](Application.cfc).
 

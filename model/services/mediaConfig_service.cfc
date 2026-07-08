@@ -2,6 +2,7 @@ component output="false" singleton {
 
     variables.publishedSiteBaseUrlKey = "media_published_site_base_url";
     variables.publishedImagesSegment = "_published_images/";
+    variables.cachedPublishedSiteBaseUrl = "";
 
     public any function init() {
         variables.AppConfigService = createObject("component", "cfc.appConfig_service").init();
@@ -9,14 +10,20 @@ component output="false" singleton {
     }
 
     public string function getPublishedSiteBaseUrl() {
+        if ( len(trim(variables.cachedPublishedSiteBaseUrl ?: "")) ) {
+            return variables.cachedPublishedSiteBaseUrl;
+        }
+
         var configuredBaseUrl = variables.AppConfigService.getValue(
             configKey    = variables.publishedSiteBaseUrlKey,
             defaultValue = ""
         );
 
-        return _normalizeBaseUrl(
+        variables.cachedPublishedSiteBaseUrl = _normalizeBaseUrl(
             len(trim(configuredBaseUrl)) ? configuredBaseUrl : _getDefaultPublishedSiteBaseUrl()
         );
+
+        return variables.cachedPublishedSiteBaseUrl;
     }
 
     public void function setPublishedSiteBaseUrl( required string baseUrl ) {
@@ -33,6 +40,8 @@ component output="false" singleton {
             configKey   = variables.publishedSiteBaseUrlKey,
             configValue = normalized
         );
+
+        variables.cachedPublishedSiteBaseUrl = normalized;
     }
 
     public string function getPublishedImageBaseUrl() {

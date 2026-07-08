@@ -2,6 +2,7 @@ component output="false" singleton {
 
     public any function init() {
         variables.dao = createObject("component", "dao.quickpull_DAO").init();
+        variables.nameResolutionService = createObject("component", "cfc.nameResolution_service").init();
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
         variables.directoryService = createObject("component", "cfc.directory_service").init();
         variables.phoneDAO = createObject("component", "dao.phone_DAO").init();
@@ -136,6 +137,7 @@ component output="false" singleton {
      */
     public array function getAttending() {
         var users = variables.dao.getAttendingUsers();
+        variables.nameResolutionService.resolveRows(users);
         for (var i = 1; i <= arrayLen(users); i++) {
             var parts = [];
             if (len(trim(users[i].FIRSTNAME)))  arrayAppend(parts, trim(users[i].FIRSTNAME));
@@ -148,7 +150,10 @@ component output="false" singleton {
             }
             users[i]["FULLNAME"] = fullName;
         }
-        return _appendConfiguredFieldsToRows( users, "attending" );
+        users = _appendConfiguredFieldsToRows( users, "attending" );
+        variables.nameResolutionService.attachPrimaryNameEnvelopeToRows(users, "USERID", false);
+        variables.nameResolutionService.stripFlatNameFields(users);
+        return users;
     }
 
     /**
@@ -208,10 +213,56 @@ component output="false" singleton {
             }
 
             _applyConfiguredFieldsToRowWithConfig( row, userID, gradClassConfig, profileCache );
+
+            if ( structKeyExists(row, "ALLDEGREES") && isArray(row.ALLDEGREES) ) {
+                row["ALLDEGREES"] = _filterExcludedDegrees(row.ALLDEGREES, ["B.S."]);
+            }
+
             arrayAppend( rows, row );
         }
 
+        variables.nameResolutionService.resolveRows(rows);
+        _repairMissingGradClassNames(rows, profileCache);
+        variables.nameResolutionService.attachPrimaryNameEnvelopeToRows(rows, "USERID", false);
+        variables.nameResolutionService.stripFlatNameFields(rows);
+
         return rows;
+    }
+
+    private void function _repairMissingGradClassNames( required array rows, required struct profileCache ) {
+        for ( var i = 1; i <= arrayLen(arguments.rows); i++ ) {
+            var row = arguments.rows[i];
+            var userID = val(row.USERID ?: 0);
+
+            if ( userID LTE 0 ) {
+                continue;
+            }
+
+            var cacheKey = toString(userID);
+            if ( !structKeyExists(arguments.profileCache, cacheKey) ) {
+                arguments.profileCache[cacheKey] = variables.directoryService.getFullProfile(userID);
+            }
+
+            var profile = arguments.profileCache[cacheKey];
+            var profileUser = isStruct(profile) ? (profile.user ?: {}) : {};
+
+            // Final authoritative source for GradClass split names.
+            var profileFirst = trim(profileUser.FIRSTNAME ?: "");
+            var profileMiddle = trim(profileUser.MIDDLENAME ?: "");
+            var profileLast = trim(profileUser.LASTNAME ?: "");
+
+            if ( len(profileFirst) ) {
+                row["FIRSTNAME"] = profileFirst;
+            }
+            if ( len(profileMiddle) ) {
+                row["MIDDLENAME"] = profileMiddle;
+            }
+            if ( len(profileLast) ) {
+                row["LASTNAME"] = profileLast;
+            }
+
+            row["FULLNAME"] = buildFullName(row);
+        }
     }
 
     private struct function _resolveGradClassLastNameFilterRange( string lastNameFilter = "" ) {
@@ -258,7 +309,10 @@ component output="false" singleton {
         user["KIOSKROSTERIMAGE"]  = structKeyExists( rosterMap,  key ) ? rosterMap[ key ]  : "";
         user["KIOSKPROFILEIMAGE"] = structKeyExists( profileMap, key ) ? profileMap[ key ] : "";
 
+        variables.nameResolutionService.resolveRow(user);
         _applyConfiguredFieldsToRow( user, uid, "graduate", {} );
+        variables.nameResolutionService.attachPrimaryNameEnvelopeToRow(user, {}, "USERID", false);
+        variables.nameResolutionService.stripFlatNameFields(user);
         return user;
     }
 
@@ -268,6 +322,8 @@ component output="false" singleton {
     public array function getDeans() {
         var users = variables.dao.getDeansUsers();
         if ( arrayLen(users) == 0 ) return [];
+
+        variables.nameResolutionService.resolveRows(users);
 
         var ids = [];
         for ( var u in users ) {
@@ -282,7 +338,10 @@ component output="false" singleton {
             users[i]["KIOSKNONGRIDIMAGE"] = structKeyExists( nonGridMap, uid ) ? nonGridMap[ uid ] : "";
         }
 
-        return _appendConfiguredFieldsToRows( users, "deans" );
+        users = _appendConfiguredFieldsToRows( users, "deans" );
+        variables.nameResolutionService.attachPrimaryNameEnvelopeToRows(users, "USERID", false);
+        variables.nameResolutionService.stripFlatNameFields(users);
+        return users;
     }
 
     /**
@@ -350,6 +409,8 @@ component output="false" singleton {
 
         // Apply configured additional fields
         _applyConfiguredFieldsToRow(user, userID, "myuhco", {});
+        variables.nameResolutionService.attachPrimaryNameEnvelopeToRow(user, {}, "USERID", false);
+        variables.nameResolutionService.stripFlatNameFields(user);
 
         return user;
     }
@@ -481,6 +542,9 @@ component output="false" singleton {
 
         profile = arguments.profileCache[cacheKey];
 
+        // Guard against empty split-name payloads by using the canonical profile user record.
+        _hydrateRowNamePartsFromProfile(arguments.row, profile);
+
         _appendGeneralFields(arguments.row, profile, arguments.config.generalFields);
         _appendContactFields(arguments.row, profile, arguments.config);
         _appendBiographicalFields(arguments.row, profile, arguments.config.biographicalItems);
@@ -494,6 +558,29 @@ component output="false" singleton {
         if ( arguments.config.appendFlags ) {
             arguments.row["FLAGS"] = profile.flags ?: [];
         }
+
+        // Keep FULLNAME consistent with the final name parts after configured-field mutations.
+        arguments.row["FULLNAME"] = buildFullName(arguments.row);
+    }
+
+    private void function _hydrateRowNamePartsFromProfile( required struct row, required struct profile ) {
+        var profileUser = arguments.profile.user ?: {};
+        var resolvedFirst = _firstMeaningfulNamePart([
+            arguments.row["FIRSTNAME"] ?: "",
+            profileUser.FIRSTNAME ?: ""
+        ]);
+        var resolvedMiddle = _firstMeaningfulNamePart([
+            arguments.row["MIDDLENAME"] ?: "",
+            profileUser.MIDDLENAME ?: ""
+        ]);
+        var resolvedLast = _firstMeaningfulNamePart([
+            arguments.row["LASTNAME"] ?: "",
+            profileUser.LASTNAME ?: ""
+        ]);
+
+        arguments.row["FIRSTNAME"] = resolvedFirst;
+        arguments.row["MIDDLENAME"] = resolvedMiddle;
+        arguments.row["LASTNAME"] = resolvedLast;
     }
 
     private struct function _getQuickpullConfig( required string quickpullType ) {
@@ -556,20 +643,23 @@ component output="false" singleton {
 
         for ( var fieldName in arguments.selectedFields ) {
             if ( compareNoCase(fieldName, "PREFERREDNAME") EQ 0 ) {
+                var originalFirstName = _normalizeMeaningfulNamePart(arguments.row["FIRSTNAME"] ?: "");
+                var originalMiddleName = _normalizeMeaningfulNamePart(arguments.row["MIDDLENAME"] ?: "");
+                var originalLastName = _normalizeMeaningfulNamePart(arguments.row["LASTNAME"] ?: "");
                 var preferredFirstName = _normalizeMeaningfulNamePart(userData.PREFERREDNAME ?: "");
                 var resolvedFirstName = _firstMeaningfulNamePart([
                     preferredFirstName,
                     userData.FIRSTNAME ?: "",
-                    arguments.row["FIRSTNAME"] ?: ""
+                    originalFirstName
                 ]);
-                var resolvedMiddleName = _firstMeaningfulNamePart([
-                    userData.MIDDLENAME ?: "",
-                    arguments.row["MIDDLENAME"] ?: ""
-                ]);
-                var resolvedLastName = _firstMeaningfulNamePart([
-                    userData.LASTNAME ?: "",
-                    arguments.row["LASTNAME"] ?: ""
-                ]);
+                var resolvedMiddleName = originalMiddleName;
+                var resolvedLastName = originalLastName;
+
+                // Never clear an existing name part when preferred-name resolution yields empty.
+                if ( !len(resolvedFirstName) AND len(originalFirstName) ) {
+                    resolvedFirstName = originalFirstName;
+                }
+
                 arguments.row["FIRSTNAME"] = resolvedFirstName;
                 arguments.row["MIDDLENAME"] = resolvedMiddleName;
                 arguments.row["LASTNAME"] = resolvedLastName;
@@ -820,6 +910,19 @@ component output="false" singleton {
         return filtered;
     }
 
+    private array function _filterExcludedDegrees( required array degrees, required array excludeNames ) {
+        var result = [];
+
+        for ( var degree in arguments.degrees ) {
+            var degreeName = trim(degree.DEGREENAME ?: "");
+            if ( !arrayFindNoCase(arguments.excludeNames, degreeName) ) {
+                arrayAppend(result, degree);
+            }
+        }
+
+        return result;
+    }
+
     private array function _filterUHCODegrees( required array degrees ) {
         var result = [];
 
@@ -1013,6 +1116,10 @@ component output="false" singleton {
             var degreeName = trim( degreeRow.DEGREENAME ?: "" );
 
             if ( !len(userKey) OR !len(degreeName) ) {
+                continue;
+            }
+
+            if ( compareNoCase(degreeName, "B.S.") EQ 0 ) {
                 continue;
             }
 

@@ -1,4 +1,4 @@
-<cfif NOT request.hasPermission("settings.api.manage")>
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -67,15 +67,19 @@
             <td>#lastUsedDisplay#</td>
             <td class='text-end'>
                 <div class='settings-action-group'>
-                <cfif s.ISACTIVE>
-                <form method='post' action='/admin/settings/uhco-api/secrets/revokeSecret.cfm' class='d-inline' onsubmit=""return confirm('Revoke this secret?')"">
+        ">
+
+        <cfif s.ISACTIVE>
+            <cfset content &= "<form method='post' action='/admin/settings/uhco-api/secrets/revokeSecret.cfm' class='d-inline' data-confirm='Revoke this secret?'>
+                <input type='hidden' name='secretID' value='#s.SECRETID#'>
+                <button class='btn btn-sm btn-ui-warning' title='Revoke Secret' data-bs-toggle='tooltip' data-bs-title='Revoke Secret' aria-label='Revoke Secret'><i class='bi bi-pause-circle'></i></button>
+            </form>">
+        </cfif>
+
+        <cfset content &= "
+                <form method='post' action='/admin/settings/uhco-api/secrets/deleteSecret.cfm' class='d-inline ms-1' data-confirm='Permanently delete this secret?'>
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-outline-warning' title='Revoke Secret' data-bs-toggle='tooltip' data-bs-title='Revoke Secret' aria-label='Revoke Secret'><i class='bi bi-pause-circle'></i></button>
-                </form>
-                </cfif>
-                <form method='post' action='/admin/settings/uhco-api/secrets/deleteSecret.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this secret?')"">
-                    <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-remove users-list-action-button users-list-action-button-delete' title='Delete Secret' data-bs-toggle='tooltip' data-bs-title='Delete Secret' aria-label='Delete Secret'><i class='bi bi-trash'></i></button>
+                    <button class='btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete' title='Delete Secret' data-bs-toggle='tooltip' data-bs-title='Delete Secret' aria-label='Delete Secret'><i class='bi bi-trash'></i></button>
                 </form>
                 </div>
             </td>

@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     UH Sync: Changed Fields
     Field-level diffs between local database and UH API.
     Split from the combined uh_sync_report.cfm — shows only the "Changed Fields" tab.
@@ -7,6 +7,10 @@
 <cfif NOT request.hasPermission("settings.uh_sync.view")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
+
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/settings/uh-sync/">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
 
 <!--- ── Human-readable field labels ── --->
 <cfset fieldLabels = {
@@ -69,6 +73,29 @@
 <!--- ══════════════════════════════════════════════════════════════ --->
 <!--- ── Page content ────────────────────────────────────────────── --->
 <!--- ══════════════════════════════════════════════════════════════ --->
+<!--- Sort params for diff table --->
+<cfset allowedDiffSortCols = ["LASTNAME","FIELDNAME"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedDiffSortCols, url.sortCol) GT 0) ? url.sortCol : "LASTNAME">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfscript>
+    arraySort(diffRows, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function diffSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        var base = structIsEmpty(currentRun) ? "?" : "?runID=" & currentRun.RUNID & (len(filterField) ? "&filter=" & urlEncodedFormat(filterField) : "") & "&";
+        return base & "sortCol=" & col & "&sortDir=" & dir;
+    }
+    function diffSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -89,15 +116,15 @@
         
             <div class="mb-3 mt-2 d-flex gap-2">
                 <cfif arrayLen(recentRuns)>
-                <button class="btn btn-outline-secondary btn-sm" type="button"
+                <button class="btn btn-ui-cancel btn-sm" type="button"
                         data-bs-toggle="collapse" data-bs-target="##historyPanel">
                     <i class="bi bi-clock-history me-1"></i> Run History
                 </button>
                 </cfif>
-                <a href="/admin/reporting/run_uh_sync_report.cfm" class="btn btn-primary btn-sm">
+                <a href="/admin/reporting/run_uh_sync_report.cfm" class="btn btn-ui-filter btn-sm js-spinner-nav">
                     <i class="bi bi-play-fill me-1"></i> Run Sync
                 </a>
-                <a href="/admin/settings/uh-sync/membership-changes.cfm<cfif NOT structIsEmpty(currentRun)>?runID=#currentRun.RUNID#</cfif>" class="btn btn-outline-secondary btn-sm">
+                <a href="/admin/settings/uh-sync/membership-changes.cfm<cfif NOT structIsEmpty(currentRun)>?runID=#currentRun.RUNID#</cfif>" class="btn btn-ui-go btn-sm">
                     <i class="bi bi-people me-1"></i> Membership Changes
                 </a>
             </div>
@@ -107,16 +134,6 @@
     <span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
 </div>
 
-<!--- Status messages --->
-<cfif msgParam EQ "ran">
-    <div class="alert alert-success"><i class="bi bi-check-circle-fill me-1"></i> Sync report run complete.</div>
-<cfelseif msgParam EQ "error">
-    <div class="alert alert-danger"><strong>Error:</strong> #encodeForHTML(errParam)#</div>
-<cfelseif msgParam EQ "resolved">
-    <div class="alert alert-success"><i class="bi bi-check-circle-fill me-1"></i> #encodeForHTML(errParam)#</div>
-<cfelseif len(errParam)>
-    <div class="alert alert-danger">#encodeForHTML(errParam)#</div>
-</cfif>
 
 <cfif NOT dbOk>
     <div class="alert alert-danger">Database error: #encodeForHTML(dbError)# &mdash; have you run <code>create_uh_sync_report.sql</code>?</div>
@@ -147,7 +164,7 @@
                     <td><span class="badge #(r.TOTALDIFFS GT 0 ? 'bg-warning text-dark' : 'bg-success')#">#r.TOTALDIFFS#</span></td>
                     <td><span class="badge #(r.TOTALGONE GT 0 ? 'bg-danger' : 'bg-success')#">#r.TOTALGONE#</span></td>
                     <td><span class="badge #(r.TOTALNEW GT 0 ? 'bg-info text-dark' : 'bg-success')#">#r.TOTALNEW#</span></td>
-                    <td><a href="?runID=#r.RUNID#" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1">View</a></td>
+                    <td><a href="?runID=#r.RUNID#" class="btn btn-xs btn-sm btn-ui-go py-0 px-1">View</a></td>
                 </tr>
             </cfloop>
             </tbody>
@@ -193,7 +210,7 @@
                 </a>
             </cfloop>
             <cfif len(filterField)>
-                <a href="?runID=#currentRun.RUNID#" class="btn btn-sm btn-outline-secondary py-0">
+                <a href="?runID=#currentRun.RUNID#" class="btn btn-sm btn-ui-clear py-0">
                     <i class="bi bi-x"></i> Clear filter
                 </a>
             </cfif>
@@ -209,11 +226,11 @@
     </div>
 <cfelse>
     <div class="table-responsive settings-shell">
-    <table class="table table-sm table-striped table-hover align-middle settings-table mb-0">
+    <table class="table table-sm table-hover align-middle mb-0 settings-table">
         <thead>
             <tr>
-                <th>User</th>
-                <th>Field</th>
+                <th><a href="#diffSortLink('LASTNAME')#" class="settings-sort-link">User#diffSortArrow('LASTNAME')#</a></th>
+                <th><a href="#diffSortLink('FIELDNAME')#" class="settings-sort-link">Field#diffSortArrow('FIELDNAME')#</a></th>
                 <th>Local Value</th>
                 <th>API Value</th>
                 <th class="text-end">Actions</th>
@@ -239,7 +256,7 @@
                         <input type="hidden" name="diffID"     value="#dr.DIFFID#">
                         <input type="hidden" name="resolution" value="synced">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(returnTo)#">
-                        <button type="submit" class="btn btn-sm btn-success py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-save py-0">
                             <i class="bi bi-cloud-download"></i> Sync
                         </button>
                     </form>
@@ -247,7 +264,7 @@
                         <input type="hidden" name="diffID"     value="#dr.DIFFID#">
                         <input type="hidden" name="resolution" value="discarded">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(returnTo)#">
-                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-cancel py-0">
                             <i class="bi bi-x"></i> Discard
                         </button>
                     </form>
@@ -263,6 +280,42 @@
 
 </div>
 
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('a.js-spinner-nav').forEach(function (link) {
+        link.addEventListener('click', function () {
+            link.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Running&hellip;';
+            link.classList.add('disabled');
+            link.style.pointerEvents = 'none';
+        });
+    });
+});
+</script>
+
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif msgParam EQ "ran">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("Sync report run complete.", { tone: 'success' });
+}
+<cfelseif msgParam EQ "error">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("Error: #encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+<cfelseif msgParam EQ "resolved">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'success' });
+}
+<cfelseif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

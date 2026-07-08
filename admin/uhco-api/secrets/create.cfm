@@ -1,7 +1,11 @@
+<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset content = "
 <h1>New API Secret</h1>
 
-<form method='post' action='/admin/secrets/saveSecret.cfm' class='mt-4 admin-form-max-680'>
+<form method='post' action='/admin/settings/uhco-api/secrets/saveSecret.cfm' class='mt-4 admin-form-max-680'>
 
     <div class='mb-3'>
         <label class='form-label fw-semibold'>Secret Name <span class='text-danger'>*</span></label>
@@ -46,8 +50,8 @@
         The raw secret will be displayed <strong>once</strong> immediately after creation. Copy it before leaving the page.
     </div>
 
-    <button class='btn btn-primary'>Generate Secret</button>
-    <a href='/admin/secrets/index.cfm' class='btn btn-secondary ms-2'>Cancel</a>
+    <button class='btn btn-ui-add'>Generate Secret</button>
+    <a href='/admin/settings/uhco-api/secrets/index.cfm' class='btn btn-ui-cancel ms-2'>Cancel</a>
 </form>
 ">
 

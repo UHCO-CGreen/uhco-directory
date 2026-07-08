@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -578,7 +578,7 @@ const SECTIONS = [
     goal: "Locate your pending UserReview submission in the admin panel and approve it.",
     steps: [
       { desc: "Switch back to your admin browser tab." },
-      { desc: "Navigate to <code>/admin/settings/user-review/index.cfm</code>.", expected: "Page loads — you have <code>users.approve_user_review</code> for this test session." },
+      { desc: "Navigate to <code>/admin/user-review/index.cfm</code>.", expected: "Page loads — you have <code>users.approve_user_review</code> for this test session." },
       { desc: "Find your pending submission (look for the most recent entry or filter by your name).", expected: "Your submission appears in the list with a Pending status." },
       { desc: "Click <strong>Review</strong> (or the detail link) to open the submission." },
       { desc: "Confirm the proposed field changes are shown with both current and proposed values.", expected: "Current vs. proposed value comparison is visible." },
@@ -603,7 +603,7 @@ const SECTIONS = [
     time: "~5 min",
     goal: "Create, edit, and delete a test flag to confirm full flag management works end-to-end.",
     steps: [
-      { desc: "Click <strong>Flags</strong> in the sidebar to go to <code>/admin/flags/index.cfm</code>.", expected: "Flags list page loads." },
+      { desc: "Click <strong>Flags</strong> in the sidebar to go to <code>/admin/settings/flags/index.cfm</code>.", expected: "Flags list page loads." },
       { desc: "Click the <strong>New Flag</strong> button. Enter name: <strong>test-flag-[Your Initials]</strong>. Fill in any other required fields. Click Save.", expected: "The new flag appears in the flags list." },
       { desc: "Click <strong>Edit</strong> on the <em>test-flag-[Your Initials]</em> flag." },
       { desc: "Change the name or label to <strong>test-flag-[Your Initials]-edited</strong>. Click Save.", expected: "Updated name appears in the list." },
@@ -617,7 +617,7 @@ const SECTIONS = [
     time: "~5 min",
     goal: "Create, edit, and delete a test organization to confirm full org management works end-to-end.",
     steps: [
-      { desc: "Click <strong>Organizations</strong> in the sidebar to go to <code>/admin/orgs/index.cfm</code>.", expected: "Organizations list/tree page loads." },
+      { desc: "Click <strong>Organizations</strong> in the sidebar to go to <code>/admin/settings/orgs/index.cfm</code>.", expected: "Organizations list/tree page loads." },
       { desc: "Click the <strong>New Organization</strong> (or Add Org) button. Enter name: <strong>Test Org -[Your Initials]</strong>. Fill in required fields. Click Save.", expected: "The new org appears in the organizations list." },
       { desc: "Click <strong>Edit</strong> on <em>Test Org -[Your Initials]</em>." },
       { desc: "Change the name to <strong>Test Org -[Your Initials]-Edited</strong>. Click Save.", expected: "Updated name appears in the list." },

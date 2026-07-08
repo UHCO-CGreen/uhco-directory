@@ -5,6 +5,7 @@ component output="false" singleton {
         variables.flagsService = createObject("component", "cfc.flags_service").init();
         variables.organizationsService = createObject("component", "cfc.organizations_service").init();
         variables.usersService = createObject("component", "cfc.users_service").init();
+        variables.externalIDService = createObject("component", "cfc.externalID_service").init();
         variables.emailsService = createObject("component", "cfc.emails_service").init();
         variables.phoneService = createObject("component", "cfc.phone_service").init();
         variables.addressesService = createObject("component", "cfc.addresses_service").init();
@@ -95,6 +96,17 @@ component output="false" singleton {
                 workflow = "generated",
                 isGeneratedTemplate = true,
                 isRepeatable = false
+            },
+            {
+                key = "bulk_external_ids",
+                label = "Bulk External IDs",
+                description = "Generate a filtered CSV for one-row external ID updates across all configured external systems.",
+                requiredCols = ["UserID", "FirstName", "LastName", "ImportMode"],
+                optionalCols = _getExternalSystemHeaders(),
+                icon = "bi-person-vcard",
+                workflow = "generated",
+                isGeneratedTemplate = true,
+                isRepeatable = false
             }
         ];
     }
@@ -141,14 +153,26 @@ component output="false" singleton {
         var templateDef = getTemplate(arguments.templateKey);
         var users = _loadFilteredUsers(arguments.filterFlag, arguments.filterOrg, arguments.filterClass);
         var csvRows = [];
-        var csvHeaders = _getTemplateHeaders(arguments.templateKey);
+        var addUHCODegrees = flagSupportsGradYear(arguments.filterFlag);
+        var uhcoDegreesSummaryMap = {};
+        var csvHeaders = _getTemplateHeaders(arguments.templateKey, addUHCODegrees);
 
         if (!arrayLen(users)) {
             throw(type="BulkImport.NoUsers", message="No matching users were found for the selected filters.");
         }
 
+        if (addUHCODegrees) {
+            var allUserIDs = [];
+            for (var u in users) {
+                arrayAppend(allUserIDs, val(u.USERID));
+            }
+            uhcoDegreesSummaryMap = variables.degreesService.buildUHCODegreesSummaryMap(allUserIDs);
+        }
+
         for (var user in users) {
-            var templateRows = _buildTemplateRows(templateDef, user, arguments.includeExistingData);
+            var userIDKey = toString(val(user.USERID));
+            var uhcoDegSummary = structKeyExists(uhcoDegreesSummaryMap, userIDKey) ? uhcoDegreesSummaryMap[userIDKey] : "";
+            var templateRows = _buildTemplateRows(templateDef, user, arguments.includeExistingData, uhcoDegSummary);
             for (var row in templateRows) {
                 arrayAppend(csvRows, row);
             }
@@ -185,6 +209,19 @@ component output="false" singleton {
         if (arrayLen(result.missingHeaders)) {
             result.valid = false;
             return result;
+        }
+
+        if (arguments.templateKey EQ "bulk_external_ids") {
+            for (var externalHeader in _getExternalSystemHeaders()) {
+                if (!arrayFindNoCase(lcHeaders, lCase(trim(externalHeader)))) {
+                    arrayAppend(result.missingHeaders, externalHeader);
+                }
+            }
+
+            if (arrayLen(result.missingHeaders)) {
+                result.valid = false;
+                return result;
+            }
         }
 
         for (var rowIndex = 1; rowIndex <= arrayLen(arguments.rows); rowIndex++) {
@@ -321,28 +358,48 @@ component output="false" singleton {
         return loadedUsers;
     }
 
-    private array function _getTemplateHeaders(required string templateKey) {
-        switch (arguments.templateKey) {
-            case "bulk_emails":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "EmailAddress", "EmailType", "IsPrimary"];
-            case "bulk_phones":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "PhoneNumber", "PhoneType", "IsPrimary"];
-            case "bulk_addresses":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "AddressType", "Address1", "Address2", "City", "State", "Zipcode", "Building", "Room", "MailCode", "IsPrimary"];
-            case "bulk_aliases":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "AliasFirstName", "AliasMiddleName", "AliasLastName", "AliasDisplayName", "AliasType", "SourceSystem", "IsActive"];
-            case "bulk_degrees":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "DegreeName", "University", "DegreeYear"];
-            case "bulk_awards":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "AwardName", "AwardType"];
-            case "bulk_profile":
-                return ["UserID", "FirstName", "LastName", "ImportMode", "Title1", "Title2", "Title3", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"];
+    private array function _getTemplateHeaders(required string templateKey, boolean includeUHCODegrees = false) {
+        var headers = [];
+        var infoColumns = ["PrimaryFirstName", "PrimaryLastName", "PrimaryEmail"];
+        if (arguments.includeUHCODegrees) {
+            arrayAppend(infoColumns, "UHCODegrees");
         }
 
-        return ["UserID", "FirstName", "LastName", "ImportMode"];
+        switch (arguments.templateKey) {
+            case "bulk_emails":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "EmailAddress", "EmailType", "IsPrimary"];
+                break;
+            case "bulk_phones":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "PhoneNumber", "PhoneType", "IsPrimary"];
+                break;
+            case "bulk_addresses":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "AddressType", "Address1", "Address2", "City", "State", "Zipcode", "Building", "Room", "MailCode", "IsPrimary"];
+                break;
+            case "bulk_aliases":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "AliasFirstName", "AliasMiddleName", "AliasLastName", "AliasDisplayName", "AliasType", "SourceSystem", "IsActive"];
+                break;
+            case "bulk_degrees":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "DegreeName", "University", "DegreeYear"];
+                break;
+            case "bulk_awards":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "AwardName", "AwardType"];
+                break;
+            case "bulk_profile":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "Title1", "Title2", "Title3", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"];
+                break;
+            case "bulk_external_ids":
+                headers = ["UserID", "FirstName", "LastName", "ImportMode"];
+                arrayAppend(headers, _getExternalSystemHeaders(), true);
+                break;
+            default:
+                headers = ["UserID", "FirstName", "LastName", "ImportMode"];
+        }
+
+        arrayAppend(headers, infoColumns, true);
+        return headers;
     }
 
-    private array function _buildTemplateRows(required struct templateDef, required struct user, required boolean includeExistingData) {
+    private array function _buildTemplateRows(required struct templateDef, required struct user, required boolean includeExistingData, string uhcoDegreesSummary = "") {
         var modeValue = arguments.includeExistingData ? "replace" : "merge";
         var baseRow = {
             UserID = arguments.user.USERID,
@@ -350,6 +407,11 @@ component output="false" singleton {
             LastName = trim(arguments.user.LASTNAME ?: ""),
             ImportMode = modeValue
         };
+        var displayInfo = _getPrimaryDisplayInfo(val(arguments.user.USERID));
+        baseRow.PrimaryFirstName = displayInfo.primaryFirstName;
+        baseRow.PrimaryLastName  = displayInfo.primaryLastName;
+        baseRow.PrimaryEmail     = displayInfo.primaryEmail;
+        baseRow.UHCODegrees      = arguments.uhcoDegreesSummary;
         var rows = [];
         var existingItems = [];
         var itemRow = {};
@@ -371,9 +433,27 @@ component output="false" singleton {
 
             if (!arguments.includeExistingData) {
                 for (var profileField in _getTemplateHeaders(arguments.templateDef.key)) {
-                    if (!listFindNoCase("UserID,FirstName,LastName,ImportMode", profileField)) {
+                    if (!listFindNoCase("UserID,FirstName,LastName,ImportMode,PrimaryFirstName,PrimaryLastName,PrimaryEmail", profileField)) {
                         itemRow[profileField] = "";
                     }
+                }
+            }
+
+            arrayAppend(rows, itemRow);
+            return rows;
+        }
+
+        if (arguments.templateDef.key EQ "bulk_external_ids") {
+            itemRow = duplicate(baseRow);
+
+            for (var externalHeader in _getExternalSystemHeaders()) {
+                itemRow[externalHeader] = "";
+            }
+
+            if (arguments.includeExistingData) {
+                var externalIdsByHeader = _getExternalIDsByHeader(val(arguments.user.USERID));
+                for (var headerName in externalIdsByHeader) {
+                    itemRow[headerName] = externalIdsByHeader[headerName];
                 }
             }
 
@@ -608,6 +688,10 @@ component output="false" singleton {
             return _processRepeatableGroup(arguments.templateDef, arguments.userGroup);
         }
 
+        if (arguments.templateDef.key EQ "bulk_external_ids") {
+            return _processExternalIDsGroup(arguments.userGroup);
+        }
+
         return _processProfileGroup(arguments.userGroup);
     }
 
@@ -724,6 +808,57 @@ component output="false" singleton {
         return { status = "skipped", message = "No profile changes detected for user ##" & arguments.userGroup.userID };
     }
 
+    private struct function _processExternalIDsGroup(required struct userGroup) {
+        var row = arguments.userGroup.rows[1];
+        var systems = _getExternalSystems();
+        var existingRows = variables.externalIDService.getExternalIDs(arguments.userGroup.userID).data;
+        var existingBySystemId = {};
+        var systemKey = "";
+        var submittedValue = "";
+        var existingValue = "";
+        var changes = 0;
+
+        for (var existingRow in existingRows) {
+            systemKey = toString(val(existingRow.SYSTEMID ?: 0));
+            if (len(systemKey)) {
+                existingBySystemId[systemKey] = trim(existingRow.EXTERNALVALUE ?: "");
+            }
+        }
+
+        for (var systemRow in systems) {
+            systemKey = toString(val(systemRow.SYSTEMID ?: 0));
+            if (!len(systemKey)) {
+                continue;
+            }
+
+            submittedValue = trim(_getRowValueByHeader(row, trim(systemRow.SYSTEMNAME ?: "")));
+            existingValue = structKeyExists(existingBySystemId, systemKey) ? existingBySystemId[systemKey] : "";
+
+            if (arguments.userGroup.importMode EQ "merge") {
+                if (len(submittedValue) AND submittedValue NEQ existingValue) {
+                    variables.externalIDService.setExternalID(arguments.userGroup.userID, val(systemKey), submittedValue);
+                    changes++;
+                }
+            } else {
+                if (len(submittedValue)) {
+                    if (submittedValue NEQ existingValue) {
+                        variables.externalIDService.setExternalID(arguments.userGroup.userID, val(systemKey), submittedValue);
+                        changes++;
+                    }
+                } else if (len(existingValue)) {
+                    variables.externalIDService.deleteExternalID(arguments.userGroup.userID, val(systemKey));
+                    changes++;
+                }
+            }
+        }
+
+        if (changes GT 0) {
+            return { status = "success", message = "Updated external IDs for user ##" & arguments.userGroup.userID };
+        }
+
+        return { status = "skipped", message = "No external ID changes detected for user ##" & arguments.userGroup.userID };
+    }
+
     private string function _resolveProfileValue(required string submittedValue, required string existingValue, required string importMode) {
         if (arguments.importMode EQ "replace") {
             return arguments.submittedValue;
@@ -734,6 +869,50 @@ component output="false" singleton {
 
     private boolean function _stringValuesDiffer(any leftValue, any rightValue) {
         return trim(toString(arguments.leftValue ?: "")) NEQ trim(toString(arguments.rightValue ?: ""));
+    }
+
+    private array function _getExternalSystems() {
+        var systemsResult = variables.externalIDService.getSystems();
+        if (structKeyExists(systemsResult, "success") AND systemsResult.success AND isArray(systemsResult.data)) {
+            return systemsResult.data;
+        }
+
+        return [];
+    }
+
+    private array function _getExternalSystemHeaders() {
+        var headers = [];
+
+        for (var systemRow in _getExternalSystems()) {
+            if (len(trim(systemRow.SYSTEMNAME ?: ""))) {
+                arrayAppend(headers, trim(systemRow.SYSTEMNAME));
+            }
+        }
+
+        return headers;
+    }
+
+    private struct function _getExternalIDsByHeader(required numeric userID) {
+        var externalRows = variables.externalIDService.getExternalIDs(arguments.userID).data;
+        var valuesByHeader = {};
+
+        for (var externalRow in externalRows) {
+            if (len(trim(externalRow.SYSTEMNAME ?: ""))) {
+                valuesByHeader[trim(externalRow.SYSTEMNAME)] = trim(externalRow.EXTERNALVALUE ?: "");
+            }
+        }
+
+        return valuesByHeader;
+    }
+
+    private string function _getRowValueByHeader(required struct row, required string headerName) {
+        for (var currentKey in arguments.row) {
+            if (compareNoCase(trim(currentKey), trim(arguments.headerName)) EQ 0) {
+                return trim(arguments.row[currentKey] ?: "");
+            }
+        }
+
+        return "";
     }
 
     private array function _normalizeExistingItems(required string templateKey, required numeric userID) {
@@ -953,6 +1132,41 @@ component output="false" singleton {
             });
         }
         return rows;
+    }
+
+    private struct function _getPrimaryDisplayInfo(required numeric userID) {
+        var result = { primaryFirstName = "", primaryLastName = "", primaryEmail = "" };
+        var items = [];
+
+        try {
+            items = variables.aliasesService.getAliases(arguments.userID).data;
+            for (var alias in items) {
+                if (_toBoolean(alias.ISPRIMARY ?: 0)) {
+                    result.primaryFirstName = trim(alias.FIRSTNAME ?: "");
+                    result.primaryLastName  = trim(alias.LASTNAME  ?: "");
+                    break;
+                }
+            }
+            if (!len(result.primaryFirstName) AND !len(result.primaryLastName) AND arrayLen(items)) {
+                result.primaryFirstName = trim(items[1].FIRSTNAME ?: "");
+                result.primaryLastName  = trim(items[1].LASTNAME  ?: "");
+            }
+        } catch (any e) {}
+
+        try {
+            items = variables.emailsService.getEmails(arguments.userID).data;
+            for (var email in items) {
+                if (_toBoolean(email.ISPRIMARY ?: 0)) {
+                    result.primaryEmail = trim(email.EMAILADDRESS ?: "");
+                    break;
+                }
+            }
+            if (!len(result.primaryEmail) AND arrayLen(items)) {
+                result.primaryEmail = trim(items[1].EMAILADDRESS ?: "");
+            }
+        } catch (any e) {}
+
+        return result;
     }
 
     private boolean function _isBooleanLike(any value) {

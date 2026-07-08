@@ -1,18 +1,18 @@
 # UHCO Identity Styling Guide
 
-This document defines the styling architecture for UHCO Identity after the move away from ad hoc inline styling and stock CDN Bootstrap CSS.
+This document defines the styling architecture for UHCO Identity after the migration to the shared portal CSS platform structure.
 
 ## Goals
 
 - Keep styling local to this repository.
 - Compile branded Bootstrap CSS from Sass instead of relying on stock CDN CSS.
-- Reuse the branding approach from `dev/uhco-web-resources-main` only where it fits UHCO Identity.
+- Separate neutral shared/platform code from UHCO Identity theme code and app-surface code.
+- Treat UHCO Identity as three compiled surfaces: admin, api, and userreview.
 - Prefer shared utilities and partials over page-level inline styles.
-- Keep JavaScript concerns separate from styling concerns.
 
 ## Current Asset Build
 
-The repository now includes a local `npm` + Sass workflow in [package.json](package.json).
+The repository includes a local `npm` + Sass workflow in [package.json](package.json).
 
 Primary commands:
 
@@ -20,19 +20,20 @@ Primary commands:
 - `npm run build:icons` copies Bootstrap Icons from `node_modules` into the app.
 - `npm run build:styles` compiles Sass entry points into application-served CSS files.
 - `npm run watch:styles` watches Sass files and recompiles on change.
+- `npm run scaffold:css:app -- -AppName "Example App" -DisplayName "Example App"` scaffolds a new admin/api/userreview app set.
 
 Generated assets are served from:
 
-- [assets/css/admin.css](assets/css/admin.css)
-- [assets/css/userreview.css](assets/css/userreview.css)
-- [assets/css/api-docs.css](assets/css/api-docs.css)
+- [assets/css/dist/admin/admin.css](assets/css/dist/admin/admin.css)
+- [assets/css/dist/userreview/userreview.css](assets/css/dist/userreview/userreview.css)
+- [assets/css/dist/api/api-docs.css](assets/css/dist/api/api-docs.css)
 - [assets/vendor/bootstrap-icons/bootstrap-icons.css](assets/vendor/bootstrap-icons/bootstrap-icons.css)
 
 ## Bundle Boundaries
 
 ### Admin Bundle
 
-Entry point: [assets/scss/admin.scss](assets/scss/admin.scss)
+Entry point: [assets/css/src/apps/uhco-identity/admin.scss](assets/css/src/apps/uhco-identity/admin.scss)
 
 Used by:
 
@@ -49,7 +50,7 @@ This bundle holds:
 
 ### UserReview Bundle
 
-Entry point: [assets/scss/userreview.scss](assets/scss/userreview.scss)
+Entry point: [assets/css/src/apps/uhco-identity/userreview.scss](assets/css/src/apps/uhco-identity/userreview.scss)
 
 Used by:
 
@@ -59,7 +60,7 @@ Keep this bundle small and focused on the self-service experience.
 
 ### API Docs Bundle
 
-Entry point: [assets/scss/api-docs.scss](assets/scss/api-docs.scss)
+Entry point: [assets/css/src/apps/uhco-identity/api.scss](assets/css/src/apps/uhco-identity/api.scss)
 
 Used by:
 
@@ -70,39 +71,46 @@ This bundle shares the same brand tokens as the admin bundle but keeps docs/exam
 
 ## Sass Structure
 
-Top-level structure:
+Top-level source structure:
 
-- [assets/scss/shared](assets/scss/shared) for cross-bundle tokens and base styles
-- [assets/scss/admin](assets/scss/admin) for admin-only partials
-- [assets/scss/userreview](assets/scss/userreview) for UserReview partials
-- [assets/scss/api](assets/scss/api) for API docs/examples partials
+- [assets/css/src/shared](assets/css/src/shared) for neutral shared base styles and mixins
+- [assets/css/src/platform](assets/css/src/platform) for neutral platform primitives
+- [assets/css/src/themes/uhco-identity](assets/css/src/themes/uhco-identity) for UHCO Identity tokens and theme rules
+- [assets/css/src/apps/uhco-identity/admin](assets/css/src/apps/uhco-identity/admin) for admin-only partials
+- [assets/css/src/apps/uhco-identity/userreview](assets/css/src/apps/uhco-identity/userreview) for UserReview partials
+- [assets/css/src/apps/uhco-identity/api](assets/css/src/apps/uhco-identity/api) for API docs/examples partials
 
 Shared partials currently include:
 
-- [assets/scss/shared/_brand.scss](assets/scss/shared/_brand.scss)
-- [assets/scss/shared/_base.scss](assets/scss/shared/_base.scss)
+- [assets/css/src/shared/_base.scss](assets/css/src/shared/_base.scss)
+- [assets/css/src/shared/_mixins.scss](assets/css/src/shared/_mixins.scss)
+
+Theme partials currently include:
+
+- [assets/css/src/themes/uhco-identity/_tokens.scss](assets/css/src/themes/uhco-identity/_tokens.scss)
+- [assets/css/src/themes/uhco-identity/_theme.scss](assets/css/src/themes/uhco-identity/_theme.scss)
 
 Admin partials currently include:
 
-- [assets/scss/admin/_layout.scss](assets/scss/admin/_layout.scss)
-- [assets/scss/admin/_dashboard.scss](assets/scss/admin/_dashboard.scss)
-- [assets/scss/admin/_users-index.scss](assets/scss/admin/_users-index.scss)
-- [assets/scss/admin/_users-edit.scss](assets/scss/admin/_users-edit.scss)
-- [assets/scss/admin/_reporting.scss](assets/scss/admin/_reporting.scss)
-- [assets/scss/admin/_settings.scss](assets/scss/admin/_settings.scss)
-- [assets/scss/admin/_media.scss](assets/scss/admin/_media.scss)
+- [assets/css/src/apps/uhco-identity/admin/_layout.scss](assets/css/src/apps/uhco-identity/admin/_layout.scss)
+- [assets/css/src/apps/uhco-identity/admin/_dashboard.scss](assets/css/src/apps/uhco-identity/admin/_dashboard.scss)
+- [assets/css/src/apps/uhco-identity/admin/_users-index.scss](assets/css/src/apps/uhco-identity/admin/_users-index.scss)
+- [assets/css/src/apps/uhco-identity/admin/_users-edit.scss](assets/css/src/apps/uhco-identity/admin/_users-edit.scss)
+- [assets/css/src/apps/uhco-identity/admin/_reporting.scss](assets/css/src/apps/uhco-identity/admin/_reporting.scss)
+- [assets/css/src/apps/uhco-identity/admin/_settings.scss](assets/css/src/apps/uhco-identity/admin/_settings.scss)
+- [assets/css/src/apps/uhco-identity/admin/_media.scss](assets/css/src/apps/uhco-identity/admin/_media.scss)
+
+Legacy compatibility entrypoints still exist in [assets/scss](assets/scss), but they now delegate to `assets/css/src` and should not receive new styling work.
 
 ## Branding and Bootstrap Policy
 
-Brand tokens live in [assets/scss/shared/_brand.scss](assets/scss/shared/_brand.scss).
-
-These values are the app-owned adaptation of the UHCO branding layer originally reviewed in `dev/uhco-web-resources-main/src/sass/theme.scss`.
+Brand tokens live in [assets/css/src/themes/uhco-identity/_tokens.scss](assets/css/src/themes/uhco-identity/_tokens.scss).
 
 Current policy:
 
 - Use one Bootstrap version for all locally compiled CSS.
 - Bootstrap is compiled from Sass with theme variable overrides.
-- Do not pull full CMS-specific styling or unrelated third-party CSS into UHCO Identity by default.
+- Do not pull unrelated third-party CSS into UHCO Identity by default.
 - Bootstrap Icons are localized and served from [assets/vendor/bootstrap-icons](assets/vendor/bootstrap-icons).
 
 If Bootstrap is upgraded, upgrade it in [package.json](package.json), rebuild, and regression-check all three bundles.
@@ -117,9 +125,9 @@ If Bootstrap is upgraded, upgrade it in [package.json](package.json), rebuild, a
 
 Examples:
 
-- hidden-state helpers in [assets/scss/admin/_settings.scss](assets/scss/admin/_settings.scss)
-- scroll-panel sizing in [assets/scss/admin/_settings.scss](assets/scss/admin/_settings.scss)
-- shared media preview sizing in [assets/scss/admin/_media.scss](assets/scss/admin/_media.scss)
+- hidden-state helpers in [assets/css/src/apps/uhco-identity/admin/_settings.scss](assets/css/src/apps/uhco-identity/admin/_settings.scss)
+- scroll-panel sizing in [assets/css/src/apps/uhco-identity/admin/_settings.scss](assets/css/src/apps/uhco-identity/admin/_settings.scss)
+- shared media preview sizing in [assets/css/src/apps/uhco-identity/admin/_media.scss](assets/css/src/apps/uhco-identity/admin/_media.scss)
 
 ### Use a page-specific partial when:
 
@@ -129,13 +137,13 @@ Examples:
 
 Examples:
 
-- [assets/scss/admin/_dashboard.scss](assets/scss/admin/_dashboard.scss)
-- [assets/scss/admin/_users-index.scss](assets/scss/admin/_users-index.scss)
-- [assets/scss/admin/_users-edit.scss](assets/scss/admin/_users-edit.scss)
+- [assets/css/src/apps/uhco-identity/admin/_dashboard.scss](assets/css/src/apps/uhco-identity/admin/_dashboard.scss)
+- [assets/css/src/apps/uhco-identity/admin/_users-index.scss](assets/css/src/apps/uhco-identity/admin/_users-index.scss)
+- [assets/css/src/apps/uhco-identity/admin/_users-edit.scss](assets/css/src/apps/uhco-identity/admin/_users-edit.scss)
 
 ## Inline Style Policy
 
-Inline styles are now the exception, not the default.
+Inline styles are the exception, not the default.
 
 Allowed:
 
@@ -152,10 +160,6 @@ Avoid:
 - image sizing
 - repeated display rules used only for initial hidden state
 
-Examples of acceptable residual inline use:
-
-- server-rendered dynamic `display:` state tied directly to runtime checkbox selection in [admin/users/edit.cfm](admin/users/edit.cfm)
-
 If an inline style repeats more than once or appears on more than one page, move it into Sass.
 
 ## CFML Page Migration Pattern
@@ -169,28 +173,9 @@ When migrating a CFML page:
 5. Rebuild CSS with `npm run build:styles`.
 6. Check the touched files for editor errors.
 
-This pattern has already been applied to:
-
-- [admin/dashboard.cfm](admin/dashboard.cfm)
-- [admin/users/index.cfm](admin/users/index.cfm)
-- [admin/users/edit.cfm](admin/users/edit.cfm)
-- [admin/reporting/data_quality_report.cfm](admin/reporting/data_quality_report.cfm)
-- [admin/reporting/uh_sync_report.cfm](admin/reporting/uh_sync_report.cfm)
-- [admin/settings/query-builder/index.cfm](admin/settings/query-builder/index.cfm)
-- [admin/settings/import/upload.cfm](admin/settings/import/upload.cfm)
-- [admin/settings/import/process.cfm](admin/settings/import/process.cfm)
-- [admin/user-media/crop.cfm](admin/user-media/crop.cfm)
-- [admin/user-media/resize.cfm](admin/user-media/resize.cfm)
-- [admin/user-media/variants.cfm](admin/user-media/variants.cfm)
-
 ## Layout Hooks
 
-The admin layout now supports a page-level CSS hook via `pageStyles` in [admin/layout.cfm](admin/layout.cfm).
-
-Use this only when:
-
-- a page has a narrow stylesheet need that is not yet worth a shared partial
-- the style is intentionally page-local
+The admin layout supports a page-level CSS hook via `pageStyles` in [admin/layout.cfm](admin/layout.cfm).
 
 Preferred order of choice:
 
@@ -200,16 +185,24 @@ Preferred order of choice:
 4. `pageStyles` hook
 5. inline style as a last resort
 
+## Scaffold Automation
+
+This repo includes a UHCO Identity-specific scaffold command for future admin/api/userreview app sets.
+
+Use:
+
+- `npm run scaffold:css:app -- -AppName "Example App" -DisplayName "Example App"`
+
+Implementation lives in [tools/css-platform/scaffold-app.ps1](tools/css-platform/scaffold-app.ps1).
+
+This scaffold generates new source sets under `assets/css/src/themes/<app-slug>` and `assets/css/src/apps/<app-slug>`, plus segregated outputs under `assets/css/dist/<app-slug>`.
+
+Do not use the scaffold to overwrite `uhco-identity`; it is intended for new app sets that follow the same three-surface model.
+
 ## Documentation Maintenance
 
-When new partials are added or bundle responsibilities change:
+When partials, bundle responsibilities, or build paths change:
 
 - update this document
 - keep the README aligned with the current build flow
 - prefer documenting conventions here rather than scattering them across comments in templates
-
-## Future Work
-
-- Continue migrating remaining admin pages with repeated inline styles.
-- Evaluate whether CropperJS and Quill CSS should be localized similarly to Bootstrap Icons.
-- Expand the shared brand token set if typography, spacing, or elevation tokens become necessary.

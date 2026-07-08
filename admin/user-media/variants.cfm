@@ -1,4 +1,4 @@
-<!--- ── Authorization ─────────────────────────────────────────────────────── --->
+﻿<!--- ── Authorization ─────────────────────────────────────────────────────── --->
 <cfif NOT request.hasPermission("media.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -18,6 +18,7 @@
 <cfset usersService   = createObject("component", "cfc.users_service").init()>
 <cfset variantService = createObject("component", "cfc.UserImageVariantService").init()>
 <cfset sourceService  = createObject("component", "cfc.UserImageSourceService").init()>
+<cfset flagsService   = createObject("component", "cfc.flags_service").init()>
 
 <!--- ── Load user — stop gracefully if not found ─────────────────────────── --->
 <cfset userResult = usersService.getUser(userID)>
@@ -33,6 +34,21 @@
 </cfif>
 
 <cfset user = userResult.data>
+<cfset _varFlags = flagsService.getUserFlags(userID).data>
+<cfset _varIsAlumni = false>
+<cfset _varIsFaculty = false>
+<cfloop array="#_varFlags#" index="_varf">
+    <cfif compareNoCase(trim(_varf.FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _varIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_varf.FLAGNAME ?: ""))>
+        <cfset _varIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _varIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_varIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 
 <!--- ── Handle POST actions ──────────────────────────────────────────────── --->
 <!---
@@ -136,6 +152,14 @@
      matching all other admin pages.
      ═══════════════════════════════════════════════════════════════════════ --->
 
+<!--- ── Publishable count (computed here so right column can use it) ──────── --->
+<cfset publishableCount = 0>
+<cfloop from="1" to="#arrayLen(variantMatrix)#" index="px">
+    <cfif variantMatrix[px].STATUS EQ "current" AND len(variantMatrix[px].LOCALPATH)>
+        <cfset publishableCount++>
+    </cfif>
+</cfloop>
+
 <!--- ── Breadcrumb + heading ─────────────────────────────────────────────── --->
 <cfset content = "
 <nav aria-label='breadcrumb' class='mb-3'>
@@ -150,42 +174,62 @@
     Assign variant types to this source, then generate and publish.
     Each source image gets its own independent set of variants.
 </p>
+<div class='row g-4'>
 ">
 
-<!--- ── User context card ────────────────────────────────────────────────── --->
+<!--- ══════════════════════════════════════════════════════════════════════
+     LEFT COLUMN — User & Source info + Status Key
+     ══════════════════════════════════════════════════════════════════════ --->
+<cfset content &= "<div class='col-lg-4'>">
+
+<!--- ── User & Source card ───────────────────────────────────────────────── --->
 <cfset content &= "
 <div class='card mb-4'>
     <div class='card-header fw-semibold'><i class='bi bi-person-circle me-1'></i> User &amp; Source</div>
     <div class='card-body'>
         <dl class='row mb-0'>
-            <dt class='col-sm-2'>Name</dt>
-            <dd class='col-sm-10'>#displayName#</dd>
-            <dt class='col-sm-2'>Email</dt>
-            <dd class='col-sm-10'>#displayEmail#</dd>
-            <dt class='col-sm-2'>User ID</dt>
-            <dd class='col-sm-10'>#userID#</dd>
-            <dt class='col-sm-2'>Source</dt>
-            <dd class='col-sm-10'>
-                <span class='badge bg-primary me-1'>#encodeForHTML(sourceRecord.SOURCEKEY ?: "")#</span>
-                <code>#encodeForHTML(sourceFilename)#</code>
-                <span class='text-muted small ms-2'>(Source ID: #sourceID#)</span>
+            <dt class='col-5'>Name</dt>
+            <dd class='col-7'>#displayName#</dd>
+            <dt class='col-5'>Email</dt>
+            <dd class='col-7'>#displayEmail#</dd>
+            <dt class='col-5'>User ID</dt>
+            <dd class='col-7'>#userID#</dd>
+            <dt class='col-5'>Source</dt>
+            <dd class='col-7'>
+                <span class='badge bg-primary'>#encodeForHTML(sourceRecord.SOURCEKEY ?: "")#</span>
+                <div class='font-monospace small mt-1'>#encodeForHTML(sourceFilename)#</div>
+                <div class='text-muted small'>ID: #sourceID#</div>
             </dd>
         </dl>
     </div>
 </div>
 ">
 
-<!--- ── Action feedback ──────────────────────────────────────────────────── --->
-<cfif len(actionMessage)>
-    <cfset content &= "
-    <div class='alert #actionMessageClass# alert-dismissible fade show' role='alert'>
-        #encodeForHTML(actionMessage)#
-        <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
+<!--- ── Status Key card ──────────────────────────────────────────────────── --->
+<cfset content &= "
+<div class='card mb-4'>
+    <div class='card-header fw-semibold'><i class='bi bi-key me-1'></i> Status Key</div>
+    <div class='card-body'>
+        <div class='d-flex flex-column gap-2'>
+            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Not Assigned</span><div class='small text-muted mt-1'>Variant type is available but not yet assigned to this source.</div></div>
+            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Assigned</span><div class='small text-muted mt-1'>Assigned, but no generated or published file exists yet.</div></div>
+            <div><span class='badge bg-info text-dark'><i class='bi bi-circle-fill me-1'></i>Staged</span><div class='small text-muted mt-1'>Generated temp file exists and is ready to publish.</div></div>
+            <div><span class='badge bg-warning text-dark'><i class='bi bi-circle-fill me-1'></i>Outdated</span><div class='small text-muted mt-1'>Published image exists, but a newer staged version is waiting.</div></div>
+            <div><span class='badge bg-success'><i class='bi bi-circle-fill me-1'></i>Published</span><div class='small text-muted mt-1'>Published image is current — no newer staged version pending.</div></div>
+            <div><span class='badge bg-danger'><i class='bi bi-circle-fill me-1'></i>Error</span><div class='small text-muted mt-1'>Generation failed. Review the error message shown in the matrix.</div></div>
+        </div>
     </div>
-    ">
-</cfif>
+</div>
+">
 
-<!--- ── Variant matrix ───────────────────────────────────────────────────── --->
+<cfset content &= "</div>"><!--- end left column --->
+
+<!--- ══════════════════════════════════════════════════════════════════════
+     RIGHT COLUMN — Variant Matrix + Publish All
+     ══════════════════════════════════════════════════════════════════════ --->
+<cfset content &= "<div class='col-lg-8'>">
+
+<!--- ── Variant matrix card ──────────────────────────────────────────────── --->
 <cfset content &= "
 <div class='card mb-4'>
     <div class='card-header d-flex justify-content-between align-items-center'>
@@ -195,7 +239,7 @@
 
 <cfif request.hasPermission("settings.media_config.manage")>
     <cfset content &= "
-            <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-sm btn-outline-secondary'>
+            <a href='/admin/settings/media-config/variant-types.cfm' class='btn btn-sm btn-ui-go'>
                 <i class='bi bi-sliders me-1'></i> Types
             </a>
     ">
@@ -296,7 +340,7 @@
             <cfset content &= "
                     <button
                         type='button'
-                        class='btn btn-sm btn-outline-dark me-1 js-variant-preview'
+                        class='btn btn-sm btn-ui-go me-1 js-variant-preview'
                         data-bs-toggle='modal'
                         data-bs-target='##variantPreviewModal'
                         data-preview-url='#encodeForHTMLAttribute(v.PREVIEWURL ?: "")#'
@@ -316,7 +360,7 @@
                     <form method='post' class='d-inline'>
                         <input type='hidden' name='action' value='assign'>
                         <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
-                        <button type='submit' class='btn btn-sm btn-outline-primary'>
+                        <button type='submit' class='btn btn-sm btn-ui-add'>
                             <i class='bi bi-plus-circle me-1'></i> Assign
                         </button>
                     </form>
@@ -330,11 +374,11 @@
             <cfif vtAllowCrop>
                 <cfset content &= "
                     <a href='/admin/user-media/crop.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'
-                       class='btn btn-sm btn-success'>
+                       class='btn btn-sm btn-ui-go'>
                         <i class='bi bi-crop'></i> Crop &amp; Generate
                     </a>
                     <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#&transferOnly=1'
-                       class='btn btn-sm btn-outline-success ms-1'
+                       class='btn btn-sm btn-ui-go ms-1'
                        title='Transfer source image without crop or resize'>
                         <i class='bi bi-arrow-left-right'></i> Transfer
                     </a>
@@ -342,11 +386,11 @@
             <cfelseif vtAllowResize>
                 <cfset content &= "
                     <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'
-                       class='btn btn-sm btn-success'>
+                       class='btn btn-sm btn-ui-go'>
                         <i class='bi bi-gear'></i> Resize
                     </a>
                     <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#&transferOnly=1'
-                       class='btn btn-sm btn-outline-success ms-1'
+                       class='btn btn-sm btn-ui-go ms-1'
                        title='Transfer source image without resize'>
                         <i class='bi bi-arrow-left-right'></i> Transfer
                     </a>
@@ -354,7 +398,7 @@
             <cfelse>
                 <cfset content &= "
                     <a href='/admin/user-media/resize.cfm?userid=#userID#&sourceid=#sourceID#&imageVariantTypeID=#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'
-                       class='btn btn-sm btn-success'>
+                       class='btn btn-sm btn-ui-go'>
                         <i class='bi bi-arrow-left-right'></i> Transfer
                     </a>
                 ">
@@ -367,8 +411,8 @@
                         <form method='post' class='d-inline ms-1'>
                             <input type='hidden' name='action' value='unpublish'>
                             <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
-                            <button type='submit' class='btn btn-sm btn-outline-danger'
-                                    onclick='return confirm(\'Unpublish #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#? This removes the published file and DB record.\');'>
+                            <button type='submit' class='btn btn-sm btn-ui-delete'
+                                    data-confirm=""Unpublish #encodeForJavaScript(v.DESCRIPTION ?: 'this variant')#? This removes the published file and DB record."">
                                 <i class='bi bi-trash me-1'></i> Unpublish
                             </button>
                         </form>
@@ -384,8 +428,8 @@
                     <form method='post' class='d-inline ms-1'>
                         <input type='hidden' name='action' value='unassign'>
                         <input type='hidden' name='imageVariantTypeID' value='#encodeForHTMLAttribute(v.IMAGEVARIANTTYPEID)#'>
-                        <button type='submit' class='btn btn-sm btn-outline-danger'
-                                onclick='return confirm(\'Remove assignment for #encodeForJavaScript(v.DESCRIPTION ?: "this variant")#?\');'>
+                        <button type='submit' class='btn btn-sm btn-ui-delete'
+                                data-confirm=""Remove assignment for #encodeForJavaScript(v.DESCRIPTION ?: 'this variant')#?"">
                             <i class='bi bi-x-circle me-1'></i> Remove
                         </button>
                     </form>
@@ -417,26 +461,34 @@
     ">
 </cfif>
 
-<cfset content &= "
-</div>
-">
+<cfset content &= "</div>"><!--- end variant matrix card --->
 
-<cfset content &= "
-<div class='card mb-4'>
-    <div class='card-header fw-semibold'><i class='bi bi-key me-1'></i> Status Key</div>
-    <div class='card-body'>
-        <div class='d-flex flex-wrap gap-3 align-items-start'>
-            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Not Assigned</span><div class='small text-muted mt-1'>Variant type is available but not assigned to this source.</div></div>
-            <div><span class='badge bg-secondary border border-secondary-subtle text-dark'><i class='bi bi-circle-fill me-1'></i>Assigned</span><div class='small text-muted mt-1'>Assigned to this source, but no generated or published file exists yet.</div></div>
-            <div><span class='badge bg-info text-dark'><i class='bi bi-circle-fill me-1'></i>Staged</span><div class='small text-muted mt-1'>Generated temp file exists and is ready to publish.</div></div>
-            <div><span class='badge bg-warning text-dark'><i class='bi bi-circle-fill me-1'></i>Outdated</span><div class='small text-muted mt-1'>Published image exists, but the staged or assigned state no longer matches it.</div></div>
-            <div><span class='badge bg-success'><i class='bi bi-circle-fill me-1'></i>Published</span><div class='small text-muted mt-1'>Published image exists and no newer staged version is waiting.</div></div>
-            <div><span class='badge bg-danger'><i class='bi bi-circle-fill me-1'></i>Error</span><div class='small text-muted mt-1'>Generation failed. Review the error message shown in the matrix.</div></div>
+<!--- ── Publish All card ─────────────────────────────────────────────────── --->
+<cfif publishableCount GT 0 AND request.hasPermission("media.publish")>
+    <cfset content &= "
+    <div class='card mb-4 border-primary'>
+        <div class='card-body d-flex justify-content-between align-items-center'>
+            <div>
+                <i class='bi bi-upload me-1 text-primary'></i>
+                <strong>#publishableCount#</strong> variant(s) ready to publish.
+                Publishing copies images to the published folder and records them in the directory.
+            </div>
+            <form method='post' class='d-inline'>
+                <input type='hidden' name='action' value='publishAll'>
+                <button type='submit' class='btn btn-ui-save'>
+                    <i class='bi bi-cloud-arrow-up me-1'></i> Publish All
+                </button>
+            </form>
         </div>
     </div>
-</div>
-">
+    ">
+</cfif>
 
+<cfset content &= "</div>"><!--- end right column --->
+
+<cfset content &= "</div>"><!--- end row --->
+
+<!--- ── Preview modal ────────────────────────────────────────────────────── --->
 <cfset content &= "
 <div class='modal fade' id='variantPreviewModal' tabindex='-1' aria-labelledby='variantPreviewModalLabel' aria-hidden='true'>
     <div class='modal-dialog modal-lg modal-dialog-centered'>
@@ -460,8 +512,37 @@
 </div>
 ">
 
+<!--- ── Toast container ──────────────────────────────────────────────────── --->
+<cfset content &= "
+<div class='toast-container position-fixed bottom-0 end-0 p-3' style='z-index: 1100;'>
+    <div id='actionToast' class='toast align-items-center border-0' role='alert' aria-live='assertive' aria-atomic='true' data-bs-delay='5000'>
+        <div class='d-flex'>
+            <div class='toast-body fw-semibold' id='actionToastBody'></div>
+            <button type='button' class='btn-close btn-close-white me-2 m-auto' data-bs-dismiss='toast' aria-label='Close'></button>
+        </div>
+    </div>
+</div>
+">
+
 <cfsavecontent variable="pageScripts">
-<script>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+<cfoutput>
+(function () {
+    var _toastMsg = '#encodeForJavaScript(actionMessage)#';
+    var _toastCls = '#encodeForJavaScript(actionMessageClass)#';
+    if (_toastMsg) {
+        document.addEventListener('DOMContentLoaded', function () {
+            var toastEl   = document.getElementById('actionToast');
+            var toastBody = document.getElementById('actionToastBody');
+            if (!toastEl || !toastBody) { return; }
+            toastBody.textContent = _toastMsg;
+            var bgClass = (_toastCls === 'alert-success') ? 'text-bg-success' : 'text-bg-danger';
+            toastEl.classList.add(bgClass);
+            bootstrap.Toast.getOrCreateInstance(toastEl).show();
+        });
+    }
+}());
+</cfoutput>
 document.addEventListener('DOMContentLoaded', function () {
     var previewModal = document.getElementById('variantPreviewModal');
     if (!previewModal) {
@@ -511,41 +592,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 </cfsavecontent>
-
-<!--- ── Publish All button ───────────────────────────────────────────────── --->
-<!---
-     Show the Publish button only when at least one variant is "current"
-     and has a temp file (non-empty LOCALPATH).  Publishing copies each
-     current temp variant to /_published_images/, upserts UserImages, and
-     deletes the temp file.
---->
-<cfset publishableCount = 0>
-<cfloop from="1" to="#arrayLen(variantMatrix)#" index="px">
-    <cfif variantMatrix[px].STATUS EQ "current" AND len(variantMatrix[px].LOCALPATH)>
-        <cfset publishableCount++>
-    </cfif>
-</cfloop>
-
-<cfif publishableCount GT 0 AND request.hasPermission("media.publish")>
-    <cfset content &= "
-    <div class='card mb-4 border-primary'>
-        <div class='card-body d-flex justify-content-between align-items-center'>
-            <div>
-                <i class='bi bi-upload me-1 text-primary'></i>
-                <strong>#publishableCount#</strong> variant(s) ready to publish.
-                Publishing copies images to the published folder and records them in the directory.
-            </div>
-            <form method='post' class='d-inline'>
-                <input type='hidden' name='action' value='publishAll'>
-                <button type='submit' class='btn btn-primary'>
-                    <i class='bi bi-cloud-arrow-up me-1'></i> Publish All
-                </button>
-            </form>
-        </div>
-    </div>
-    ">
-</cfif>
-
-
 
 <cfinclude template="/admin/layout.cfm">

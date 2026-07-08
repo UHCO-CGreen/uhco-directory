@@ -1,5 +1,5 @@
 <!--- Duplicate merge workspace (phase 2: decision capture + status update). --->
-<cfif NOT application.authService.hasRole("SUPER_ADMIN")>
+<cfif NOT application.authService.hasRole("SUPER_ADMIN") AND NOT request.hasPermission("reporting.duplicate_users.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -207,21 +207,21 @@
         <h5 class="mb-2">Deep Scan (Per Pair)</h5>
         <p class="text-muted mb-2">Choose one data area to compare User A vs User B.</p>
         <div class="d-flex flex-wrap gap-2 mb-3">
-            <a class="btn btn-sm #deepType EQ 'profile' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=profile">Profile</a>
-            <a class="btn btn-sm #deepType EQ 'aliases' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=aliases">Aliases</a>
-            <a class="btn btn-sm #deepType EQ 'emails' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=emails">Emails</a>
-            <a class="btn btn-sm #deepType EQ 'phones' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=phones">Phones</a>
-            <a class="btn btn-sm #deepType EQ 'addresses' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=addresses">Addresses</a>
-            <a class="btn btn-sm #deepType EQ 'flags' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=flags">Flags</a>
-            <a class="btn btn-sm #deepType EQ 'organizations' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=organizations">Orgs</a>
-            <a class="btn btn-sm #deepType EQ 'external_ids' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=external_ids">External IDs</a>
-            <a class="btn btn-sm #deepType EQ 'bio' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=bio">Bio</a>
-            <a class="btn btn-sm #deepType EQ 'academic' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=academic">Academic</a>
-            <a class="btn btn-sm #deepType EQ 'degrees' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=degrees">Degrees</a>
-            <a class="btn btn-sm #deepType EQ 'awards' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=awards">Awards</a>
-            <a class="btn btn-sm #deepType EQ 'student_profile' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=student_profile">Student Profile</a>
-            <a class="btn btn-sm #deepType EQ 'review_submissions' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=review_submissions">Review Submissions</a>
-            <a class="btn btn-sm #deepType EQ 'images' ? 'btn-primary' : 'btn-outline-primary'#" href="?pairID=#pairID#&deep=images">Images</a>
+            <a class="btn btn-sm #deepType EQ 'profile' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=profile">Profile</a>
+            <a class="btn btn-sm #deepType EQ 'aliases' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=aliases">Aliases</a>
+            <a class="btn btn-sm #deepType EQ 'emails' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=emails">Emails</a>
+            <a class="btn btn-sm #deepType EQ 'phones' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=phones">Phones</a>
+            <a class="btn btn-sm #deepType EQ 'addresses' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=addresses">Addresses</a>
+            <a class="btn btn-sm #deepType EQ 'flags' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=flags">Flags</a>
+            <a class="btn btn-sm #deepType EQ 'organizations' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=organizations">Orgs</a>
+            <a class="btn btn-sm #deepType EQ 'external_ids' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=external_ids">External IDs</a>
+            <a class="btn btn-sm #deepType EQ 'bio' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=bio">Bio</a>
+            <a class="btn btn-sm #deepType EQ 'academic' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=academic">Academic</a>
+            <a class="btn btn-sm #deepType EQ 'degrees' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=degrees">Degrees</a>
+            <a class="btn btn-sm #deepType EQ 'awards' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=awards">Awards</a>
+            <a class="btn btn-sm #deepType EQ 'student_profile' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=student_profile">Student Profile</a>
+            <a class="btn btn-sm #deepType EQ 'review_submissions' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=review_submissions">Review Submissions</a>
+            <a class="btn btn-sm #deepType EQ 'images' ? 'btn-ui-filter' : 'btn-ui-go'#" href="?pairID=#pairID#&deep=images">Images</a>
         </div>
 
         <cfif NOT len(deepType)>
@@ -261,8 +261,8 @@
             <textarea id="mergeNotes" name="notes" class="form-control" rows="3" maxlength="500" placeholder="Why this primary user was selected"></textarea>
 
             <div class="mt-3 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Confirm Merge</button>
-                <a href="/admin/reporting/duplicate_users_report.cfm" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-ui-save">Confirm Merge</button>
+                <a href="/admin/reporting/duplicate_users_report.cfm" class="btn btn-ui-cancel">Cancel</a>
             </div>
         </form>
 
@@ -272,7 +272,7 @@
             <input type="hidden" name="reason" value="Marked as not a duplicate during pair review.">
             <div class="d-flex gap-2 align-items-center">
                 <div class="text-muted">Ignore this pair when it is not a true duplicate.</div>
-                <button type="submit" class="btn btn-outline-secondary btn-sm">Ignore Pair</button>
+                <button type="submit" class="btn btn-ui-warning btn-sm">Ignore Pair</button>
             </div>
         </form>
     <cfelseif pairStatus EQ "ignored">
@@ -281,7 +281,7 @@
             <input type="hidden" name="pairID" value="#pairID#">
             <div class="d-flex gap-2 align-items-center">
                 <div class="text-muted">This pair is currently ignored.</div>
-                <button type="submit" class="btn btn-outline-primary btn-sm">Restore To Pending</button>
+                <button type="submit" class="btn btn-ui-go btn-sm">Restore To Pending</button>
             </div>
         </form>
     <cfelse>
@@ -292,7 +292,7 @@
 </cfif>
 
 <div class="mt-3">
-    <a href="/admin/reporting/duplicate_users_report.cfm" class="btn btn-outline-secondary">Back to Duplicate Report</a>
+    <a href="/admin/reporting/duplicate_users_report.cfm" class="btn btn-ui-cancel">Back to Duplicate Report</a>
 </div>
 </cfoutput>
 </cfsavecontent>

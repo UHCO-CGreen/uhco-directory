@@ -22,6 +22,7 @@
 <cfset usersService       = createObject("component", "cfc.users_service").init()>
 <cfset variantService     = createObject("component", "cfc.UserImageVariantService").init()>
 <cfset publishingService  = createObject("component", "cfc.PublishingService").init()>
+<cfset flagsService       = createObject("component", "cfc.flags_service").init()>
 
 <!--- ── Load user ────────────────────────────────────────────────────────── --->
 <cfset userResult = usersService.getUser(userID)>
@@ -29,6 +30,21 @@
     <cflocation url="#request.webRoot#/admin/user-media/index.cfm" addtoken="false">
 </cfif>
 <cfset user = userResult.data>
+<cfset _rzFlags = flagsService.getUserFlags(userID).data>
+<cfset _rzIsAlumni = false>
+<cfset _rzIsFaculty = false>
+<cfloop array="#_rzFlags#" index="_rzf">
+    <cfif compareNoCase(trim(_rzf.FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _rzIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_rzf.FLAGNAME ?: ""))>
+        <cfset _rzIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _rzIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_rzIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 
 <!--- ── Load variant matrix to find this variant type ────────────────────── --->
 <cfset variantMatrix = variantService.getVariantMatrix(userID, sourceID)>
@@ -166,7 +182,7 @@
             &mdash; #displayName#
         </p>
     </div>
-    <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#sourceID#' class='btn btn-secondary text-dark'>
+    <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#sourceID#' class='btn btn-ui-cancel'>
         <i class='bi bi-arrow-left me-1'></i> Back to Variants
     </a>
 </div>
@@ -247,7 +263,7 @@
                 <cfif transferOnlyMode>
                     <input type='hidden' name='transferOnly' value='1'>
                 </cfif>
-                <button type='submit' class='btn btn-success'>
+                <button type='submit' class='btn btn-ui-save'>
                     <i class='bi bi-arrow-clockwise me-1'></i> #(hasGeneratedFile ? 'Regenerate' : (isPassThrough ? 'Transfer' : 'Generate'))#
                 </button>
             </form>

@@ -1,0 +1,474 @@
+@use "../../../themes/uhco-identity/tokens" as brand;
+
+body {
+	--portal-header-height: 72px;
+	--portal-sidebar-width: 240px;
+	background:
+		radial-gradient(circle at 80% -10%, #f9d7de 0%, rgba(249, 215, 222, 0) 42%),
+		radial-gradient(circle at -5% 110%, #d8ecff 0%, rgba(216, 236, 255, 0) 36%),
+		brand.$app-bg;
+	color: brand.$portal-ink;
+}
+
+body.sidebar-collapsed {
+	--portal-sidebar-width: 74px;
+}
+
+.portal-shell {
+	min-height: 100vh;
+}
+
+.main-sidebar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: var(--portal-sidebar-width);
+	border-right: 1px solid brand.$portal-border;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	transition: width 0.2s ease, transform 0.2s ease;
+	z-index: 1040;
+	overflow-y: auto;
+}
+
+.main-sidebar-inner {
+	min-height: 100%;
+	padding: 1rem 0.75rem;
+	display: flex;
+	flex-direction: column;
+}
+
+.sidebar-brand {
+	font-size: 0.9rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #6b7280;
+	margin-bottom: 0.75rem;
+	padding: 0.25rem 0.5rem;
+
+	&.uhco-logo {
+		display: block;
+	}
+
+	&.uh-logo {
+		display: none;
+	}
+
+	img {
+		display: block;
+		max-width: 100%;
+		height: auto;
+	}
+}
+
+.sidebar-nav {
+	list-style: none;
+	padding-left: 0;
+	margin-bottom: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+
+	.nav-link {
+		border-radius: 0.6rem;
+		color: brand.$portal-ink;
+		font-weight: 600;
+		padding: 0.6rem 0.75rem;
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+
+		&:hover,
+		&:focus,
+		&:focus-visible {
+			background: #f6f9fc;
+			color: brand.$portal-primary;
+		}
+
+		&.active {
+			background: brand.$portal-active-bg;
+			color: brand.$portal-active-ink;
+		}
+	}
+
+	.nav-item.active > .nav-link {
+		background: brand.$portal-active-bg;
+		color: brand.$portal-active-ink;
+	}
+}
+
+.sidebar-icon {
+	width: 1.1rem;
+	min-width: 1.1rem;
+	text-align: center;
+}
+
+.sidebar-label {
+	white-space: nowrap;
+	flex: 1;
+}
+
+.sidebar-footer {
+	margin-top: auto;
+	padding-top: 1rem;
+	border-top: 1px solid brand.$portal-border;
+}
+
+.settings-btn {
+	border-radius: 0.6rem;
+	color: brand.$portal-ink;
+	padding: 0.6rem 0.75rem;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	text-decoration: none;
+
+	&:hover,
+	&:focus,
+	&:focus-visible {
+		background: #f6f9fc;
+		color: brand.$portal-primary;
+	}
+}
+
+.settings-icon-wrap {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.1rem;
+	min-width: 1.1rem;
+}
+
+.settings-environment-indicator {
+	position: absolute;
+	top: -0.35rem;
+	right: -0.2rem;
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 999px;
+	background: #1f9d55;
+	box-shadow: 0 0 0 2px #fff;
+	pointer-events: none;
+}
+
+.mainContainer,
+.main-content {
+	min-height: 100vh;
+	min-width: 0;
+	flex: 1 1 auto;
+	margin-left: var(--portal-sidebar-width);
+	padding-top: var(--portal-header-height);
+	transition: margin-left 0.2s ease;
+}
+
+.mainContainer.no-global-admin-toolbar,
+.main-content.no-global-admin-toolbar {
+	padding-top: 0;
+}
+
+.mainContainer.no-global-admin-toolbar .portal-main,
+.main-content.no-global-admin-toolbar .portal-main {
+	min-height: 100vh;
+}
+
+.portal-main {
+	position: relative;
+	min-width: 0;
+	min-height: calc(100vh - var(--portal-header-height));
+}
+
+.portal-header {
+	position: fixed;
+	top: 0;
+	right: 0;
+	left: var(--portal-sidebar-width);
+	min-height: var(--portal-header-height);
+	background: brand.$portal-surface;
+	z-index: 1030;
+	box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+	transition: left 0.2s ease;
+}
+
+.portal-header .navbar {
+	min-height: var(--portal-header-height);
+}
+
+.users-list-toolbar-shell {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: nowrap;
+	padding-left: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
+	padding-right: calc(var(--bs-gutter-x, 1.5rem) * 0.5);
+}
+
+.users-page-secondary-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	padding: 0.9rem 1rem;
+	border: 1px solid brand.$portal-border;
+	border-radius: 0.95rem;
+	background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+	box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.users-page-secondary-toolbar-heading {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
+}
+
+.users-page-secondary-toolbar-eyebrow {
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: brand.$portal-muted;
+}
+
+.users-page-secondary-toolbar-title {
+	margin: 0;
+	font-size: 1.35rem;
+	line-height: 1.15;
+	color: brand.$portal-ink;
+}
+
+.users-page-secondary-toolbar-meta {
+	color: brand.$portal-muted;
+	font-size: 0.95rem;
+}
+
+.users-page-secondary-toolbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	margin-left: auto;
+}
+
+.users-page-secondary-toolbar-actions .btn {
+	white-space: nowrap;
+}
+
+.users-list-toolbar-primary {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.users-list-toolbar-brand {
+	color: brand.$portal-ink;
+	font-weight: 700;
+	white-space: nowrap;
+	margin-bottom: 0;
+	font-size: 1.2rem;
+	line-height: 1;
+	text-decoration: none;
+}
+
+.admin-toolbar-title {
+	color: brand.$portal-muted;
+	font-weight: 600;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+.admin-sidebar-toggle {
+	flex: 0 0 auto;
+}
+
+.users-list-toolbar-controls,
+.admin-toolbar-title {
+	margin-left: 0.75rem;
+}
+
+.portal-header .nav-link,
+.users-list-toolbar-nav .nav-link {
+	color: brand.$portal-ink;
+
+	&:hover,
+	&:focus {
+		color: brand.$portal-primary;
+	}
+}
+
+.users-list-toolbar-dropdown {
+	border: 1px solid rgba(31, 38, 48, 0.08);
+	box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+	border-radius: 1rem;
+}
+
+.users-list-toolbar-avatar,
+.admin-toolbar-avatar {
+	width: 2rem;
+	height: 2rem;
+	object-fit: cover;
+	background: #eef2f6;
+}
+
+.admin-toolbar-content-root .card {
+	border-color: brand.$portal-border;
+	box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+	background: linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
+}
+
+.admin-toolbar-content-root .card-header {
+	background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+	border-bottom-color: rgba(84, 88, 90, 0.12);
+	color: brand.$portal-ink;
+}
+
+.admin-toolbar-content-root .card-body {
+	background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+}
+
+.main-content .table > thead > tr > th,
+.main-content .table > :not(caption) > thead > tr > th,
+.main-content .table-dark > :not(caption) > tr > th,
+.main-content thead.table-dark > tr > th {
+	background: linear-gradient(180deg, #ffffff 0%, #f2f5f8 52%, #e9eff5 100%);
+	border-bottom-color: rgba(49, 70, 90, 0.2);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(49, 70, 90, 0.14);
+	color: #31465a;
+}
+
+.main-sidebar.collapsed {
+	width: 74px;
+}
+
+body.sidebar-collapsed .sidebar-label,
+.main-sidebar.collapsed .sidebar-label,
+body.sidebar-collapsed .sidebar-title,
+.main-sidebar.collapsed .sidebar-title {
+	display: none;
+}
+
+body.sidebar-collapsed .sidebar-brand.uhco-logo,
+.main-sidebar.collapsed .sidebar-brand.uhco-logo {
+	display: none;
+}
+
+body.sidebar-collapsed .sidebar-brand.uh-logo,
+.main-sidebar.collapsed .sidebar-brand.uh-logo {
+	display: block;
+}
+
+body.sidebar-collapsed .main-sidebar .nav-link,
+.main-sidebar.collapsed .nav-link,
+body.sidebar-collapsed .settings-btn,
+.main-sidebar.collapsed .settings-btn {
+	justify-content: center;
+	padding-left: 0.65rem;
+	padding-right: 0.65rem;
+}
+
+.viewbar {
+	width: 460px;
+	flex-shrink: 0;
+	background: brand.$admin-viewbar-bg;
+	color: brand.$admin-viewbar-text;
+	min-height: 100vh;
+	transition: width 0.3s ease;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.cfdebug {
+	max-width: 100%;
+	overflow: auto;
+
+	table {
+		box-sizing: border-box;
+		margin-left: calc(var(--portal-sidebar-width) + 1rem);
+		max-width: calc(100% - var(--portal-sidebar-width) - 1rem);
+		width: auto;
+	}
+}
+
+a[href^="javascript:setDebugSource()"],
+a[onclick*="dockedMode("] {
+	position: fixed;
+	left: calc(var(--portal-sidebar-width) + 1rem);
+	z-index: 1082;
+	display: inline-block;
+	box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.18);
+}
+
+a[href^="javascript:setDebugSource()"] {
+	bottom: 3.5rem;
+}
+
+a[onclick*="dockedMode("] {
+	bottom: 1rem;
+}
+
+.admin-login-card {
+	width: 100%;
+	max-width: 400px;
+}
+
+@media (max-width: 991.98px) {
+	body,
+	body.sidebar-collapsed {
+		--portal-sidebar-width: 0px;
+	}
+
+	.portal-header {
+		left: 0;
+	}
+
+	.main-sidebar {
+		top: var(--portal-header-height);
+		width: 240px;
+		transform: translateX(-100%);
+		box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.15);
+	}
+
+	body.sidebar-open .main-sidebar {
+		transform: translateX(0);
+	}
+
+	body.sidebar-collapsed .main-sidebar,
+	.main-sidebar.collapsed {
+		width: 240px;
+	}
+
+	body.sidebar-collapsed .sidebar-label,
+	body.sidebar-collapsed .sidebar-title,
+	body.sidebar-collapsed .sidebar-brand.uhco-logo {
+		display: initial;
+	}
+
+	body.sidebar-collapsed .sidebar-brand.uh-logo {
+		display: none;
+	}
+
+	.mainContainer,
+	.main-content {
+		margin-left: 0;
+	}
+
+	.users-list-toolbar-shell {
+		flex-wrap: wrap;
+	}
+
+	.users-list-toolbar-nav {
+		width: 100%;
+		justify-content: flex-end;
+	}
+
+	.admin-toolbar-title {
+		display: none !important;
+	}
+}

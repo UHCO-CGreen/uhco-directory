@@ -27,20 +27,39 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     public void function replaceEmails( required numeric userID, required array emails ) {
         var idParam = { id={ value=userID, cfsqltype="cf_sql_integer" } };
+        var explicitPrimaryIndex = 0;
+        var primaryIndex = 0;
+        var idx = 0;
+
+        for (idx = 1; idx <= arrayLen(arguments.emails); idx++) {
+            if (val(arguments.emails[idx].isPrimary ?: 0) EQ 1) {
+                explicitPrimaryIndex = idx;
+                break;
+            }
+        }
+
+        if (explicitPrimaryIndex GT 0) {
+            primaryIndex = explicitPrimaryIndex;
+        } else if (arrayLen(arguments.emails) GT 0) {
+            primaryIndex = 1;
+        }
+
         executeQueryWithRetry(
             "DELETE FROM UserEmails WHERE UserID = :id",
             idParam, { datasource=variables.datasource, timeout=30 }
         );
         var sortIdx = 0;
+        idx = 0;
         for ( var em in arguments.emails ) {
+            idx++;
             executeQueryWithRetry(
                 "INSERT INTO UserEmails (UserID, EmailAddress, EmailType, IsPrimary, SortOrder)
                  VALUES (:id, :EmailAddress, :EmailType, :IsPrimary, :SortOrder)",
                 {
                     id           = { value=userID,                   cfsqltype="cf_sql_integer"  },
-                    EmailAddress = { value=em.address,               cfsqltype="cf_sql_nvarchar" },
-                    EmailType    = { value=em.type,                  cfsqltype="cf_sql_nvarchar" },
-                    IsPrimary    = { value=(em.isPrimary ? 1 : 0),   cfsqltype="cf_sql_bit"      },
+                    EmailAddress = { value=lCase(trim(em.address ?: "")), cfsqltype="cf_sql_nvarchar" },
+                    EmailType    = { value=trim(em.type ?: ""),     cfsqltype="cf_sql_nvarchar" },
+                    IsPrimary    = { value=(idx EQ primaryIndex ? 1 : 0), cfsqltype="cf_sql_bit" },
                     SortOrder    = { value=sortIdx,                  cfsqltype="cf_sql_integer"  }
                 },
                 { datasource=variables.datasource, timeout=30 }
@@ -60,6 +79,52 @@ component extends="dao.BaseDAO" output="false" singleton {
             var key = toString(row.USERID);
             if ( !structKeyExists(map, key) ) { map[key] = []; }
             arrayAppend(map[key], row);
+        }
+        return map;
+    }
+
+    public struct function getPrimaryEmailsMap( array userIDs = [] ) {
+        var map = {};
+        var dedupedIDs = [];
+        var seen = {};
+        for ( var rawID in arguments.userIDs ) {
+            if ( isNumeric(rawID) ) {
+                var numericID = val(rawID);
+                var idKey = toString(numericID);
+                if ( numericID GT 0 AND !structKeyExists(seen, idKey) ) {
+                    seen[idKey] = true;
+                    arrayAppend(dedupedIDs, numericID);
+                }
+            }
+        }
+        if ( !arrayLen(dedupedIDs) ) return map;
+
+        var inClause = "";
+        var params = {};
+        for ( var i = 1; i <= arrayLen(dedupedIDs); i++ ) {
+            if ( i GT 1 ) inClause &= ",";
+            inClause &= ":uid" & i;
+            params["uid" & i] = { value=dedupedIDs[i], cfsqltype="cf_sql_integer" };
+        }
+
+        var qry = executeQueryWithRetry(
+            "SELECT UserID, EmailAddress, EmailType, IsPrimary
+             FROM UserEmails
+             WHERE UserID IN (#inClause#)
+             ORDER BY UserID, ISNULL(IsPrimary,0) DESC, SortOrder, EmailID",
+            params,
+            { datasource=variables.datasource, timeout=30, fetchSize=1000 }
+        );
+
+        for ( var row in qry ) {
+            var key = toString(row.USERID);
+            if ( !structKeyExists(map, key) ) {
+                map[key] = {
+                    EMAIL   = trim(row.EMAILADDRESS ?: ""),
+                    TYPE    = trim(row.EMAILTYPE ?: ""),
+                    PRIMARY = (val(row.ISPRIMARY ?: 0) EQ 1)
+                };
+            }
         }
         return map;
     }

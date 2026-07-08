@@ -1,4 +1,4 @@
-<!--- Authorization --->
+﻿<!--- Authorization --->
 <cfif NOT request.hasPermission("media.publish")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -283,7 +283,7 @@
                 </div>
             </div>
             <div class='col-md-auto'>
-                <button type='submit' class='btn btn-primary'>
+                <button type='submit' class='btn btn-ui-filter'>
                     <i class='bi bi-search me-1'></i> Search Folder
                 </button>
             </div>
@@ -367,7 +367,7 @@
                         #showAmbiguous ? "<input type='hidden' name='showAmbiguous' value='1'>" : ""#
                         <input type='hidden' name='userID' value='#row.userID#'>
                         <input type='hidden' name='sourcePath' value='#encodeForHTMLAttribute(row.sourcePath)#'>
-                        <button type='submit' class='btn btn-sm btn-primary' onclick=&quot;return confirm('Transfer and publish this image for #encodeForJavaScript(row.userDisplayName)#?')&quot;>
+                        <button type='submit' class='btn btn-sm btn-ui-save' data-confirm="Transfer and publish this image for #encodeForJavaScript(row.userDisplayName)#?">
                             <i class='bi bi-arrow-left-right me-1'></i> Transfer
                         </button>
                         <div class='small text-muted mt-1'>Source Key: #encodeForHTML(selectedSourceKey)#<br>Variant: #encodeForHTML(row.variantCode ?: "")#</div>
@@ -477,12 +477,12 @@
                 <div class='form-text'>Subfolder created under <code>/_temp_source/</code> for extracted images.</div>
             </div>
             <div class='col-md-auto'>
-                <button type='submit' name='action' value='uploadZip' class='btn btn-primary'>
+                <button type='submit' name='action' value='uploadZip' class='btn btn-ui-save'>
                     <i class='bi bi-upload me-1'></i> Upload &amp; Transfer
                 </button>
             </div>
             <div class='col-md-auto'>
-                <button type='submit' name='action' value='clearZipHistory' class='btn btn-outline-danger' formnovalidate onclick=&quot;return confirm('Clear previous extracted files and ZIP results for this folder?')&quot;>
+                <button type='submit' name='action' value='clearZipHistory' class='btn btn-ui-delete' formnovalidate data-confirm="Clear previous extracted files and ZIP results for this folder?">
                     <i class='bi bi-trash me-1'></i> Clear Upload History
                 </button>
             </div>

@@ -1,10 +1,10 @@
-<!---
+﻿<!---
     Admin Users — list, add, toggle active, manage role assignments.
     Permission: settings.admin_users.manage.
 --->
 
 <!--- ── Auth guard ── --->
-<cfif NOT request.hasPermission("settings.admin_users.manage")>
+<cfif NOT request.isSuperAdmin()>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -58,6 +58,28 @@
     <cfset userEffectivePermissionsByID[toString(adminUserRow.USER_ID)] = effectivePermissions>
 </cfloop>
 
+<!--- Sort params --->
+<cfset allowedAdminUserSortCols = ["USER_ID","COUGARNET","IS_ACTIVE"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedAdminUserSortCols, url.sortCol) GT 0) ? url.sortCol : "COUGARNET">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfscript>
+    arraySort(users, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function adminUserSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        return "?sortCol=" & col & "&sortDir=" & dir;
+    }
+    function adminUserSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -78,19 +100,6 @@
     </div>
 </cfif>
 
-<!--- Status messages --->
-<cfif len(msgParam)>
-    <div class="alert alert-success alert-dismissible fade show mt-3">
-        #encodeForHTML(msgParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
-<cfif len(errParam)>
-    <div class="alert alert-danger alert-dismissible fade show mt-3">
-        #encodeForHTML(errParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
 
 <cfif request.isActualSuperAdmin()>
 <div class="card border-0 shadow-sm mt-3 mb-4 border-start border-4 border-warning settings-shell">
@@ -101,14 +110,14 @@
                 <p class="text-muted mb-0">Temporarily impersonate a lower role or a custom permission set without switching LDAP accounts.</p>
             </div>
             <div class="d-flex gap-2 align-items-center">
-                <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="##impersonationPanel" aria-expanded="<cfif structCount(currentImpersonation)>true<cfelse>false</cfif>">
+                <button class="btn btn-sm btn-ui-warning" type="button" data-bs-toggle="collapse" data-bs-target="##impersonationPanel" aria-expanded="<cfif structCount(currentImpersonation)>true<cfelse>false</cfif>">
                     <i class="bi bi-chevron-down me-1"></i>Toggle Panel
                 </button>
                 <cfif structCount(currentImpersonation)>
                     <form method="post" action="/admin/settings/admin-users/save.cfm" class="d-inline">
                         <input type="hidden" name="action" value="clearImpersonation">
                         <input type="hidden" name="returnURL" value="/admin/settings/admin-users/?msg=#urlEncodedFormat('Impersonation cleared.')#">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <button type="submit" class="btn btn-sm btn-ui-warning">
                             <i class="bi bi-x-octagon me-1"></i>Stop Impersonating
                         </button>
                     </form>
@@ -142,7 +151,7 @@
                         </select>
                     </div>
                     <div class="col-md-auto">
-                        <button type="submit" class="btn btn-warning text-dark">
+                        <button type="submit" class="btn btn-ui-warning">
                             <i class="bi bi-person-down me-1"></i>Impersonate
                         </button>
                     </div>
@@ -215,12 +224,12 @@
     <div class="card-body">
         <h5 class="mb-3 settings-section-title"><i class="bi bi-people me-2"></i>Current Admin Users</h5>
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 settings-table">
+            <table class="table table-sm table-hover align-middle mb-0 settings-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>CougarNet</th>
-                        <th>Status</th>
+                        <th><a href="#adminUserSortLink('USER_ID')#" class="settings-sort-link">ID#adminUserSortArrow('USER_ID')#</a></th>
+                        <th><a href="#adminUserSortLink('COUGARNET')#" class="settings-sort-link">CougarNet#adminUserSortArrow('COUGARNET')#</a></th>
+                        <th><a href="#adminUserSortLink('IS_ACTIVE')#" class="settings-sort-link">Status#adminUserSortArrow('IS_ACTIVE')#</a></th>
                         <th>Roles</th>
                         <th>Permissions</th>
                         <th class="text-end">Actions</th>
@@ -257,29 +266,35 @@
                         <td class="text-end">
                             <div class="settings-action-group">
                             <!--- Toggle active --->
-                            <form method="post" action="/admin/settings/admin-users/save.cfm" class="d-inline">
-                                <input type="hidden" name="action" value="toggleActive">
-                                <input type="hidden" name="userID" value="#u.USER_ID#">
-                                <cfif u.IS_ACTIVE>
-                                    <button type="submit" class="btn btn-sm btn-outline-warning"
-                                            title="Deactivate"
-                                            onclick="return confirm('Deactivate #encodeForJavaScript(u.COUGARNET)#?')">
+                            <cfif u.IS_ACTIVE>
+                                <form method="post" action="/admin/settings/admin-users/save.cfm" class="d-inline js-confirm-submit"
+                                      data-confirm-title="Deactivate User"
+                                      data-confirm-message="Deactivate #encodeForJavaScript(u.COUGARNET)#? They will lose admin access."
+                                      data-confirm-ok="Deactivate"
+                                      data-confirm-class="warning">
+                                    <input type="hidden" name="action" value="toggleActive">
+                                    <input type="hidden" name="userID" value="#u.USER_ID#">
+                                    <button type="submit" class="btn btn-sm btn-ui-warning" title="Deactivate">
                                         <i class="bi bi-pause-circle"></i>
                                     </button>
-                                <cfelse>
-                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Activate">
+                                </form>
+                            <cfelse>
+                                <form method="post" action="/admin/settings/admin-users/save.cfm" class="d-inline">
+                                    <input type="hidden" name="action" value="toggleActive">
+                                    <input type="hidden" name="userID" value="#u.USER_ID#">
+                                    <button type="submit" class="btn btn-sm btn-ui-save" title="Activate">
                                         <i class="bi bi-play-circle"></i>
                                     </button>
-                                </cfif>
-                            </form>
+                                </form>
+                            </cfif>
                             <!--- Manage Roles --->
-                            <button type="button" class="btn btn-sm btn-outline-primary"
+                            <button type="button" class="btn btn-sm btn-ui-go"
                                     title="Manage Roles"
                                     data-bs-toggle="modal"
                                     data-bs-target="##rolesModal#u.USER_ID#">
                                 <i class="bi bi-key"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-dark"
+                            <button type="button" class="btn btn-sm btn-ui-go"
                                     title="Manage Permissions"
                                     data-bs-toggle="modal"
                                     data-bs-target="##permissionsModal#u.USER_ID#">
@@ -287,7 +302,7 @@
                             </button>
                             <!--- Impersonate User --->
                             <cfif request.isActualSuperAdmin() AND u.USER_ID NEQ session.user.adminUserID AND NOT listFindNoCase(u.ROLE_NAMES ?: "", "SUPER_ADMIN")>
-                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                <button type="button" class="btn btn-sm btn-ui-warning"
                                         title="Impersonate #encodeForHTMLAttribute(u.COUGARNET)#"
                                         data-bs-toggle="modal"
                                         data-bs-target="##impersonateUserConfirmModal"
@@ -327,10 +342,10 @@
                                                 <input type="hidden" name="roleID" value="#role.ROLE_ID#">
                                                 <cfif hasRole>
                                                     <input type="hidden" name="action" value="revokeRole">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                                                    <button type="submit" class="btn btn-sm btn-ui-delete">Revoke</button>
                                                 <cfelse>
                                                     <input type="hidden" name="action" value="assignRole">
-                                                    <button type="submit" class="btn btn-sm btn-outline-success">Assign</button>
+                                                    <button type="submit" class="btn btn-sm btn-ui-save">Assign</button>
                                                 </cfif>
                                             </form>
                                         </div>
@@ -397,8 +412,8 @@
                                         </cfif>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                                        <button type="submit" class="btn btn-primary">Save Direct Permissions</button>
+                                        <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-ui-save">Save Direct Permissions</button>
                                     </div>
                                 </form>
                             </div>
@@ -431,12 +446,12 @@
                 <p class="text-muted small mb-0">Your session will reflect this user&rsquo;s exact permission set. You can stop impersonating at any time from the banner at the top of every page.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
                 <form method="post" action="/admin/settings/admin-users/save.cfm" class="mb-0">
                     <input type="hidden" name="action" value="startImpersonationUser">
                     <input type="hidden" name="impersonationUserID" id="impersonateUserConfirmUserID" value="">
                     <input type="hidden" name="returnURL" value="/admin/dashboard.cfm">
-                    <button type="submit" class="btn btn-warning text-dark">
+                    <button type="submit" class="btn btn-ui-warning">
                         <i class="bi bi-person-down me-1"></i>Confirm Impersonate
                     </button>
                 </form>
@@ -447,11 +462,11 @@
 </cfif>
 
 <div class="mt-3 d-flex flex-wrap gap-2">
-    <a href="/admin/settings/admin-roles/" class="btn btn-outline-secondary">
+    <a href="/admin/settings/admin-roles/" class="btn btn-ui-go">
         <i class="bi bi-gear me-1"></i>Manage Roles
     </a>
     <cfif request.hasPermission("settings.admin_permissions.manage")>
-        <a href="/admin/settings/admin-permissions/" class="btn btn-outline-secondary">
+        <a href="/admin/settings/admin-permissions/" class="btn btn-ui-go">
             <i class="bi bi-sliders me-1"></i>Manage Permissions
         </a>
     </cfif>
@@ -459,7 +474,9 @@
 
 </div>
 
-<script>
+<cfinclude template="/admin/settings/_confirm_modal.cfm">
+
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
 
@@ -541,6 +558,23 @@
 }());
 </script>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(msgParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(msgParam)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

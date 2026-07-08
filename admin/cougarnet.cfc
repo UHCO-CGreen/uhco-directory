@@ -46,8 +46,7 @@
 			    attributes="displayName,memberOf,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title,initials"          
 			    start="DC=cougarnet,DC=uh,DC=edu"          
 			    scope="SUBTREE"
-			    <!---filter="(&(objectClass=User)(objectCategory=Person)(samaccountname=#user#)(|(memberOf=CN=OPT-ASC,OU=ASC USERS,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=%OPTOMETRY,OU=Master Users,DC=cougarnet,DC=uh,DC=edu)))"--->
-				filter="(&(objectClass=User)(objectCategory=Person)(samaccountname=#user#)(|(memberOf=CN=OPT-ASC,OU=ASC USERS,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-STAFF,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-OPTOMETRY,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-FACULTY-1,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2020,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2021,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2022,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2023,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2024,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)))"
+			    filter="(&(objectClass=User)(objectCategory=Person)(samaccountname=#user#)(memberOf=CN=%OPTOMETRY,OU=Master Users,DC=cougarnet,DC=uh,DC=edu))"<!---filter="(&(objectClass=User)(objectCategory=Person)(samaccountname=#user#)(|(memberOf=CN=OPT-ASC,OU=ASC USERS,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-STAFF,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-OPTOMETRY,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-FACULTY-1,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2020,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2021,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2022,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2023,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)(memberOf=CN=OPT-CLASS2024,OU=Distribution Groups,OU=OPTOMETRY,DC=cougarnet,DC=uh,DC=edu)))"--->
 				maxrows="1"          
 			    server="cougarnet.uh.edu"          
 			    username="#DOMAIN#\#USER#"          
@@ -196,19 +195,19 @@
 				<cfset SESSION.AUTH.MSG = "#cfcatch.message#">
 				<cfif cfcatch.message CONTAINS 'error code 49'>
 					<cfif cfcatch.message CONTAINS '52e'>
-						<cfset SESSION.AUTH.DETAIL = "Invalid Credentials, Please check your Username Or Password and try again">
+						<cfset SESSION.AUTH.DETAIL = "Error 52e: Invalid Credentials, Please check your Username Or Password and try again">
 					<cfelseif cfcatch.message CONTAINS '525'>
-						<cfset SESSION.AUTH.DETAIL = "User Not Found, Please check your Username and try again">
+						<cfset SESSION.AUTH.DETAIL = "Error 525: User Not Found, Please check your Username and try again">
 					<cfelseif cfcatch.message CONTAINS '530'>
-						<cfset SESSION.AUTH.DETAIL = "Not Permitted To Logon At This Time, Please contact your IT Admin">
+						<cfset SESSION.AUTH.DETAIL = "Error 530: Not Permitted To Logon At This Time, Please contact your IT Admin">
 					<cfelseif cfcatch.message CONTAINS '532'>
-						<cfset SESSION.AUTH.DETAIL = "Password Expired, Please change your password before attempting to login again">
+						<cfset SESSION.AUTH.DETAIL = "Error 532: Password Expired, Please change your password before attempting to login again">
 					<cfelseif cfcatch.message CONTAINS '533'>
-						<cfset SESSION.AUTH.DETAIL = "Account Disabled,  Please contact your IT admin">
+						<cfset SESSION.AUTH.DETAIL = "Error 533: Account Disabled,  Please contact your IT admin">
 					<cfelseif cfcatch.message CONTAINS '701'>
-						<cfset SESSION.AUTH.DETAIL = "Account Expired, Please contact your IT admin">
+						<cfset SESSION.AUTH.DETAIL = "Error 701: Account Expired, Please contact your IT admin">
 					<cfelseif cfcatch.message CONTAINS '773'>
-						<cfset SESSION.AUTH.DETAIL = "User Must Reset Password, Please reset your password before attempting to login again">
+						<cfset SESSION.AUTH.DETAIL = "Error 773: User Must Reset Password, Please reset your password before attempting to login again">
 					<cfelse>
 						<cfset SESSION.AUTH.DETAIL = "Login Attempt Failed For Unknown Reason, Please try again... #cfcatch.message# <br/> #cfcatch.detail#">
 					</cfif>

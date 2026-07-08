@@ -1,5 +1,7 @@
 component output="false" singleton {
 
+    variables.largeSubsetThreshold = 1500;
+
     public any function init() {
         variables.AcademicDAO = createObject("component", "dao.academic_DAO").init();
         variables.DegreesDAO  = createObject("component", "dao.degrees_DAO").init();
@@ -19,49 +21,7 @@ component output="false" singleton {
      * EFFECTIVEGRADYEAR (derived from UserDegrees UHCO rows first, then legacy fallback).
      */
     public struct function getAllAcademicInfoMap() {
-        var rows = variables.AcademicDAO.getAllAcademicInfo();
-
-        // Build legacy map first
-        var result = {};
-        for ( var row in rows ) {
-            result[ toString( row.USERID ) ] = {
-                CURRENTGRADYEAR  = row.CURRENTGRADYEAR,
-                ORIGINALGRADYEAR = row.ORIGINALGRADYEAR,
-                EFFECTIVEGRADYEAR = val(row.CURRENTGRADYEAR ?: 0)
-            };
-        }
-
-        // Override EFFECTIVEGRADYEAR with degree-based value where available
-        var degreeRows = variables.DegreesDAO.getAllUHCODegrees();
-        // Group by UserID
-        var enrolledByUser  = {};  // userID -> ExpectedGradYear (enrolled)
-        var graduatedByUser = {};  // userID -> max GraduationYear
-        for ( var d in degreeRows ) {
-            var uid = toString( d.USERID );
-            if ( isBoolean(d.ISENROLLED ?: false) AND d.ISENROLLED AND val(d.EXPECTEDGRADYEAR ?: 0) GT 0 ) {
-                enrolledByUser[ uid ] = val(d.EXPECTEDGRADYEAR);
-            } else if ( !structKeyExists(enrolledByUser, uid) ) {
-                var yr = val(d.GRADUATIONYEAR ?: 0);
-                if ( yr GT val(graduatedByUser[ uid ] ?: 0) ) {
-                    graduatedByUser[ uid ] = yr;
-                }
-            }
-        }
-
-        for ( var uid in enrolledByUser ) {
-            if ( structKeyExists(result, uid) ) {
-                result[ uid ].EFFECTIVEGRADYEAR = enrolledByUser[ uid ];
-            } else {
-                result[ uid ] = { CURRENTGRADYEAR="", ORIGINALGRADYEAR="", EFFECTIVEGRADYEAR=enrolledByUser[ uid ] };
-            }
-        }
-        for ( var uid in graduatedByUser ) {
-            if ( structKeyExists(result, uid) AND result[uid].EFFECTIVEGRADYEAR EQ val(result[uid].CURRENTGRADYEAR ?: 0) ) {
-                result[ uid ].EFFECTIVEGRADYEAR = graduatedByUser[ uid ];
-            }
-        }
-
-        return result;
+        return getAllAcademicMaps().academicInfoMap;
     }
 
     /**
@@ -69,30 +29,107 @@ component output="false" singleton {
      * Primary source is UHCO UserDegrees; CURRENTGRADYEAR is fallback when no usable degree years exist.
      */
     public struct function getAllGradYearMap() {
-        var rows = variables.AcademicDAO.getAllAcademicInfo();
-        var map = {};
+        return getAllAcademicMaps().gradYearMap;
+    }
+
+    public string function buildGradYearDisplay(struct gradYearData={}) {
+        var years = isArray(arguments.gradYearData.YEARS ?: "") ? arguments.gradYearData.YEARS : [];
+        var yearProgramMap = isStruct(arguments.gradYearData.YEARPROGRAMMAP ?: {}) ? arguments.gradYearData.YEARPROGRAMMAP : {};
+        var pairDisplay = [];
+        var idx = 0;
+        var pairYear = 0;
+        var programText = "";
+        var programs = [];
+        var programKey = "";
+
+        if (arrayLen(years) LTE 0) {
+            return "";
+        }
+
+        for (idx = 1; idx LTE arrayLen(years); idx++) {
+            pairYear = val(years[idx]);
+            programText = "";
+            programs = [];
+
+            if (structKeyExists(yearProgramMap, toString(pairYear))) {
+                for (programKey in yearProgramMap[toString(pairYear)]) {
+                    arrayAppend(programs, programKey);
+                }
+
+                if (arrayLen(programs) GT 1) {
+                    arraySort(programs, "textnocase", "asc");
+                }
+
+                programText = arrayToList(programs, "/");
+            }
+
+            if (len(programText)) {
+                arrayAppend(pairDisplay, toString(pairYear) & " : " & programText);
+            } else {
+                arrayAppend(pairDisplay, toString(pairYear));
+            }
+        }
+
+        return arrayLen(pairDisplay) GT 1
+            ? "(" & arrayToList(pairDisplay, " | ") & ")"
+            : (arrayLen(pairDisplay) EQ 1 ? pairDisplay[1] : "");
+    }
+
+    public struct function getAllAcademicMaps( array userIDs = [], boolean includeProgramMap = true ) {
+        var normalizedUserIDs = _normalizeUserIDs(arguments.userIDs);
+        var requestedIDLookup = _toIDLookup(normalizedUserIDs);
+        var hasUserFilter = arrayLen(normalizedUserIDs) GT 0;
+        var useFullLoadForSubset = hasUserFilter AND arrayLen(normalizedUserIDs) GTE variables.largeSubsetThreshold;
+        var cacheKey = "academicServiceAllMaps:" & (hasUserFilter ? arrayToList(normalizedUserIDs, ",") : "all") & ":programs=" & (arguments.includeProgramMap ? "1" : "0");
+
+        if ( structKeyExists(request, cacheKey) AND isStruct(request[cacheKey] ?: {}) ) {
+            return request[cacheKey];
+        }
+
+        var rows = (hasUserFilter AND !useFullLoadForSubset)
+            ? variables.AcademicDAO.getAcademicInfoForUsers(normalizedUserIDs)
+            : variables.AcademicDAO.getAllAcademicInfo();
+        var academicInfoMap = {};
+        var gradYearMap = {};
 
         for ( var row in rows ) {
             var uid = toString( row.USERID );
-            map[ uid ] = {
+
+            if ( hasUserFilter AND useFullLoadForSubset AND !structKeyExists(requestedIDLookup, uid) ) {
+                continue;
+            }
+
+            academicInfoMap[ uid ] = {
+                CURRENTGRADYEAR  = row.CURRENTGRADYEAR,
+                ORIGINALGRADYEAR = row.ORIGINALGRADYEAR,
+                EFFECTIVEGRADYEAR = val(row.CURRENTGRADYEAR ?: 0)
+            };
+            gradYearMap[ uid ] = {
                 YEARS = [],
                 YEARLOOKUP = {},
-                YEARPROGRAMMAP = {},
                 LEGACYYEAR = val(row.CURRENTGRADYEAR ?: 0),
-                DISPLAY = ""
+                YEARPROGRAMMAP = arguments.includeProgramMap ? {} : {}
             };
         }
 
-        var degreeRows = variables.DegreesDAO.getAllUHCODegrees();
+        var degreeRows = (hasUserFilter AND !useFullLoadForSubset)
+            ? variables.DegreesDAO.getUHCODegreesForUsers(normalizedUserIDs)
+            : variables.DegreesDAO.getAllUHCODegrees();
+        var enrolledByUser = {};
+        var graduatedByUser = {};
+
         for ( var d in degreeRows ) {
             var uid = toString( d.USERID );
-            if ( !structKeyExists(map, uid) ) {
-                map[ uid ] = {
+            if ( hasUserFilter AND !structKeyExists(requestedIDLookup, uid) ) {
+                continue;
+            }
+
+            if ( !structKeyExists(gradYearMap, uid) ) {
+                gradYearMap[ uid ] = {
                     YEARS = [],
                     YEARLOOKUP = {},
-                    YEARPROGRAMMAP = {},
                     LEGACYYEAR = 0,
-                    DISPLAY = ""
+                    YEARPROGRAMMAP = arguments.includeProgramMap ? {} : {}
                 };
             }
 
@@ -100,73 +137,70 @@ component output="false" singleton {
             var graduationYear = val(d.GRADUATIONYEAR ?: 0);
             var programLabel = uCase(trim(d.PROGRAM ?: ""));
 
+            if ( isBoolean(d.ISENROLLED ?: false) AND d.ISENROLLED AND expectedYear GT 0 ) {
+                enrolledByUser[ uid ] = expectedYear;
+            } else if ( !structKeyExists(enrolledByUser, uid) AND graduationYear GT val(graduatedByUser[ uid ] ?: 0) ) {
+                graduatedByUser[ uid ] = graduationYear;
+            }
+
             if ( expectedYear GT 0 ) {
-                if ( !structKeyExists(map[uid].YEARLOOKUP, toString(expectedYear)) ) {
-                    map[uid].YEARLOOKUP[ toString(expectedYear) ] = true;
-                    arrayAppend(map[uid].YEARS, expectedYear);
+                if ( !structKeyExists(gradYearMap[uid].YEARLOOKUP, toString(expectedYear)) ) {
+                    gradYearMap[uid].YEARLOOKUP[ toString(expectedYear) ] = true;
+                    arrayAppend(gradYearMap[uid].YEARS, expectedYear);
                 }
-                if ( len(programLabel) ) {
-                    if ( !structKeyExists(map[uid].YEARPROGRAMMAP, toString(expectedYear)) ) {
-                        map[uid].YEARPROGRAMMAP[toString(expectedYear)] = {};
+                if ( arguments.includeProgramMap AND len(programLabel) ) {
+                    if ( !structKeyExists(gradYearMap[uid].YEARPROGRAMMAP, toString(expectedYear)) ) {
+                        gradYearMap[uid].YEARPROGRAMMAP[toString(expectedYear)] = {};
                     }
-                    map[uid].YEARPROGRAMMAP[toString(expectedYear)][programLabel] = true;
+                    gradYearMap[uid].YEARPROGRAMMAP[toString(expectedYear)][programLabel] = true;
                 }
             }
 
             if ( graduationYear GT 0 ) {
-                if ( !structKeyExists(map[uid].YEARLOOKUP, toString(graduationYear)) ) {
-                    map[uid].YEARLOOKUP[ toString(graduationYear) ] = true;
-                    arrayAppend(map[uid].YEARS, graduationYear);
+                if ( !structKeyExists(gradYearMap[uid].YEARLOOKUP, toString(graduationYear)) ) {
+                    gradYearMap[uid].YEARLOOKUP[ toString(graduationYear) ] = true;
+                    arrayAppend(gradYearMap[uid].YEARS, graduationYear);
                 }
-                if ( len(programLabel) ) {
-                    if ( !structKeyExists(map[uid].YEARPROGRAMMAP, toString(graduationYear)) ) {
-                        map[uid].YEARPROGRAMMAP[toString(graduationYear)] = {};
+                if ( arguments.includeProgramMap AND len(programLabel) ) {
+                    if ( !structKeyExists(gradYearMap[uid].YEARPROGRAMMAP, toString(graduationYear)) ) {
+                        gradYearMap[uid].YEARPROGRAMMAP[toString(graduationYear)] = {};
                     }
-                    map[uid].YEARPROGRAMMAP[toString(graduationYear)][programLabel] = true;
+                    gradYearMap[uid].YEARPROGRAMMAP[toString(graduationYear)][programLabel] = true;
                 }
             }
         }
 
-        for ( var uid in map ) {
-            if ( !arrayLen(map[uid].YEARS) AND val(map[uid].LEGACYYEAR) GT 0 ) {
-                map[uid].YEARLOOKUP[ toString(val(map[uid].LEGACYYEAR)) ] = true;
-                arrayAppend(map[uid].YEARS, val(map[uid].LEGACYYEAR));
-            }
-
-            if ( arrayLen(map[uid].YEARS) ) {
-                arraySort(map[uid].YEARS, "numeric", "asc");
-            }
-
-            if ( arrayLen(map[uid].YEARS) EQ 1 ) {
-                map[uid].DISPLAY = toString(map[uid].YEARS[1]);
-            } else if ( arrayLen(map[uid].YEARS) GT 1 ) {
-                var pairDisplay = [];
-                for ( var idx = 1; idx LTE arrayLen(map[uid].YEARS); idx++ ) {
-                    var pairYear = val(map[uid].YEARS[idx]);
-                    var programText = "";
-                    if ( structKeyExists(map[uid].YEARPROGRAMMAP, toString(pairYear)) ) {
-                        var programs = [];
-                        for ( var programKey in map[uid].YEARPROGRAMMAP[toString(pairYear)] ) {
-                            arrayAppend(programs, programKey);
-                        }
-                        arraySort(programs, "textnocase", "asc");
-                        programText = arrayToList(programs, "/");
-                    }
-
-                    if ( len(programText) ) {
-                        arrayAppend(pairDisplay, toString(pairYear) & " : " & programText);
-                    } else {
-                        arrayAppend(pairDisplay, toString(pairYear));
-                    }
-                }
-
-                map[uid].DISPLAY = "(" & arrayToList(pairDisplay, " | ") & ")";
+        for ( var uid in enrolledByUser ) {
+            if ( structKeyExists(academicInfoMap, uid) ) {
+                academicInfoMap[ uid ].EFFECTIVEGRADYEAR = enrolledByUser[ uid ];
             } else {
-                map[uid].DISPLAY = "";
+                academicInfoMap[ uid ] = { CURRENTGRADYEAR="", ORIGINALGRADYEAR="", EFFECTIVEGRADYEAR=enrolledByUser[ uid ] };
             }
         }
 
-        return map;
+        for ( var uid in graduatedByUser ) {
+            if ( structKeyExists(academicInfoMap, uid) AND academicInfoMap[uid].EFFECTIVEGRADYEAR EQ val(academicInfoMap[uid].CURRENTGRADYEAR ?: 0) ) {
+                academicInfoMap[ uid ].EFFECTIVEGRADYEAR = graduatedByUser[ uid ];
+            }
+        }
+
+        for ( var uid in gradYearMap ) {
+            if ( !arrayLen(gradYearMap[uid].YEARS) AND val(gradYearMap[uid].LEGACYYEAR) GT 0 ) {
+                gradYearMap[uid].YEARLOOKUP[ toString(val(gradYearMap[uid].LEGACYYEAR)) ] = true;
+                arrayAppend(gradYearMap[uid].YEARS, val(gradYearMap[uid].LEGACYYEAR));
+            }
+
+            if ( arrayLen(gradYearMap[uid].YEARS) ) {
+                arraySort(gradYearMap[uid].YEARS, "numeric", "asc");
+            }
+        }
+
+        request[cacheKey] = {
+            academicInfoMap = academicInfoMap,
+            gradYearMap = gradYearMap
+        };
+
+        return request[cacheKey];
     }
 
     public struct function updateAcademicInfo( required numeric userID, required struct data ) {
@@ -212,6 +246,43 @@ component output="false" singleton {
         }
 
         return { success=true, message="Academic info saved." };
+    }
+
+    private array function _normalizeUserIDs( required array userIDs ) {
+        var normalized = [];
+        var seen = {};
+        var rawUserID = "";
+        var numericUserID = 0;
+        var userKey = "";
+
+        for ( rawUserID in arguments.userIDs ) {
+            if ( isNumeric(rawUserID) ) {
+                numericUserID = val(rawUserID);
+                userKey = toString(numericUserID);
+
+                if ( numericUserID GT 0 AND !structKeyExists(seen, userKey) ) {
+                    seen[userKey] = true;
+                    arrayAppend(normalized, numericUserID);
+                }
+            }
+        }
+
+        if ( arrayLen(normalized) GT 1 ) {
+            arraySort(normalized, "numeric", "asc");
+        }
+
+        return normalized;
+    }
+
+    private struct function _toIDLookup( required array userIDs ) {
+        var lookup = {};
+        var userID = 0;
+
+        for ( userID in arguments.userIDs ) {
+            lookup[toString(val(userID))] = true;
+        }
+
+        return lookup;
     }
 
 }

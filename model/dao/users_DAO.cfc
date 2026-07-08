@@ -16,8 +16,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                  FROM UserAliases ua
                  WHERE ua.UserID = u.UserID
                    AND ua.IsActive = 1
+                                     AND ISNULL(ua.IsPrimary, 0) = 1
                  ORDER BY
-                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID
              ) pa
@@ -101,12 +101,45 @@ component extends="dao.BaseDAO" output="false" singleton {
                  FROM UserAliases ua
                  WHERE ua.UserID = u.UserID
                    AND ua.IsActive = 1
+                                     AND ISNULL(ua.IsPrimary, 0) = 1
                  ORDER BY
-                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID
              ) pa
              ORDER BY COALESCE(pa.LastName, u.LastName), COALESCE(pa.FirstName, u.FirstName)",
+            {},
+            { datasource=variables.datasource, timeout=60, fetchSize=1000 }
+        );
+        var rows = queryToArray(qry);
+        _applyPreferredNameToRows( rows );
+        return rows;
+    }
+
+    public array function getAdminListUsers() {
+        var qry = executeQueryWithRetry(
+            "SELECT
+                    u.UserID,
+                    u.Active,
+                    u.FirstName,
+                    u.MiddleName,
+                    u.LastName,
+                    u.PreferredName,
+                    u.EmailPrimary,
+                    u.Title1,
+                    COALESCE(pa.FirstName, '')  AS PreferredFirstName,
+                    COALESCE(pa.MiddleName, '') AS PreferredMiddleName,
+                    COALESCE(pa.LastName, '')   AS PreferredLastName
+             FROM Users u
+             OUTER APPLY (
+                 SELECT TOP 1 ua.FirstName, ua.MiddleName, ua.LastName
+                 FROM UserAliases ua
+                 WHERE ua.UserID = u.UserID
+                   AND ua.IsActive = 1
+                                     AND ISNULL(ua.IsPrimary, 0) = 1
+                 ORDER BY
+                    ISNULL(ua.SortOrder, 999999),
+                    ua.AliasID
+             ) pa",
             {},
             { datasource=variables.datasource, timeout=60, fetchSize=1000 }
         );
@@ -159,8 +192,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                     FROM UserAliases ua
                     WHERE ua.UserID = u.UserID
                       AND ua.IsActive = 1
+                                            AND ISNULL(ua.IsPrimary, 0) = 1
                     ORDER BY
-                        CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                         ISNULL(ua.SortOrder, 999999),
                         ua.AliasID
                 ) pa
@@ -250,8 +283,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                 FROM UserAliases ua
                 WHERE ua.UserID = u.UserID
                   AND ua.IsActive = 1
+                                    AND ISNULL(ua.IsPrimary, 0) = 1
                 ORDER BY
-                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID
             ) pa
@@ -346,7 +379,10 @@ component extends="dao.BaseDAO" output="false" singleton {
             params["orgName"] = { value=trim(arguments.filterOrg), cfsqltype="cf_sql_nvarchar" };
         }
 
-        // Exclude users that have any of the protected flags
+        // Exclude users that have any of the protected flags.
+        // Exception: the Alumni exclusion doesn't apply to Public-Facing users who
+        // currently also hold an active-role flag (Staff/Faculty/Resident) — their
+        // current role takes precedence over their protected alumni history.
         if (len(trim(arguments.excludeFlags))) {
             var exFlagList = "";
             var i = 0;
@@ -359,10 +395,23 @@ component extends="dao.BaseDAO" output="false" singleton {
             arrayAppend(conditions,
                 "NOT EXISTS (SELECT 1 FROM UserFlagAssignments ufa
                              INNER JOIN UserFlags uf ON ufa.FlagID = uf.FlagID
-                             WHERE ufa.UserID = u.UserID AND uf.FlagName IN (#exFlagList#))");
+                             WHERE ufa.UserID = u.UserID AND uf.FlagName IN (#exFlagList#)
+                               AND NOT (
+                                   uf.FlagName = 'Alumni'
+                                   AND EXISTS (SELECT 1 FROM UserFlagAssignments pfa
+                                               INNER JOIN UserFlags pf ON pfa.FlagID = pf.FlagID
+                                               WHERE pfa.UserID = u.UserID AND pf.FlagName = 'Public-Facing')
+                                   AND EXISTS (SELECT 1 FROM UserFlagAssignments rfa
+                                               INNER JOIN UserFlags rf ON rfa.FlagID = rf.FlagID
+                                               WHERE rfa.UserID = u.UserID
+                                                 AND rf.FlagName IN ('Staff', 'Faculty-Fulltime', 'Faculty-Adjunct', 'Resident'))
+                               ))");
         }
 
-        // Exclude users that belong to any of the protected orgs
+        // Exclude users that belong to any of the protected orgs.
+        // Same exception as the Alumni flag above: a Public-Facing user who also
+        // holds an active-role flag isn't hidden by any protected-org membership
+        // they retained from their student days (e.g. their graduating program).
         if (len(trim(arguments.excludeOrgs))) {
             var exOrgList = "";
             var j = 0;
@@ -375,7 +424,16 @@ component extends="dao.BaseDAO" output="false" singleton {
             arrayAppend(conditions,
                 "NOT EXISTS (SELECT 1 FROM UserOrganizations uo
                              INNER JOIN Organizations o ON uo.OrgID = o.OrgID
-                             WHERE uo.UserID = u.UserID AND o.OrgName IN (#exOrgList#))");
+                             WHERE uo.UserID = u.UserID AND o.OrgName IN (#exOrgList#)
+                               AND NOT (
+                                   EXISTS (SELECT 1 FROM UserFlagAssignments pfa
+                                           INNER JOIN UserFlags pf ON pfa.FlagID = pf.FlagID
+                                           WHERE pfa.UserID = u.UserID AND pf.FlagName = 'Public-Facing')
+                                   AND EXISTS (SELECT 1 FROM UserFlagAssignments rfa
+                                               INNER JOIN UserFlags rf ON rfa.FlagID = rf.FlagID
+                                               WHERE rfa.UserID = u.UserID
+                                                 AND rf.FlagName IN ('Staff', 'Faculty-Fulltime', 'Faculty-Adjunct', 'Resident'))
+                               ))");
         }
 
         var where = arrayLen(conditions) ? "WHERE " & arrayToList(conditions, " AND ") : "";
@@ -443,8 +501,8 @@ component extends="dao.BaseDAO" output="false" singleton {
                  FROM UserAliases ua
                  WHERE ua.UserID = u.UserID
                    AND ua.IsActive = 1
+                                     AND ISNULL(ua.IsPrimary, 0) = 1
                  ORDER BY
-                    CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 999999),
                     ua.AliasID
              ) pa
@@ -951,9 +1009,18 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     private void function _applyPreferredNameToRow( required struct row ) {
-        var first = len(trim(arguments.row.PREFERREDFIRSTNAME ?: "")) ? trim(arguments.row.PREFERREDFIRSTNAME) : trim(arguments.row.FIRSTNAME ?: "");
-        var middle = len(trim(arguments.row.PREFERREDMIDDLENAME ?: "")) ? trim(arguments.row.PREFERREDMIDDLENAME) : trim(arguments.row.MIDDLENAME ?: "");
-        var last = len(trim(arguments.row.PREFERREDLASTNAME ?: "")) ? trim(arguments.row.PREFERREDLASTNAME) : trim(arguments.row.LASTNAME ?: "");
+        var baseFirst = trim(arguments.row.FIRSTNAME ?: "");
+        var baseMiddle = trim(arguments.row.MIDDLENAME ?: "");
+        var baseLast = trim(arguments.row.LASTNAME ?: "");
+        var preferredFirst = trim(arguments.row.PREFERREDFIRSTNAME ?: "");
+        var preferredMiddle = trim(arguments.row.PREFERREDMIDDLENAME ?: "");
+        var preferredLast = trim(arguments.row.PREFERREDLASTNAME ?: "");
+        var hasPreferredName = len(trim(arguments.row.PREFERREDFIRSTNAME ?: ""))
+            OR len(trim(arguments.row.PREFERREDMIDDLENAME ?: ""))
+            OR len(trim(arguments.row.PREFERREDLASTNAME ?: ""));
+        var first = hasPreferredName ? preferredFirst : baseFirst;
+        var middle = hasPreferredName ? preferredMiddle : baseMiddle;
+        var last = hasPreferredName ? preferredLast : baseLast;
 
         arguments.row["FIRSTNAME"] = first;
         arguments.row["MIDDLENAME"] = middle;
@@ -1143,6 +1210,17 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    public void function updateDropboxFolderPath( required numeric userID, required string folderPath ) {
+        executeQueryWithRetry(
+            "UPDATE Users SET DropboxFolderPath = :path, UpdatedAt = GETDATE() WHERE UserID = :id",
+            {
+                id   = { value=userID,               cfsqltype="cf_sql_integer"  },
+                path = { value=arguments.folderPath, cfsqltype="cf_sql_nvarchar" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
     public void function updateTitle1Field( required numeric userID, required string title1 ) {
         executeQueryWithRetry(
             "UPDATE Users SET Title1 = :Title1, UpdatedAt = GETDATE() WHERE UserID = :id",
@@ -1165,6 +1243,39 @@ component extends="dao.BaseDAO" output="false" singleton {
             {
                 id = { value=arguments.userID, cfsqltype="cf_sql_integer" },
                 active = { value=(arguments.active ? 1 : 0), cfsqltype="cf_sql_bit" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
+    public void function updateDemographics(
+        required numeric userID,
+        string dob = "",
+        string gender = ""
+    ) {
+        var normalizedDob = trim(arguments.dob ?: "");
+        var normalizedGender = trim(arguments.gender ?: "");
+
+        executeQueryWithRetry(
+            "
+            UPDATE Users
+            SET DOB = :DOB,
+                Gender = :Gender,
+                UpdatedAt = GETDATE()
+            WHERE UserID = :id
+            ",
+            {
+                id = { value=arguments.userID, cfsqltype="cf_sql_integer" },
+                DOB = {
+                    value=normalizedDob,
+                    cfsqltype="cf_sql_date",
+                    null=!len(normalizedDob)
+                },
+                Gender = {
+                    value=normalizedGender,
+                    cfsqltype="cf_sql_nvarchar",
+                    null=!len(normalizedGender)
+                }
             },
             { datasource=variables.datasource, timeout=30 }
         );

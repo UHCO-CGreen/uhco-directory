@@ -1,0 +1,81 @@
+body {
+  --portal-header-height: 72px;
+  --portal-sidebar-width: 240px;
+}
+
+body.sidebar-collapsed {
+  --portal-sidebar-width: 74px;
+}
+
+.portal-header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--portal-sidebar-width);
+  min-height: var(--portal-header-height);
+  background: var(--uhco-surface);
+  z-index: 1030;
+}
+
+.portal-header .navbar {
+  min-height: var(--portal-header-height);
+}
+
+.portal-logo {
+  width: min(350px, 72vw);
+  max-height: 58px;
+}
+
+.navbar .nav-link {
+  color: var(--uhco-ink);
+
+  &:hover,
+  &:focus {
+    color: var(--uhco-primary);
+  }
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--uhco-primary);
+  --bs-btn-border-color: var(--uhco-primary);
+  --bs-btn-hover-bg: var(--uhco-primary);
+  --bs-btn-hover-border-color: var(--uhco-primary);
+  --bs-btn-active-bg: var(--uhco-primary-dark);
+  --bs-btn-active-border-color: var(--uhco-primary-dark);
+}
+
+.ql-images {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.portal-user-avatar {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+}
+
+.portal-user-avatar-fallback {
+  font-size: 24px;
+}
+
+@media (max-width: 991.98px) {
+  body,
+  body.sidebar-collapsed {
+    --portal-sidebar-width: 0px;
+  }
+
+  .portal-header {
+    left: 0;
+  }
+
+  .navbar-nav {
+    padding-top: 0.75rem;
+  }
+
+  .navbar-nav .btn {
+    width: 100%;
+  }
+}

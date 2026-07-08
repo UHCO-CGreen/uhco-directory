@@ -1,3 +1,4 @@
+﻿
 <cfif !structKeyExists(url, "userID") OR !isNumeric(url.userID)>
     <cflocation url="#request.webRoot#/admin/users/index.cfm" addtoken="false">
 </cfif>
@@ -9,16 +10,18 @@
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset flagsService = createObject("component", "cfc.flags_service").init()>
 <cfset organizationsService = createObject("component", "cfc.organizations_service").init()>
+<cfset aliasesService = createObject("component", "cfc.aliases_service").init()>
+<cfset bioService = createObject("component", "cfc.bio_service").init()>
+<cfset editViewHelper = createObject("component", "cfc.adminUsersEditView_service").init()>
+<cfset degreesService = createObject("component", "cfc.degrees_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
-<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
-<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
-<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
-<cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
 <cfset profile = directoryService.getFullProfile( url.userID )>
 <cfset user = profile.user>
+<cfset editReturnTo = "/admin/users/edit.cfm?userID=" & urlEncodedFormat(url.userID)>
+<cfset uhSyncMsgParam = trim(url.msg ?: "")>
+<cfset uhSyncErrParam = trim(url.err ?: "")>
+<cfset uhSyncInfoParam = trim(url.info ?: "")>
+<cfset aliasTypes = aliasesService.getAliasTypes()>
 <cfset freshUserResult = usersService.getUser(val(url.userID))>
 <cfset userActiveRaw = val(user.ACTIVE ?: 0)>
 <cfif structKeyExists(freshUserResult, "success") AND freshUserResult.success>
@@ -37,615 +40,17 @@
         <!--- Keep previously resolved value when direct query is unavailable. --->
     </cfcatch>
 </cftry>
+
 <cfset user.ACTIVE = userActiveRaw>
 <cfset userFlags = profile.flags>
 <cfset userOrganizations = profile.organizations>
-<cfset isTestUser = false>
-<cfloop from="1" to="#arrayLen(userFlags)#" index="flagIndex">
-    <cfif compareNoCase(trim(userFlags[flagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
-        <cfset isTestUser = true>
-        <cfbreak>
-    </cfif>
-</cfloop>
-<cfif hideTestUsersForAdmin AND isTestUser>
+<cfif NOT request.canAccessUserProfile(profile)>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 <cfset allFlagsResult = flagsService.getAllFlags()>
-<cfset allFlags = allFlagsResult.data />
+<cfset allFlags = allFlagsResult.data>
 <cfset allOrganizationsResult = organizationsService.getAllOrgs()>
-<cfset allOrganizations = allOrganizationsResult.data />
-<cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER)) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
-<cfset contentWrapperClass = "">
-<cfset toolbarListType = "all">
-<cfset toolbarSearchTerm = structKeyExists(url, "search") ? trim(url.search) : "">
-<cfset currentAdminUser = structKeyExists(session, "user") AND isStruct(session.user) ? session.user : {}>
-<cfset currentUserDisplayName = encodeForHTML(trim(currentAdminUser.displayName ?: "Admin User"))>
-<cfset currentUserEmail = encodeForHTML(trim(currentAdminUser.email ?: ""))>
-<cfset currentUserUsername = encodeForHTML(trim(currentAdminUser.username ?: ""))>
-<cfset currentUserRoleLabel = "">
-<cfset currentUserImageSrc = "">
-<cfset impersonationState = {}>
-<cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
-<cfset toolbarReturnToMatch = reFindNoCase("(?:\?|&)list=([^&]+)", returnTo, 1, true)>
-
-<cfif isStruct(toolbarReturnToMatch) AND arrayLen(toolbarReturnToMatch.len) GTE 2 AND toolbarReturnToMatch.len[2] GT 0>
-    <cfset toolbarListType = lCase(urlDecode(mid(returnTo, toolbarReturnToMatch.pos[2], toolbarReturnToMatch.len[2])))>
-</cfif>
-<cfif NOT listFindNoCase("problems,all,alumni,current-students,faculty,staff,inactive", toolbarListType)>
-    <cfset toolbarListType = "all">
-</cfif>
-<cfif structKeyExists(currentAdminUser, "roles") AND isArray(currentAdminUser.roles) AND arrayLen(currentAdminUser.roles)>
-    <cfset currentUserRoleLabel = encodeForHTML(replace(currentAdminUser.roles[1], "_", " ", "all"))>
-</cfif>
-<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "image")>
-    <cfset currentUserImageSrc = trim(currentAdminUser.image ?: "")>
-</cfif>
-<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "avatar")>
-    <cfset currentUserImageSrc = trim(currentAdminUser.avatar ?: "")>
-</cfif>
-<cfif NOT len(currentUserImageSrc)>
-    <cfset currentUserImageSrc = request.webRoot & "/assets/images/uh.png">
-</cfif>
-<cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
-    <cfset impersonationState = application.authService.getImpersonationState()>
-</cfif>
-
-<cfswitch expression="#toolbarListType#">
-    <cfcase value="problems"><cfset toolbarListLabel = "Problem Records"></cfcase>
-    <cfcase value="faculty"><cfset toolbarListLabel = "Faculty"></cfcase>
-    <cfcase value="staff"><cfset toolbarListLabel = "Staff"></cfcase>
-    <cfcase value="current-students"><cfset toolbarListLabel = "Current Students"></cfcase>
-    <cfcase value="alumni"><cfset toolbarListLabel = "Alumni"></cfcase>
-    <cfcase value="inactive"><cfset toolbarListLabel = "Inactive Records"></cfcase>
-    <cfdefaultcase><cfset toolbarListLabel = "All Records"></cfdefaultcase>
-</cfswitch>
-
-<cfset usersListMenuHTML = "
-            <div class='dropdown users-list-view-selector'>
-                <button class='btn btn-link navbar-brand text-white users-list-toolbar-brand users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                    <i class='bi bi-people-fill me-2'></i>Users: #toolbarListLabel#
-                </button>
-                <ul class='dropdown-menu dropdown-menu-end'>
-                    <li><a class='dropdown-item#(toolbarListType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "faculty" ? " active" : "")#' href='/admin/users/index.cfm?list=faculty'><i class='bi bi-people-fill me-2'></i>Faculty</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "staff" ? " active" : "")#' href='/admin/users/index.cfm?list=staff'><i class='bi bi-people-fill me-2'></i>Staff</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "current-students" ? " active" : "")#' href='/admin/users/index.cfm?list=current-students'><i class='bi bi-people-fill me-2'></i>Current Students</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "alumni" ? " active" : "")#' href='/admin/users/index.cfm?list=alumni'><i class='bi bi-mortarboard me-2'></i>Alumni</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "inactive" ? " active" : "")#' href='/admin/users/index.cfm?list=inactive'><i class='bi bi-person-dash me-2'></i>Inactive Records</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "all" ? " active" : "")#' href='/admin/users/index.cfm?list=all'><i class='bi bi-list me-2'></i>All Records</a></li>
-                </ul>
-            </div>
-">
-
-<cfset usersTopToolBar = "
-    <nav class='navbar sticky-top bg-slate text-white users-list-toolbar'>
-        <div class='container-fluid users-list-toolbar-shell'>
-            <div class='users-list-toolbar-primary'>
-                #usersListMenuHTML#
-                <div class='users-list-toolbar-controls'>
-                    <form method='get' action='/admin/users/index.cfm' class='users-list-toolbar-search-form'>
-                        <input type='hidden' name='list' value='#toolbarListType#'>
-                        <input type='hidden' name='page' value='1'>
-                        <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
-                            <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(toolbarSearchTerm)#'>
-                            <button class='btn btn-ui-neutral' type='submit'><i class='bi bi-search me-1'></i>Search</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        
-            <ul class='navbar-nav d-flex flex-row align-items-center gap-2 ms-auto users-list-toolbar-nav'>
-                <li class='nav-item dropdown ms-3 users-list-toolbar-account'>
-                    <a class='nav-link dropdown-toggle d-flex align-items-center text-white' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                        <i class='bi bi-person-circle me-2'></i>
-                        #currentUserDisplayName#
-                    </a>
-                    <div class='dropdown-menu dropdown-menu-end p-3 users-list-toolbar-dropdown' style='min-width: 320px;'>
-                        <div class='d-flex align-items-center gap-3 mb-3 users-list-toolbar-account-header'>
-                            <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='users-list-toolbar-avatar rounded-circle'>
-                            <div class='users-list-toolbar-account-meta'>
-                                <h6 class='mb-1'>#currentUserDisplayName#</h6>
-                                #(len(currentUserEmail) ? "<div class='small text-muted'>" & currentUserEmail & "</div>" : "")#
-                                #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
-                            </div>
-                        </div>
-                        #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
-                        #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
-                        <div class='d-grid'>
-                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-ui-outline btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
-                        </div>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </nav>
-">
-
-
-<cfset userFlagIDs = []>
-<cfloop from="1" to="#arrayLen(userFlags)#" index="i">
-    <cfset arrayAppend(userFlagIDs, userFlags[i].FLAGID)>
-</cfloop>
-
-<cfset userOrgIDs = []>
-<cfset orgRoleMap  = {}>
-<cfloop from="1" to="#arrayLen(userOrganizations)#" index="i">
-    <cfset arrayAppend(userOrgIDs, val(userOrganizations[i].ORGID))>
-    <cfset orgRoleMap[toString(userOrganizations[i].ORGID)] = {
-        roleTitle: (userOrganizations[i].ROLETITLE ?: ""),
-        roleOrder: (isNumeric(userOrganizations[i].ROLEORDER ?: "") ? val(userOrganizations[i].ROLEORDER) : 0)
-    }>
-</cfloop>
-
-<!--- ── External IDs ── --->
-<cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
-<cfset allSystemsResult = externalIDService.getSystems()>
-<cfset allSystems = allSystemsResult.data>
-<cfset userExtIDsResult = externalIDService.getExternalIDs(url.userID)>
-
-<!--- ── Academic Info ── --->
-<cfset academicService  = createObject("component", "cfc.academic_service").init()>
-<cfset academicInfo     = academicService.getAcademicInfo(url.userID).data>
-<cfset currentGradYear  = structIsEmpty(academicInfo) ? "" : (academicInfo.CURRENTGRADYEAR  ?: "")>
-<cfset originalGradYear = structIsEmpty(academicInfo) ? "" : (academicInfo.ORIGINALGRADYEAR ?: "")>
-<cfif NOT isNumeric(currentGradYear)  OR val(currentGradYear)  EQ 0><cfset currentGradYear  = ""></cfif>
-<cfif NOT isNumeric(originalGradYear) OR val(originalGradYear) EQ 0><cfset originalGradYear = ""></cfif>
-
-<!--- ── Student Profile (Current Students & Alumni) ── --->
-<cfset showStudentProfile = false>
-<cfset studentFlagIDs     = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfset flagNameLC = lCase(trim(allFlags[i].FLAGNAME))>
-    <cfif flagNameLC EQ "current-student" OR flagNameLC EQ "alumni">
-        <cfset arrayAppend(studentFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showStudentProfile = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Faculty Profile tab visibility ── --->
-<cfset showFacultyProfile = false>
-<cfset facultyFlagIDs     = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfset flagNameLC = lCase(trim(allFlags[i].FLAGNAME))>
-    <cfif flagNameLC EQ "faculty-adjunct" OR flagNameLC EQ "faculty-fulltime" OR flagNameLC EQ "joint faculty appointment">
-        <cfset arrayAppend(facultyFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showFacultyProfile = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Staff Profile tab visibility ── --->
-<cfset showStaffProfile = false>
-<cfset staffFlagIDs    = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfif lCase(trim(allFlags[i].FLAGNAME)) EQ "staff">
-        <cfset arrayAppend(staffFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showStaffProfile = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Professor Emeritus Profile tab visibility ── --->
-<cfset showEmeritusProfile = false>
-<cfset emeritusFlagIDs     = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfif lCase(trim(allFlags[i].FLAGNAME)) EQ "professor-emeritus">
-        <cfset arrayAppend(emeritusFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showEmeritusProfile = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Resident Profile tab visibility ── --->
-<cfset showResidentProfile = false>
-<cfset residentFlagIDs     = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfif lCase(trim(allFlags[i].FLAGNAME)) EQ "resident">
-        <cfset arrayAppend(residentFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showResidentProfile = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Bio tab visibility (tied to public-facing flag) ── --->
-<cfset showBio      = false>
-<cfset bioFlagIDs   = []>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfif lCase(trim(allFlags[i].FLAGNAME)) EQ "public-facing">
-        <cfset arrayAppend(bioFlagIDs, allFlags[i].FLAGID)>
-        <cfif arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-            <cfset showBio = true>
-        </cfif>
-    </cfif>
-</cfloop>
-
-<!--- ── Bio data ── --->
-<cfset bioSvc     = createObject("component", "cfc.bio_service").init()>
-<cfset bioData    = bioSvc.getBio(url.userID).data>
-<cfset bioContent = structIsEmpty(bioData) ? "" : (bioData.BIOCONTENT ?: "")>
-
-<!--- ── Emails (repeatable) ── --->
-<cfset emailsSvc  = createObject("component", "cfc.emails_service").init()>
-<cfset userEmails  = emailsSvc.getEmails(url.userID).data>
-
-<!--- ── Phones (repeatable) ── --->
-<cfset phoneSvc   = createObject("component", "cfc.phone_service").init()>
-<cfset userPhones  = phoneSvc.getPhones(url.userID).data>
-
-<!--- ── Aliases (repeatable) ── --->
-<cfset aliasesSvc   = createObject("component", "cfc.aliases_service").init()>
-<cfset userAliases  = aliasesSvc.getAliases(url.userID).data>
-<cfset aliasTypes   = aliasesSvc.getAliasTypes()>
-<cfset primaryAlias = {}>
-<cfset primaryAliasForHeading = {}>
-<cfset editUserHeading = "">
-<cfset resolvedFirstName = trim(user.FIRSTNAME ?: "")>
-<cfset resolvedMiddleName = trim(user.MIDDLENAME ?: "")>
-<cfset resolvedLastName = trim(user.LASTNAME ?: "")>
-
-<cfloop from="1" to="#arrayLen(userAliases)#" index="i">
-    <cfif val(userAliases[i].ISPRIMARY ?: 0) EQ 1>
-        <cfset primaryAliasForHeading = userAliases[i]>
-        <cfbreak>
-    </cfif>
-</cfloop>
-
-<cfif NOT structIsEmpty(primaryAliasForHeading)>
-    <cfset headingFirst = trim(primaryAliasForHeading.FIRSTNAME ?: "")>
-    <cfset headingMiddle = trim(primaryAliasForHeading.MIDDLENAME ?: "")>
-    <cfset headingLast = trim(primaryAliasForHeading.LASTNAME ?: "")>
-    <cfset headingMiddleInitial = len(headingMiddle) ? (left(headingMiddle, 1) & ".") : "">
-    <cfset editUserHeading = trim(headingFirst & (len(headingMiddleInitial) ? " " & headingMiddleInitial : "") & (len(headingLast) ? " " & headingLast : ""))>
-</cfif>
-
-<cfloop from="1" to="#arrayLen(userAliases)#" index="i">
-    <cfif val(userAliases[i].ISPRIMARY ?: 0) EQ 1 AND val(userAliases[i].ISACTIVE ?: 0) EQ 1>
-        <cfset primaryAlias = userAliases[i]>
-        <cfbreak>
-    </cfif>
-</cfloop>
-
-<cfif structIsEmpty(primaryAlias)>
-    <cfloop from="1" to="#arrayLen(userAliases)#" index="i">
-        <cfif val(userAliases[i].ISACTIVE ?: 0) EQ 1>
-            <cfset primaryAlias = userAliases[i]>
-            <cfbreak>
-        </cfif>
-    </cfloop>
-</cfif>
-
-<cfif structIsEmpty(primaryAlias) AND arrayLen(userAliases) GT 0>
-    <cfset primaryAlias = userAliases[1]>
-</cfif>
-
-<cfif NOT structIsEmpty(primaryAlias)>
-    <cfset resolvedFirstName = trim(primaryAlias.FIRSTNAME ?: resolvedFirstName)>
-    <cfset resolvedMiddleName = trim(primaryAlias.MIDDLENAME ?: resolvedMiddleName)>
-    <cfset resolvedLastName = trim(primaryAlias.LASTNAME ?: resolvedLastName)>
-</cfif>
-
-<!--- ── Degrees (shared across Faculty, Emeritus, Resident) ── --->
-<cfset showDegrees = showFacultyProfile OR showEmeritusProfile OR showResidentProfile OR showStudentProfile>
-<cfset degreesSvc  = createObject("component", "cfc.degrees_service").init()>
-<cfset userDegrees = degreesSvc.getDegrees(url.userID).data>
-
-<!--- Role check (needed early for General tab email fields) --->
-<cfset isSuperAdmin = application.authService.hasRole("SUPER_ADMIN")>
-
-<!--- ── Addresses (repeatable) ── --->
-<cfset addressesSvc  = createObject("component", "cfc.addresses_service").init()>
-<cfset userAddresses = addressesSvc.getAddresses(url.userID).data>
-
-<cfif showStudentProfile>
-    <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-    <cfset spProfile  = studentProfileSvc.getProfile(url.userID).data>
-    <cfset spAwards   = studentProfileSvc.getAwards(url.userID).data>
-    <cfset spResidencies = studentProfileSvc.getResidencies(url.userID).data>
-    <cfset spFirstExt      = structIsEmpty(spProfile) ? "" : (spProfile.FIRSTEXTERNSHIP   ?: "")>
-    <cfset spSecondExt     = structIsEmpty(spProfile) ? "" : (spProfile.SECONDEXTERNSHIP  ?: "")>
-    <cfset spCommAge       = structIsEmpty(spProfile) ? "" : (spProfile.COMMENCEMENTAGE   ?: "")>
-    <cfset spDissertation  = structIsEmpty(spProfile) ? "" : (spProfile.DISSERTATIONTHESIS ?: "")>
-    <!--- Legacy vars kept for hidden old Student Profile tab --->
-    <cfset spHometownCity  = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWNCITY      ?: "")>
-    <cfset spHometownState = structIsEmpty(spProfile) ? "" : (spProfile.HOMETOWNSTATE     ?: "")>
-    <cfset spDOB           = structIsEmpty(spProfile) ? "" : (spProfile.DOB              ?: "")>
-    <cfset spGender        = structIsEmpty(spProfile) ? "" : (spProfile.GENDER           ?: "")>
-<cfelse>
-    <cfset spAwards        = []>
-    <cfset spResidencies   = []>
-    <cfset spFirstExt      = "">
-    <cfset spSecondExt     = "">
-    <cfset spCommAge       = "">
-    <cfset spDissertation  = "">
-    <cfset spHometownCity  = "">
-    <cfset spHometownState = "">
-    <cfset spDOB           = "">
-    <cfset spGender        = "">
-</cfif>
-
-<cfset userExternalIDs = userExtIDsResult.data>
-<cfset externalBySystem = {}>
-<cfloop from="1" to="#arrayLen(userExternalIDs)#" index="i">
-    <cfset externalBySystem[toString(userExternalIDs[i].SYSTEMID)] = userExternalIDs[i].EXTERNALVALUE>
-</cfloop>
-
-<cfset cougarNetSystemID = 0>
-<cfset peopleSoftSystemID = 0>
-<cfloop from="1" to="#arrayLen(allSystems)#" index="i">
-    <cfset sysScan = allSystems[i]>
-    <cfset scanText = lCase(trim((sysScan.SYSTEMNAME ?: "") & " " & (sysScan.SYSTEMCODE ?: "")))>
-    <cfif cougarNetSystemID EQ 0 AND findNoCase("cougarnet", scanText)>
-        <cfset cougarNetSystemID = val(sysScan.SYSTEMID)>
-    </cfif>
-    <cfif peopleSoftSystemID EQ 0 AND findNoCase("peoplesoft", scanText)>
-        <cfset peopleSoftSystemID = val(sysScan.SYSTEMID)>
-    </cfif>
-</cfloop>
-
-<cfset extIDHtml = "<div class='mb-3 users-edit-extids'><label class='form-label fw-semibold'>External IDs</label><div class='border p-3 rounded users-edit-extids-shell'><div class='row g-2'>">
-<cfif arrayLen(allSystems) GT 0>
-    <cfloop from="1" to="#arrayLen(allSystems)#" index="i">
-        <cfset sys = allSystems[i]>
-        <cfset sysVal = structKeyExists(externalBySystem, toString(sys.SYSTEMID)) ? externalBySystem[toString(sys.SYSTEMID)] : "">
-        <cfif cougarNetSystemID GT 0 AND val(sys.SYSTEMID) EQ cougarNetSystemID>
-            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-cougarnet-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-ui-outline js-cougarnet-lookup' type='button' data-target='extid-cougarnet-input'>Lookup</button></div></div>">
-        <cfelseif peopleSoftSystemID GT 0 AND val(sys.SYSTEMID) EQ peopleSoftSystemID>
-            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><div class='input-group input-group-sm'><input class='form-control' id='extid-peoplesoft-input' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'><button class='btn btn-ui-outline js-cougarnet-lookup' type='button' data-target='extid-peoplesoft-input'>Lookup</button></div></div>">
-        <cfelse>
-            <cfset extIDHtml &= "<div class='col-md-6 col-lg-4'><label class='form-label form-label-sm text-muted mb-1'>" & EncodeForHTML(sys.SYSTEMNAME) & "</label><input class='form-control form-control-sm' name='extID_" & sys.SYSTEMID & "' value='" & EncodeForHTMLAttribute(sysVal) & "' placeholder='Not set'></div>">
-        </cfif>
-    </cfloop>
-<cfelse>
-    <cfset extIDHtml &= "<p class='text-muted mb-0'>No external systems configured.</p>">
-</cfif>
-<cfset extIDHtml &= "</div></div></div>">
-
-<cfset orgIds = {}>
-<cfset orgChildrenByParent = {}>
-
-<cfloop from="1" to="#arrayLen(allOrganizations)#" index="i">
-    <cfset org = allOrganizations[i]>
-    <cfset orgIds[toString(org.ORGID)] = true>
-</cfloop>
-
-<cfloop from="1" to="#arrayLen(allOrganizations)#" index="i">
-    <cfset org = allOrganizations[i]>
-    <cfset parentValue = trim((org.PARENTORGID ?: "") & "")>
-    <cfset parentKey = "ROOT">
-
-    <cfif len(parentValue) AND structKeyExists(orgIds, parentValue)>
-        <cfset parentKey = parentValue>
-    </cfif>
-
-    <cfif NOT structKeyExists(orgChildrenByParent, parentKey)>
-        <cfset orgChildrenByParent[parentKey] = []>
-    </cfif>
-    <cfset arrayAppend(orgChildrenByParent[parentKey], org)>
-</cfloop>
-
-<cffunction name="renderOrgPanels" access="private" returntype="string" output="false">
-    <cfargument name="selectedOrgIDs" type="array" required="true">
-
-    <cfset var html         = "">
-    <cfset var rootOrgs     = []>
-    <cfset var ro           = {}>
-    <cfset var children     = []>
-    <cfset var child        = {}>
-    <cfset var gcKey        = "">
-    <cfset var grandchildren = []>
-    <cfset var gc           = {}>
-    <cfset var i            = 0>
-    <cfset var j            = 0>
-    <cfset var k            = 0>
-    <cfset var isRootChecked  = false>
-    <cfset var isChildChecked = false>
-    <cfset var isGcChecked    = false>
-    <cfset var collapseID     = "">
-
-    <cfif NOT structKeyExists(orgChildrenByParent, "ROOT") OR arrayLen(orgChildrenByParent["ROOT"]) EQ 0>
-        <cfreturn "<p class='text-muted'>No organizations available</p>">
-    </cfif>
-
-    <cfset rootOrgs = orgChildrenByParent["ROOT"]>
-    <cfset html = "<div class='row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3'>">
-
-    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="i">
-        <cfset ro           = rootOrgs[i]>
-        <cfset collapseID   = "orgPanel#ro.ORGID#">
-        <cfset isRootChecked = arrayFindNoCase(arguments.selectedOrgIDs, val(ro.ORGID)) GT 0>
-        <cfset children     = structKeyExists(orgChildrenByParent, toString(ro.ORGID)) ? orgChildrenByParent[toString(ro.ORGID)] : []>
-
-        <cfset html &= "<div class='col'><div class='card shadow-sm h-100 users-edit-org-card card-surface'>">
-
-        <!--- Card header with parent checkbox --->
-        <cfset html &= "<div class='card-header d-flex align-items-center gap-2 py-2 px-3 users-edit-org-card-header'>">
-        <cfset var roRoleTitle = (structKeyExists(orgRoleMap, toString(ro.ORGID)) ? orgRoleMap[toString(ro.ORGID)].roleTitle : '')>
-        <cfset var roRoleOrder = (structKeyExists(orgRoleMap, toString(ro.ORGID)) ? val(orgRoleMap[toString(ro.ORGID)].roleOrder) : 0)>
-        <cfset html &= "<div class='form-check mb-0 flex-grow-1 d-flex align-items-center gap-1'>">
-        <cfset html &= "<input class='form-check-input flex-shrink-0 org-checkbox' type='checkbox' name='Organizations' value='#ro.ORGID#' id='org#ro.ORGID#' data-orgid='#ro.ORGID#' data-orgname='#EncodeForHTMLAttribute(ro.ORGNAME)#' data-parentorgid='' data-panelid='#collapseID#' data-isparent='1' #(isRootChecked ? 'checked' : '')#>">
-        <cfset html &= "<label class='form-check-label fw-semibold user-select-none' for='org#ro.ORGID#'>#EncodeForHTML(ro.ORGNAME)#</label>">
-        <cfset html &= "</div>">
-        <cfif arrayLen(children) GT 0>
-            <cfset html &= "<button class='btn btn-sm border-0 text-muted p-0 ms-1 org-chevron users-edit-org-chevron' type='button' data-bs-toggle='collapse' data-bs-target='###collapseID#' aria-expanded='true'><i class='bi bi-chevron-down'></i></button>">
-        </cfif>
-        <cfset html &= "</div>">
-
-        <!--- Description (parent orgs only) --->
-        <cfset var roDesc = trim(ro.ORGDESCRIPTION ?: '')>
-        <cfif len(roDesc)>
-            <cfset html &= "<div class='px-3 pt-2 pb-1 text-muted small border-bottom users-edit-org-description'>#EncodeForHTML(roDesc)#</div>">
-        </cfif>
-
-        <!--- Collapsible card body with children --->
-        <cfif arrayLen(children) GT 0>
-            <cfset html &= "<div id='#collapseID#' class='collapse show'>">
-            <cfset html &= "<div class='card-body py-2 px-3 users-edit-org-card-body'>">
-
-            <cfloop from="1" to="#arrayLen(children)#" index="j">
-                <cfset child        = children[j]>
-                <cfset isChildChecked = arrayFindNoCase(arguments.selectedOrgIDs, val(child.ORGID)) GT 0>
-                <cfset gcKey        = toString(child.ORGID)>
-                <cfset grandchildren = structKeyExists(orgChildrenByParent, gcKey) ? orgChildrenByParent[gcKey] : []>
-
-                <cfset var chRoleTitle = (structKeyExists(orgRoleMap, toString(child.ORGID)) ? orgRoleMap[toString(child.ORGID)].roleTitle : '')>
-                <cfset var chRoleOrder = (structKeyExists(orgRoleMap, toString(child.ORGID)) ? val(orgRoleMap[toString(child.ORGID)].roleOrder) : 0)>
-                <cfset var chAdditionalRoles = (isNumeric(child.ADDITIONALROLES ?: '') AND val(child.ADDITIONALROLES) EQ 1) ? 1 : 0>
-                <cfset html &= "<div class='form-check mb-1 d-flex align-items-center gap-1'>">
-                <cfset html &= "<input class='form-check-input flex-shrink-0 org-checkbox' type='checkbox' name='Organizations' value='#child.ORGID#' id='org#child.ORGID#' data-orgid='#child.ORGID#' data-orgname='#EncodeForHTMLAttribute(child.ORGNAME)#' data-parentorgid='#ro.ORGID#' data-additionalroles='#chAdditionalRoles#' #(isChildChecked ? 'checked' : '')#>">
-                <cfset html &= "<label class='form-check-label user-select-none' for='org#child.ORGID#'>#EncodeForHTML(child.ORGNAME)#</label>">
-                <cfif chAdditionalRoles>
-                    <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-sm btn-edit ms-1#(isChildChecked ? ' is-visible' : '')#' data-orgid='#child.ORGID#' data-orgname='#EncodeForHTMLAttribute(child.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
-                </cfif>
-                <cfif isChildChecked>
-                    <cfset html &= "<input type='hidden' name='roleTitle_#child.ORGID#' id='roleTitle_#child.ORGID#' value='#EncodeForHTMLAttribute(chRoleTitle)#'><input type='hidden' name='roleOrder_#child.ORGID#' id='roleOrder_#child.ORGID#' value='#chRoleOrder#'>">
-                </cfif>
-                <cfset html &= "</div>">
-
-                <cfloop from="1" to="#arrayLen(grandchildren)#" index="k">
-                    <cfset gc = grandchildren[k]>
-                    <cfset isGcChecked = arrayFindNoCase(arguments.selectedOrgIDs, val(gc.ORGID)) GT 0>
-                    <cfset var gcRoleTitle = (structKeyExists(orgRoleMap, toString(gc.ORGID)) ? orgRoleMap[toString(gc.ORGID)].roleTitle : '')>
-                    <cfset var gcRoleOrder = (structKeyExists(orgRoleMap, toString(gc.ORGID)) ? val(orgRoleMap[toString(gc.ORGID)].roleOrder) : 0)>
-                    <cfset var gcAdditionalRoles = (isNumeric(gc.ADDITIONALROLES ?: '') AND val(gc.ADDITIONALROLES) EQ 1) ? 1 : 0>
-                    <cfset html &= "<div class='form-check mb-1 ms-3 d-flex align-items-center gap-1'>">
-                    <cfset html &= "<input class='form-check-input flex-shrink-0 org-checkbox' type='checkbox' name='Organizations' value='#gc.ORGID#' id='org#gc.ORGID#' data-orgid='#gc.ORGID#' data-orgname='#EncodeForHTMLAttribute(gc.ORGNAME)#' data-parentorgid='#child.ORGID#' data-additionalroles='#gcAdditionalRoles#' #(isGcChecked ? 'checked' : '')#>">
-                    <cfset html &= "<label class='form-check-label user-select-none small text-muted' for='org#gc.ORGID#'>#EncodeForHTML(gc.ORGNAME)#</label>">
-                    <cfif gcAdditionalRoles>
-                        <cfset html &= "<button type='button' class='org-role-edit users-edit-org-role-button btn btn-sm btn-edit ms-1#(isGcChecked ? ' is-visible' : '')#' data-orgid='#gc.ORGID#' data-orgname='#EncodeForHTMLAttribute(gc.ORGNAME)#' title='Edit role'><i class='bi bi-pencil-square'></i></button>">
-                    </cfif>
-                    <cfif isGcChecked>
-                        <cfset html &= "<input type='hidden' name='roleTitle_#gc.ORGID#' id='roleTitle_#gc.ORGID#' value='#EncodeForHTMLAttribute(gcRoleTitle)#'><input type='hidden' name='roleOrder_#gc.ORGID#' id='roleOrder_#gc.ORGID#' value='#gcRoleOrder#'>">
-                    </cfif>
-                    <cfset html &= "</div>">
-                </cfloop>
-            </cfloop>
-
-            <cfset html &= "</div></div>">
-        </cfif>
-
-        <cfset html &= "</div></div>">
-    </cfloop>
-
-    <cfset html &= "</div>">
-    <cfreturn html>
-</cffunction>
-
-<cffunction name="renderDegreesPanel" access="private" returntype="string" output="false">
-    <cfargument name="degrees" type="array" required="true">
-    <cfargument name="prefix" type="string" required="true" hint="Unique prefix per tab, e.g. O.D., Ph.D., etc.">
-    <cfargument name="showComposite" type="boolean" required="false" default="false" hint="Show read-only composite Degrees field for Super Admins">
-    <cfargument name="compositeValue" type="string" required="false" default="">
-
-    <cfsavecontent variable="local.result"><!--- Use cfsavecontent to prevent re-parsing of # expressions --->
-        <div class="mb-4">
-            <cfif arguments.showComposite>
-                <div class="row mb-3">
-                    <div class="col-md-8">
-                        <label class="form-label text-muted">Combined Degrees (auto-generated, read-only)</label>
-                        <input class="form-control form-control-sm" id="<cfoutput>#arguments.prefix#_composite</cfoutput>" value="<cfoutput>#EncodeForHTMLAttribute(arguments.compositeValue)#</cfoutput>" readonly disabled>
-                    </div>
-                </div>
-            </cfif>
-            <label class="form-label fw-semibold">Degrees</label>
-            <div id="<cfoutput>#arguments.prefix#_degreesContainer</cfoutput>">
-                <cfloop from="1" to="#arrayLen(arguments.degrees)#" index="local.di">
-                    <cfset local.dg = arguments.degrees[local.di]>
-                    <cfset local.idx = local.di - 1>
-                    <cfset local.isUHCO     = isBoolean(local.dg.ISUHCO ?: "") ? local.dg.ISUHCO : (val(local.dg.ISUHCO ?: 0) EQ 1)>
-                    <cfset local.isEnrolled = isBoolean(local.dg.ISENROLLED ?: "") ? local.dg.ISENROLLED : (val(local.dg.ISENROLLED ?: 0) EQ 1)>
-                    <cfset local.hasChange  = isBoolean(local.dg.HASYEARCHANGE ?: "") ? local.dg.HASYEARCHANGE : (val(local.dg.HASYEARCHANGE ?: 0) EQ 1)>
-                    <cfset local.uhcoCheckedAttr       = local.isUHCO ? "checked" : "">
-                    <cfset local.enrolledCheckedAttr   = local.isEnrolled ? "checked" : "">
-                    <cfset local.hasChangeCheckedAttr  = local.hasChange ? "checked" : "">
-                    <cfset local.uhcoHiddenClass       = local.isUHCO ? "" : "d-none">
-                    <cfset local.uhcoDisabledAttr      = local.isUHCO ? "" : "disabled">
-                    <cfset local.enrolledDisabledAttr  = local.isEnrolled ? "" : "disabled">
-                    <cfset local.hasChangeDisabledAttr = local.hasChange ? "" : "disabled">
-                    <!--- Precompute values --->
-                    <cfset local.univVal        = trim(local.dg.UNIVERSITY ?: '')>
-                    <cfset local.gradYearVal    = trim(local.dg.GRADUATIONYEAR ?: '')>
-                    <cfset local.expGradVal     = ''>
-                    <cfif structKeyExists(local.dg, 'EXPECTEDGRADYEAR')>
-                        <cfset local.expGradRaw = local.dg.EXPECTEDGRADYEAR>
-                        <cfif len(trim(local.expGradRaw & '')) AND isNumeric(local.expGradRaw)>
-                            <cfset local.expGradVal = toString(val(local.expGradRaw))>
-                        </cfif>
-                    </cfif>
-                    <cfset local.origExpGradVal = ''>
-                    <cfif structKeyExists(local.dg, 'ORIGINALEXPECTEDGRADYEAR')>
-                        <cfset local.origExpGradRaw = local.dg.ORIGINALEXPECTEDGRADYEAR>
-                        <cfif len(trim(local.origExpGradRaw & '')) AND isNumeric(local.origExpGradRaw)>
-                            <cfset local.origExpGradVal = toString(val(local.origExpGradRaw))>
-                        </cfif>
-                    </cfif>
-                    <cfset local.programVal     = trim(local.dg.PROGRAM ?: '')>
-                    
-                    <div class="row g-2 mb-2 degree-row">
-                        <div class="col-md-4">
-                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_name_#local.idx#</cfoutput>" data-field="deg_name" value="<cfoutput>#EncodeForHTMLAttribute(local.dg.DEGREENAME)#</cfoutput>" placeholder="Degree (required)" required>
-                        </div>
-                        <div class="col-md-4">
-                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_univ_#local.idx#</cfoutput>" data-field="deg_univ" value="<cfoutput>#EncodeForHTMLAttribute(local.univVal)#</cfoutput>" placeholder="University">
-                        </div>
-                        <div class="col-md-2">
-                            <input class="form-control form-control-sm" name="<cfoutput>#arguments.prefix#_deg_year_#local.idx#</cfoutput>" data-field="deg_year" value="<cfoutput>#EncodeForHTMLAttribute(local.gradYearVal)#</cfoutput>" placeholder="Year">
-                        </div>
-                        <div class="col-md-2">
-                            <button type="button" class="btn btn-sm btn-remove remove-degree-row w-100"><i class="bi bi-trash me-1"></i>Remove</button>
-                        </div>
-                    </div>
-                    
-                    <div class="col-12 uhco-fields mt-1 <cfoutput>#local.uhcoHiddenClass#</cfoutput>">
-                        <div class="row g-2 border-start border-2 border-primary ps-2">
-                            <div class="col-auto">
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input deg-isuhco" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_isuhco_#local.idx#</cfoutput>" value="1" <cfoutput>#local.uhcoCheckedAttr#</cfoutput>>
-                                    <label class="form-check-label small">UHCO Degree</label>
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input deg-isenrolled" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_enrolled_#local.idx#</cfoutput>" value="1" <cfoutput>#local.enrolledCheckedAttr#</cfoutput> <cfoutput>#local.uhcoDisabledAttr#</cfoutput>>
-                                    <label class="form-check-label small">Currently Enrolled</label>
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input deg-haschange" type="checkbox" name="<cfoutput>#arguments.prefix#_deg_haschange_#local.idx#</cfoutput>" value="1" <cfoutput>#local.hasChangeCheckedAttr#</cfoutput> <cfoutput>#local.enrolledDisabledAttr#</cfoutput>>
-                                    <label class="form-check-label small">Year Changed</label>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <input class="form-control form-control-sm deg-expgrad" name="<cfoutput>#arguments.prefix#_deg_expgrad_#local.idx#</cfoutput>" type="number" min="2000" max="2099" value="<cfoutput>#EncodeForHTMLAttribute(local.expGradVal)#</cfoutput>" placeholder="Exp. Grad Yr" <cfoutput>#local.enrolledDisabledAttr#</cfoutput>>
-                            </div>
-                            <div class="col-md-2">
-                                <input class="form-control form-control-sm deg-origexpgrad" name="<cfoutput>#arguments.prefix#_deg_origexpgrad_#local.idx#</cfoutput>" type="number" min="2000" max="2099" value="<cfoutput>#EncodeForHTMLAttribute(local.origExpGradVal)#</cfoutput>" placeholder="Orig. Exp. Yr" <cfoutput>#local.hasChangeDisabledAttr#</cfoutput>>
-                            </div>
-                            <div class="col-md-2">
-                                <select class="form-select form-select-sm deg-program" name="<cfoutput>#arguments.prefix#_deg_program_#local.idx#</cfoutput>" <cfoutput>#local.uhcoDisabledAttr#</cfoutput>>
-                                    <option value="">-- Program --</option>
-                                    <cfloop list="OD,MS,PhD,Residency" index="local.prog">
-                                        <cfset local.selected = (local.programVal EQ local.prog) ? 'selected' : ''>
-                                        <option value="<cfoutput>#local.prog#</cfoutput>" <cfoutput>#local.selected#</cfoutput>><cfoutput>#local.prog#</cfoutput></option>
-                                    </cfloop>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </cfloop>
-            </div>
-            <input type="hidden" name="<cfoutput>#arguments.prefix#_degree_count</cfoutput>" id="<cfoutput>#arguments.prefix#_degreeCount</cfoutput>" value="<cfoutput>#arrayLen(arguments.degrees)#</cfoutput>">
-            <button type="button" class="btn btn-sm btn-ui-add mt-2 add-degree-row" data-prefix="<cfoutput>#arguments.prefix#</cfoutput>"><i class="bi bi-plus-circle me-1"></i>Add Degree</button>
-        </div>
-    </cfsavecontent>
-    <cfreturn local.result>
-</cffunction>
+<cfset allOrganizations = allOrganizationsResult.data>
 
 <!--- ── Data Quality Exclusions ── --->
 <cfset dqDAO            = createObject("component", "dao.dataQuality_DAO").init()>
@@ -676,6 +81,9 @@
 <!--- ── UH Sync pending diffs for this user ── --->
 <cfset uhSyncPendingDiffs = []>
 <cfset uhSyncPanelHtml    = "">
+<cfset uhSyncFlagRows = []>
+<cfset uhSyncFlashMessage = "">
+<cfset uhSyncFlashIsError = false>
 <cftry>
     <cfset uhSyncDAO_edit = createObject("component", "dao.uhSync_DAO").init()>
     <cfset uhSyncPendingDiffs = uhSyncDAO_edit.getUnresolvedDiffsForUser(val(url.userID))>
@@ -684,37 +92,181 @@
 </cfcatch>
 </cftry>
 
-<cfif arrayLen(uhSyncPendingDiffs) GT 0>
-    <cfset uhSyncFieldLabels_edit = {
-        "FirstName"              : "First Name",
-        "LastName"               : "Last Name",
-        "EmailPrimary"           : "Primary Email",
-        "Phone"                  : "Phone",
-        "Room"                   : "Room",
-        "Building"               : "Building",
-        "Title1"                 : "Title",
-        "Division"               : "Division",
-        "DivisionName"           : "Division Name",
-        "Campus"                 : "Campus",
-        "Department"             : "Department",
-        "DepartmentName"         : "Department Name",
-        "Office_Mailing_Address" : "Office Mailing Address",
-        "Mailcode"               : "Mailcode"
-    }>
-    <cfset editReturnTo = "/admin/users/edit.cfm?userID=" & urlEncodedFormat(url.userID)>
+<cfset uhSyncFieldLabels_edit = {
+    "FirstName"              : "First Name",
+    "LastName"               : "Last Name",
+    "EmailPrimary"           : "Primary Email",
+    "Phone"                  : "Phone",
+    "Room"                   : "Room",
+    "Building"               : "Building",
+    "Title1"                 : "Title",
+    "Division"               : "Division",
+    "DivisionName"           : "Division Name",
+    "Campus"                 : "Campus",
+    "Department"             : "Department",
+    "DepartmentName"         : "Department Name",
+    "Office_Mailing_Address" : "Office Mailing Address",
+    "Mailcode"               : "Mailcode"
+}>
+<cfset uhSyncHasApiId = len(trim(user.UH_API_ID ?: "")) GT 0>
+<cfset uhSyncApiStatusCode = "">
+<cfset uhSyncApiWarning = "">
+<cfset uhSyncApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhSyncApiToken = trim(uhSyncApiCredentials.token ?: "")>
+<cfset uhSyncApiSecret = trim(uhSyncApiCredentials.secret ?: "")>
+
+<cfif len(uhSyncInfoParam)>
+    <cfset uhSyncFlashMessage = uhSyncInfoParam>
+    <cfset uhSyncFlashIsError = false>
+<cfelseif len(uhSyncErrParam)>
+    <cfset uhSyncFlashMessage = uhSyncErrParam>
+    <cfset uhSyncFlashIsError = true>
+</cfif>
+
+<cfif uhSyncHasApiId AND len(uhSyncApiToken) AND len(uhSyncApiSecret)>
+    <cfsilent>
+        <cfset uhSyncLiveApi = createObject("component", "cfc.uh_api").init(apiToken=uhSyncApiToken, apiSecret=uhSyncApiSecret)>
+        <cfset uhSyncPersonResponse = uhSyncLiveApi.getPerson(
+            trim(user.UH_API_ID ?: ""),
+            trim(user.DEPARTMENT ?: ""),
+            trim(user.DIVISION ?: ""),
+            trim(user.CAMPUS ?: "")
+        )>
+    </cfsilent>
+
+    <cfset uhSyncApiStatusCode = uhSyncPersonResponse.statusCode ?: "Unknown">
+    <cfset uhSyncResponseData = uhSyncPersonResponse.data ?: {}>
+    <cfset uhSyncApiPerson = {}>
+
+    <cfif left(uhSyncApiStatusCode, 3) EQ "200">
+        <cfif isStruct(uhSyncResponseData)>
+            <cfif structKeyExists(uhSyncResponseData, "data") AND isStruct(uhSyncResponseData.data)>
+                <cfif structKeyExists(uhSyncResponseData.data, "person") AND isStruct(uhSyncResponseData.data.person)>
+                    <cfset uhSyncApiPerson = uhSyncResponseData.data.person>
+                <cfelse>
+                    <cfset uhSyncApiPerson = uhSyncResponseData.data>
+                </cfif>
+            <cfelseif structKeyExists(uhSyncResponseData, "person") AND isStruct(uhSyncResponseData.person)>
+                <cfset uhSyncApiPerson = uhSyncResponseData.person>
+            <cfelse>
+                <cfset uhSyncApiPerson = uhSyncResponseData>
+            </cfif>
+        </cfif>
+
+        <cfscript>
+            function editUhSyncFindValueByKeyDeep(any node="", required string keyName) {
+                var keys = [];
+                var currentKey = "";
+                var foundValue = "";
+                var index = 1;
+
+                if (isNull(arguments.node)) { return ""; }
+
+                if (isStruct(arguments.node)) {
+                    keys = structKeyArray(arguments.node);
+                    for (index = 1; index <= arrayLen(keys); index++) {
+                        currentKey = keys[index];
+                        if (compareNoCase(currentKey, arguments.keyName) EQ 0) {
+                            if (isSimpleValue(arguments.node[currentKey])) { return toString(arguments.node[currentKey] ?: ""); }
+                            if (isBoolean(arguments.node[currentKey])) { return arguments.node[currentKey] ? "true" : "false"; }
+                        }
+                    }
+                    for (index = 1; index <= arrayLen(keys); index++) {
+                        foundValue = editUhSyncFindValueByKeyDeep(node=arguments.node[keys[index]], keyName=arguments.keyName);
+                        if (len(trim(toString(foundValue)))) { return foundValue; }
+                    }
+                } else if (isArray(arguments.node)) {
+                    for (index = 1; index <= arrayLen(arguments.node); index++) {
+                        foundValue = editUhSyncFindValueByKeyDeep(node=arguments.node[index], keyName=arguments.keyName);
+                        if (len(trim(toString(foundValue)))) { return foundValue; }
+                    }
+                }
+
+                return "";
+            }
+
+            function editUhSyncGetApiValue(required any source, required string keyListCsv) {
+                var names = listToArray(arguments.keyListCsv);
+                var index = 1;
+                var valueFound = "";
+
+                for (index = 1; index <= arrayLen(names); index++) {
+                    valueFound = editUhSyncFindValueByKeyDeep(node=arguments.source, keyName=trim(names[index]));
+                    if (len(trim(toString(valueFound)))) { return toString(valueFound); }
+                }
+
+                return "";
+            }
+
+            function editUhSyncHasFlag(required array flags, required string flagName) {
+                var index = 1;
+                var currentFlagName = "";
+
+                for (index = 1; index <= arrayLen(arguments.flags); index++) {
+                    if (isStruct(arguments.flags[index])) {
+                        currentFlagName = trim(toString(arguments.flags[index].FLAGNAME ?: ""));
+                        if (compareNoCase(currentFlagName, arguments.flagName) EQ 0) { return true; }
+                    }
+                }
+
+                return false;
+            }
+
+            function editUhSyncToYesNo(required any value) {
+                var normalized = lCase(trim(toString(arguments.value ?: "")));
+
+                if (normalized EQ "true" OR normalized EQ "1" OR normalized EQ "yes" OR normalized EQ "y") { return "Yes"; }
+                if (normalized EQ "false" OR normalized EQ "0" OR normalized EQ "no" OR normalized EQ "n") { return "No"; }
+
+                return "N/A";
+            }
+        </cfscript>
+
+        <cfset uhSyncFlagCompareRows = [
+            { label="Student", apiKeys="student,is_student,isStudent", flagName="Current-Student" },
+            { label="Staff", apiKeys="staff,is_staff,isStaff", flagName="Staff" },
+            { label="Faculty", apiKeys="faculty,is_faculty,isFaculty", flagName="Faculty-Fulltime" }
+        ]>
+
+        <cfloop from="1" to="#arrayLen(uhSyncFlagCompareRows)#" index="flagCompareIndex">
+            <cfset flagCompareRow = uhSyncFlagCompareRows[flagCompareIndex]>
+            <cfset uhSyncApiFlagDisplay = editUhSyncToYesNo(editUhSyncGetApiValue(uhSyncApiPerson, flagCompareRow.apiKeys))>
+            <cfset uhSyncLocalFlagDisplay = editUhSyncHasFlag(userFlags, flagCompareRow.flagName) ? "Yes" : "No">
+
+            <cfif (uhSyncApiFlagDisplay EQ "Yes" OR uhSyncApiFlagDisplay EQ "No") AND uhSyncApiFlagDisplay NEQ uhSyncLocalFlagDisplay>
+                <cfset arrayAppend(uhSyncFlagRows, {
+                    label = flagCompareRow.label,
+                    flagName = flagCompareRow.flagName,
+                    localValue = uhSyncLocalFlagDisplay,
+                    apiValue = uhSyncApiFlagDisplay
+                })>
+            </cfif>
+        </cfloop>
+    <cfelse>
+        <cfset uhSyncApiWarning = "Live UH API flag checks are unavailable right now. API returned status " & uhSyncApiStatusCode & ".">
+    </cfif>
+<cfelseif uhSyncHasApiId>
+    <cfset uhSyncApiWarning = "Live UH API checks require UH_API_TOKEN and UH_API_SECRET to be configured.">
+</cfif>
+
+<cfset uhSyncPanelItemCount = arrayLen(uhSyncPendingDiffs) + arrayLen(uhSyncFlagRows)>
+<cfset uhSyncCanShowPanel = uhSyncPanelItemCount GT 0>
+
+<cfif uhSyncCanShowPanel>
+    <cfset uhSyncSummaryText = uhSyncPanelItemCount & " UH Sync update(s) available">
+    <cfset uhSyncSubText = arrayLen(uhSyncPendingDiffs) GT 0
+        ? "field differences from the last sync report"
+        : "live Student/Staff/Faculty flag changes detected">
 
     <cfset uhSyncPanelHtml = "
     <div class='alert alert-warning border-warning mb-4 p-0 users-edit-sync-panel panel-info'>
         <div class='d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom users-edit-sync-panel-header'>
             <div>
                 <i class='bi bi-arrow-left-right me-2 text-warning'></i>
-                <strong>#arrayLen(uhSyncPendingDiffs)# UH Sync difference(s) detected</strong>
-                <span class='text-muted small ms-2'>from the last sync report run</span>
+                <strong>#EncodeForHTML(uhSyncSummaryText)#</strong>
+                <span class='text-muted small ms-2'>#EncodeForHTML(uhSyncSubText)#</span>
             </div>
             <div class='d-flex gap-2 users-edit-sync-panel-actions'>
-                <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-ui-outline py-0 users-edit-secondary-button'>
-                    <i class='bi bi-clipboard-data'></i> View Full Report
-                </a>
                 <button class='btn btn-sm btn-ui-warning py-0 users-edit-warning-button' type='button'
                         data-bs-toggle='collapse' data-bs-target='##uhSyncDiffPanel'>
                     <i class='bi bi-chevron-down'></i> Details
@@ -723,6 +275,14 @@
         </div>
         <div class='collapse show' id='uhSyncDiffPanel'>
             <div class='px-3 py-2 users-edit-sync-panel-body'>
+    ">
+
+    <cfif len(uhSyncApiWarning)>
+        <cfset uhSyncPanelHtml &= "<div class='alert alert-warning mb-3'>#EncodeForHTML(uhSyncApiWarning)#</div>">
+    </cfif>
+
+    <cfif uhSyncPanelItemCount GT 0>
+        <cfset uhSyncPanelHtml &= "
                 <div class='table-responsive'>
                 <table class='table table-sm table-bordered mb-2 users-edit-sync-table'>
                     <thead class='table-light users-edit-sync-table-head'>
@@ -734,46 +294,85 @@
                         </tr>
                     </thead>
                     <tbody>
-    ">
-    <cfloop from="1" to="#arrayLen(uhSyncPendingDiffs)#" index="dIdx">
-        <cfset pd     = uhSyncPendingDiffs[dIdx]>
-        <cfset pdLbl  = structKeyExists(uhSyncFieldLabels_edit, pd.FIELDNAME) ? uhSyncFieldLabels_edit[pd.FIELDNAME] : pd.FIELDNAME>
-        <cfset uhSyncPanelHtml &= "
+        ">
+
+        <cfloop from="1" to="#arrayLen(uhSyncPendingDiffs)#" index="dIdx">
+            <cfset pd = uhSyncPendingDiffs[dIdx]>
+            <cfset pdLbl = structKeyExists(uhSyncFieldLabels_edit, pd.FIELDNAME) ? uhSyncFieldLabels_edit[pd.FIELDNAME] : pd.FIELDNAME>
+            <cfset uhSyncPanelHtml &= "
                         <tr>
                             <td class='fw-semibold small'>#EncodeForHTML(pdLbl)#</td>
                             <td class='text-muted small'>#(len(trim(pd.LOCALVALUE)) ? EncodeForHTML(pd.LOCALVALUE) : '<em>empty</em>')#</td>
                             <td class='small'><strong>#EncodeForHTML(pd.APIVALUE)#</strong></td>
                             <td class='text-end text-nowrap'>
                                 <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
-                                    <input type='hidden' name='diffID'     value='#pd.DIFFID#'>
+                                    <input type='hidden' name='diffID' value='#pd.DIFFID#'>
                                     <input type='hidden' name='resolution' value='synced'>
-                                    <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(editReturnTo)#'>
-                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-success py-0 px-2 users-edit-success-button'>
+                                    <input type='hidden' name='returnTo' value='#EncodeForHTMLAttribute(editReturnTo)#'>
+                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-save py-0 px-2 users-edit-success-button'>
                                         <i class='bi bi-cloud-download'></i> Sync
                                     </button>
                                 </form>
                                 <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
-                                    <input type='hidden' name='diffID'     value='#pd.DIFFID#'>
+                                    <input type='hidden' name='diffID' value='#pd.DIFFID#'>
                                     <input type='hidden' name='resolution' value='discarded'>
-                                    <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(editReturnTo)#'>
-                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-outline py-0 px-2 users-edit-secondary-button'>
+                                    <input type='hidden' name='returnTo' value='#EncodeForHTMLAttribute(editReturnTo)#'>
+                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-cancel py-0 px-2 users-edit-secondary-button'>
                                         <i class='bi bi-x'></i> Discard
                                     </button>
                                 </form>
                             </td>
                         </tr>
-        ">
-    </cfloop>
-    <cfset uhSyncSyncAllBtn = "">
-    <cfif len(trim(user.UH_API_ID ?: ""))>
-        <cfset uhSyncSyncAllBtn = "<a href='/admin/users/uh_sync.cfm?userID=#urlEncodedFormat(url.userID)#&returnTo=#urlEncodedFormat(editReturnTo)#' class='btn btn-sm btn-ui-success'><i class='bi bi-cloud-download me-1'></i>Sync All Fields from UH API</a>">
-    </cfif>
-    <cfset uhSyncPanelHtml &= "
+            ">
+        </cfloop>
+
+        <cfloop from="1" to="#arrayLen(uhSyncFlagRows)#" index="flagRowIndex">
+            <cfset flagRow = uhSyncFlagRows[flagRowIndex]>
+            <cfset uhSyncPanelHtml &= "
+                        <tr>
+                            <td class='fw-semibold small'>#EncodeForHTML(flagRow.label)# Flag</td>
+                            <td class='text-muted small'>#EncodeForHTML(flagRow.localValue)#</td>
+                            <td class='small'><strong>#EncodeForHTML(flagRow.apiValue)#</strong></td>
+                            <td class='text-end text-nowrap'>
+                                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
+                                    <input type='hidden' name='applyFlagName' value='#EncodeForHTMLAttribute(flagRow.flagName)#'>
+                                    <input type='hidden' name='applyFlagApiValue' value='#EncodeForHTMLAttribute(flagRow.apiValue)#'>
+                                    <input type='hidden' name='applySourceUserID' value='#EncodeForHTMLAttribute(user.USERID)#'>
+                                    <input type='hidden' name='returnTo' value='#EncodeForHTMLAttribute(editReturnTo)#'>
+                                    <button type='submit' class='btn btn-xs btn-sm btn-ui-save py-0 px-2 users-edit-success-button'>
+                                        <i class='bi bi-cloud-download'></i> Sync Flag
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+            ">
+        </cfloop>
+
+        <cfset uhSyncPanelHtml &= "
                     </tbody>
                 </table>
                 </div>
+        ">
+    </cfif>
+
+    <cfset uhSyncPanelHtml &= "
                 <div class='d-flex gap-2 pb-1 users-edit-sync-panel-footer'>
-                    #uhSyncSyncAllBtn#
+    ">
+
+    <cfif uhSyncHasApiId>
+        <cfset uhSyncPanelHtml &= "
+                    <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
+                        <input type='hidden' name='syncAll' value='1'>
+                        <input type='hidden' name='applySourceUserID' value='#EncodeForHTMLAttribute(user.USERID)#'>
+                        <input type='hidden' name='returnTo' value='#EncodeForHTMLAttribute(editReturnTo)#'>
+                        <button type='submit' class='btn btn-sm btn-ui-save'>
+                            <i class='bi bi-cloud-download me-1'></i>Sync All Fields &amp; Flags
+                        </button>
+                    </form>
+        ">
+    </cfif>
+
+    <cfset uhSyncPanelHtml &= "
                 </div>
             </div>
         </div>
@@ -781,49 +380,466 @@
     ">
 </cfif>
 
-<cffunction name="renderTabActionButtonGroup" access="private" returntype="string" output="false">
-    <cfargument name="refreshButtonId" type="string" required="true">
+<cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER ?: "")) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
+<cfset contentWrapperClass = "">
+<cfset toolbarListType = "all">
+<cfset toolbarSearchTerm = structKeyExists(url, "search") ? trim(url.search) : "">
+<cfset currentAdminUser = structKeyExists(session, "user") AND isStruct(session.user) ? session.user : {}>
+<cfset currentUserDisplayName = encodeForHTML(trim(currentAdminUser.displayName ?: "Admin User"))>
+<cfset currentUserEmail = encodeForHTML(trim(currentAdminUser.email ?: ""))>
+<cfset currentUserUsername = encodeForHTML(trim(currentAdminUser.username ?: ""))>
+<cfset currentUserRoleLabel = "">
+<cfset currentUserImageSrc = "">
+<cfset impersonationState = {}>
+<cfset currentRequestUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & cgi.query_string : "")>
+<cfset toolbarReturnToMatch = reFindNoCase("(?:\?|&)list=([^&]+)", returnTo, 1, true)>
 
-    <cfset var html = "">
-    <cfset var viewUserUrl = "/admin/users/view.cfm?userID=" & urlEncodedFormat(user.USERID)>
-    <cfset var uhSyncUrl = "">
-    <cfset var uhSyncButtonHtml = "">
+<cfif isStruct(toolbarReturnToMatch) AND arrayLen(toolbarReturnToMatch.len) GTE 2 AND toolbarReturnToMatch.len[2] GT 0>
+    <cfset toolbarListType = lCase(urlDecode(mid(returnTo, toolbarReturnToMatch.pos[2], toolbarReturnToMatch.len[2])))>
+</cfif>
 
-    <cfif len(trim(user.UH_API_ID ?: ""))>
-        <cfset uhSyncUrl = "/admin/users/uh_sync.cfm?userID=" & urlEncodedFormat(user.USERID) & "&uhApiId=" & urlEncodedFormat(user.UH_API_ID)>
-        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-ui-outline'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
-    <cfelse>
-        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-ui-outline disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
+<cfif structKeyExists(currentAdminUser, "roles") AND isArray(currentAdminUser.roles) AND arrayLen(currentAdminUser.roles)>
+    <cfset currentUserRoleLabel = encodeForHTML(replace(currentAdminUser.roles[1], "_", " ", "all"))>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "image")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.image ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc) AND structKeyExists(currentAdminUser, "avatar")>
+    <cfset currentUserImageSrc = trim(currentAdminUser.avatar ?: "")>
+</cfif>
+<cfif NOT len(currentUserImageSrc)>
+    <cfset currentUserImageSrc = request.webRoot & "/assets/images/uh.png">
+</cfif>
+<cfif application.authService.isImpersonating() AND application.authService.isActualSuperAdmin()>
+    <cfset impersonationState = application.authService.getImpersonationState()>
+</cfif>
+
+<cfset usersTopToolBar = "
+        <nav class='navbar sticky-top users-list-toolbar'>
+            <div class='container-fluid users-list-toolbar-shell'>
+                <div class='users-list-toolbar-primary'>
+                    <button class='btn btn-sm btn-ui-cancel me-2 admin-sidebar-toggle' id='sidebarToggle' type='button' title='Toggle Sidebar' aria-label='Toggle Sidebar'>
+                        <i class='bi bi-list'></i>
+                    </button>
+                    <div class='navbar-brand users-list-toolbar-brand mb-0 fs-5 d-flex align-items-center gap-2'>
+                        <span>UHCO_Identity</span>
+                        <span class='users-list-toolbar-brand-divider'>|</span>
+                        <i class='bi bi-people-fill'></i>
+                        <span class='users-list-toolbar-brand-label'>Users</span>
+                    </div>
+                    <div class='users-list-toolbar-controls'>
+                        <form method='get' action='/admin/users/index.cfm' class='users-list-toolbar-search-form'>
+                            <input type='hidden' name='list' value='#toolbarListType#'>
+                            <input type='hidden' name='page' value='1'>
+                            <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
+                                <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(toolbarSearchTerm)#'>
+                                <button class='btn btn-ui-filter' type='submit'><i class='bi bi-search me-1'></i>Search</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            
+                <ul class='navbar-nav d-flex flex-row align-items-center gap-2 ms-auto users-list-toolbar-nav'>
+                    <li class='nav-item dropdown ms-3 users-list-toolbar-account'>
+                        <a class='nav-link dropdown-toggle p-0 d-flex align-items-center gap-2 text-dark' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false' aria-label='User menu'>
+                            <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='rounded-circle users-list-toolbar-avatar admin-toolbar-avatar'>
+                            <span class='d-none d-lg-inline small'>#currentUserDisplayName#</span>
+                        </a>
+                        <div class='dropdown-menu dropdown-menu-end p-3 users-list-toolbar-dropdown' style='min-width: 320px;'>
+                            <div class='d-flex align-items-center gap-3 mb-3 users-list-toolbar-account-header'>
+                                <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='users-list-toolbar-avatar rounded-circle'>
+                                <div class='users-list-toolbar-account-meta'>
+                                    <h6 class='mb-1'>#currentUserDisplayName#</h6>
+                                    #(len(currentUserEmail) ? "<div class='small text-muted'>" & currentUserEmail & "</div>" : "")#
+                                    #(len(currentUserUsername) ? "<div class='small text-muted'>@" & currentUserUsername & "</div>" : "")#
+                                </div>
+                            </div>
+                            #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
+                            #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-ui-warning w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
+                            <div class='d-grid'>
+                                <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+">
+
+<cfset isSuperAdmin = application.authService.hasRole("SUPER_ADMIN")>
+<cfset canViewAlumni = application.authService.hasRole("ALUMNI_ADMIN")>
+<cfset canManageFacultyAlumni = application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])>
+<cfset canManageDropboxFolder = isSuperAdmin OR request.hasPermission("media.folder.manage")>
+<cfset dropboxFolderResultClass = "mt-2 d-none">
+<cfset dropboxFolderResultHtml  = "">
+<cfif canManageDropboxFolder AND len(trim(user.DROPBOXFOLDERPATH ?: ""))>
+    <cfset _dbxPath = encodeForHTML(trim(user.DROPBOXFOLDERPATH))>
+    <cfset dropboxFolderResultClass = "mt-2">
+    <cfset dropboxFolderResultHtml  = "<div class='alert alert-success d-flex align-items-center gap-3 py-2 mb-0'><i class='bi bi-folder-check fs-5 flex-shrink-0'></i><div><strong>Folder on Record</strong> <code class='ms-1'>#_dbxPath#</code><span class='text-muted small ms-2'>(click Verify to refresh)</span></div><a href='/admin/user-media/sources.cfm?userid=#val(user.USERID)#' class='btn btn-sm btn-ui-go ms-auto' target='_blank'><i class='bi bi-card-image me-1'></i>User-Media</a></div>">
+</cfif>
+<cfset userAliases = aliasesService.getAliases(val(url.userID)).data>
+<cfset userEmails = (structKeyExists(profile, "emails") AND isArray(profile.emails)) ? profile.emails : []>
+<cfset userPhones = (structKeyExists(profile, "phones") AND isArray(profile.phones)) ? profile.phones : []>
+<cfset userAddresses = (structKeyExists(profile, "addresses") AND isArray(profile.addresses)) ? profile.addresses : []>
+<cfset userDegrees = (structKeyExists(profile, "degrees") AND isArray(profile.degrees)) ? profile.degrees : []>
+<cfset userExtIDs = (structKeyExists(profile, "externalIDs") AND isArray(profile.externalIDs)) ? profile.externalIDs : []>
+<cfset userAccess = (structKeyExists(profile, "access") AND isArray(profile.access)) ? profile.access : []>
+<cfset spProfile = (structKeyExists(profile, "studentProfile") AND isStruct(profile.studentProfile)) ? profile.studentProfile : {}>
+<cfset spAwards = (structKeyExists(profile, "awards") AND isArray(profile.awards)) ? profile.awards : []>
+<cfset spResidencies = (structKeyExists(profile, "residencies") AND isArray(profile.residencies)) ? profile.residencies : []>
+<cfset bioRecord = (structKeyExists(profile, "bio") AND isStruct(profile.bio)) ? profile.bio : {}>
+<cfset bioContent = trim(toString(bioRecord.BIOCONTENT ?: bioRecord.BioContent ?: ""))>
+<cfset bioContent = bioService.sanitizeForRender(bioContent)>
+<cfset aliasTypeOptsJS = "">
+<cfset aliasTypeLblsJS = "">
+<cfloop from="1" to="#arrayLen(aliasTypes)#" index="local.aliasTypeIndex">
+    <cfset local.aliasType = aliasTypes[local.aliasTypeIndex]>
+    <cfset aliasTypeOptsJS = listAppend(aliasTypeOptsJS, serializeJSON(trim(toString(local.aliasType.ALIASTYPECODE ?: ""))), ",")>
+    <cfset aliasTypeLblsJS = listAppend(aliasTypeLblsJS, serializeJSON(trim(toString(local.aliasType.DESCRIPTION ?: local.aliasType.ALIASTYPECODE ?: ""))), ",")>
+</cfloop>
+
+<cfset resolvedFirstName = trim(toString(user.PREFERREDFIRSTNAME ?: user.FIRSTNAME ?: ""))>
+<cfset resolvedMiddleName = trim(toString(user.PREFERREDMIDDLENAME ?: user.MIDDLENAME ?: ""))>
+<cfset resolvedLastName = trim(toString(user.PREFERREDLASTNAME ?: user.LASTNAME ?: ""))>
+<cfset editUserHeading = trim(resolvedFirstName & " " & resolvedLastName)>
+<cfif NOT len(editUserHeading)>
+    <cfset editUserHeading = trim(toString(user.DISPLAYNAME ?: user.PREFERREDNAME ?: "User #val(user.USERID)#"))>
+</cfif>
+<cfset editPrefix = trim(toString(user.PREFIX ?: ""))>
+<cfset editSuffix = trim(toString(user.SUFFIX ?: ""))>
+<cfset editCombinedDegrees = trim(degreesService.buildDegreesString(val(url.userID)))>
+<cfset editTitle1 = trim(toString(user.TITLE1 ?: ""))>
+<cfset editSubTitle = len(editTitle1) ? "<p class='text-muted fs-5'>#EncodeForHTML(editTitle1)#</p>" : "<p class='text-muted fs-5'>&nbsp;</p>">
+<cfset editProfileThumbnail = "/assets/images/uh.png">
+<cfif structKeyExists(profile, "images") AND isArray(profile.images) AND arrayLen(profile.images) GT 0>
+    <cfset editProfileImageFallback = "">
+    <cfloop from="1" to="#arrayLen(profile.images)#" index="i">
+        <cfset img = profile.images[i]>
+        <cfif NOT len(editProfileImageFallback) AND lCase(trim(img.IMAGEVARIANT ?: "")) EQ "web_profile">
+            <cfset editProfileImageFallback = img.IMAGEURL>
+        </cfif>
+        <cfif lCase(trim(img.IMAGEVARIANT ?: "")) EQ "web_thumb">
+            <cfset editProfileThumbnail = img.IMAGEURL>
+            <cfbreak>
+        </cfif>
+    </cfloop>
+    <cfif editProfileThumbnail EQ "/assets/images/uh.png" AND len(editProfileImageFallback)>
+        <cfset editProfileThumbnail = editProfileImageFallback>
+    </cfif>
+</cfif>
+
+<cfset currentGradYear = trim(toString(spProfile.CURRENTGRADYEAR ?: spProfile.CurrentGradYear ?: ""))>
+<cfset originalGradYear = trim(toString(spProfile.ORIGINALGRADYEAR ?: spProfile.OriginalGradYear ?: ""))>
+<cfset spCommAge = trim(toString(spProfile.COMMENCEMENTAGE ?: spProfile.CommencementAge ?: ""))>
+<cfset spFirstExt = trim(toString(spProfile.FIRSTEXTERNSHIP ?: spProfile.FirstExternship ?: ""))>
+<cfset spSecondExt = trim(toString(spProfile.SECONDEXTERNSHIP ?: spProfile.SecondExternship ?: ""))>
+<cfset spDissertation = trim(toString(spProfile.DISSERTATIONTHESIS ?: spProfile.DissertationThesis ?: ""))>
+<cfset spHometownCity = trim(toString(spProfile.HOMETOWNCITY ?: spProfile.HometownCity ?: ""))>
+<cfset spHometownState = trim(toString(spProfile.HOMETOWNSTATE ?: spProfile.HometownState ?: ""))>
+
+<cfset userOrgIDs = []>
+<cfset orgRoleMap = {}>
+<cfset orgChildrenByParent = { "ROOT" = [] }>
+<cfloop from="1" to="#arrayLen(userOrganizations)#" index="i">
+    <cfif structKeyExists(userOrganizations[i], "ORGID") AND NOT isNull(userOrganizations[i].ORGID)>
+        <cfset arrayAppend(userOrgIDs, val(userOrganizations[i].ORGID))>
+        <cfset orgRoleMap[toString(userOrganizations[i].ORGID)] = {
+            roleTitle = trim(toString(userOrganizations[i].ROLETITLE ?: "")),
+            roleOrder = val(userOrganizations[i].ROLEORDER ?: 0)
+        }>
+    </cfif>
+</cfloop>
+<cfloop from="1" to="#arrayLen(allOrganizations)#" index="i">
+    <cfset local.org = allOrganizations[i]>
+    <cfset local.parentKey = "ROOT">
+    <cfif structKeyExists(local.org, "PARENTORGID") AND len(trim(toString(local.org.PARENTORGID ?: ""))) AND val(local.org.PARENTORGID ?: 0) GT 0>
+        <cfset local.parentKey = toString(val(local.org.PARENTORGID))>
+    </cfif>
+    <cfif NOT structKeyExists(orgChildrenByParent, local.parentKey)>
+        <cfset orgChildrenByParent[local.parentKey] = []>
+    </cfif>
+    <cfset arrayAppend(orgChildrenByParent[local.parentKey], local.org)>
+</cfloop>
+
+<cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
+<cfset extSystemsResult = externalIDService.getSystems()>
+<cfset extSystems = (structKeyExists(extSystemsResult, "success") AND extSystemsResult.success AND isArray(extSystemsResult.data)) ? extSystemsResult.data : []>
+<cfset extIdValueBySystemId = {}>
+<cfloop from="1" to="#arrayLen(userExtIDs)#" index="i">
+    <cfif structKeyExists(userExtIDs[i], "SYSTEMID")>
+        <cfset extIdValueBySystemId[toString(val(userExtIDs[i].SYSTEMID))] = trim(toString(userExtIDs[i].EXTERNALVALUE ?: ""))>
+    </cfif>
+</cfloop>
+<cfset extIDHtml = "<div class='row g-3'>">
+<cfloop from="1" to="#arrayLen(extSystems)#" index="i">
+    <cfset local.sys = extSystems[i]>
+    <cfset local.sysId = val(local.sys.SYSTEMID ?: 0)>
+    <cfset local.sysName = trim(toString(local.sys.SYSTEMNAME ?: "External ID"))>
+    <cfset local.inputId = "extid-" & lCase(reReplace(local.sysName, "[^A-Za-z0-9]+", "-", "all")) & "-input">
+    <cfset local.currentValue = structKeyExists(extIdValueBySystemId, toString(local.sysId)) ? extIdValueBySystemId[toString(local.sysId)] : "">
+    <cfset local.isCougarnetField = findNoCase("cougarnet", local.sysName) GT 0>
+    <cfset local.isPeoplesoftField = findNoCase("peoplesoft", local.sysName) GT 0>
+    <cfif local.isCougarnetField>
+        <cfset local.inputId = "extid-cougarnet-input">
+    <cfelseif local.isPeoplesoftField>
+        <cfset local.inputId = "extid-peoplesoft-input">
+    </cfif>
+    <cfset extIDHtml &= "<div class='col-md-6'><label class='form-label' for='#local.inputId#'>#EncodeForHTML(local.sysName)#</label><div class='input-group'><input class='form-control' id='#local.inputId#' name='extID_#local.sysId#' value='#EncodeForHTMLAttribute(local.currentValue)#'>" & ((local.isCougarnetField OR local.isPeoplesoftField) ? "<button type='button' class='btn btn-ui-go js-cougarnet-lookup' title='Lookup in LDAP'><i class='bi bi-search me-1'></i>LDAP Lookup</button>" : "") & "</div></div>">
+</cfloop>
+<cfif NOT arrayLen(extSystems)>
+    <cfset extIDHtml &= "<div class='col-12'><p class='text-muted mb-0'>No external ID systems are configured.</p></div>">
+</cfif>
+<cfset extIDHtml &= "</div>">
+
+<cfset userFlagIDs = []>
+<cfloop from="1" to="#arrayLen(userFlags)#" index="i">
+    <cfif structKeyExists(userFlags[i], "FLAGID") AND NOT isNull(userFlags[i].FLAGID)>
+        <cfset arrayAppend(userFlagIDs, val(userFlags[i].FLAGID))>
+    </cfif>
+</cfloop>
+
+<cfset emeritusFlagIDs = []>
+<cfset residentFlagIDs = []>
+<cfset showCurrentStudent = false>
+<cfset showAlumni = false>
+<cfset showFacultyProfile = false>
+<cfset showFacultyFullOrAdjunct = false>
+<cfset showStaffProfile = false>
+<cfset showEmeritusProfile = false>
+<cfset showResidentProfile = false>
+<cfset showBio = false>
+<cfset showPublicationsProfile = false>
+<cfset publicationEligibleFlagNames = "faculty-adjunct,faculty-fulltime,professor-emeritus,joint faculty appointment">
+<cfset publicationProfiles = isArray(profile.publicationProfiles ?: "") ? profile.publicationProfiles : []>
+<cfset userPublications = isArray(profile.publications ?: "") ? profile.publications : []>
+<cfset publicationFetchSummary = isArray(profile.publicationFetchSummary ?: "") ? profile.publicationFetchSummary : []>
+<cfset publicationConfig = isStruct(profile.publicationConfig ?: "") ? profile.publicationConfig : {}>
+<cfset publicationMaxShowcased = val(publicationConfig.maxShowcasedPerUser ?: 10)>
+<cfset publicationProfilesByCode = {}>
+<cfset publicationFetchByCode = {}>
+
+<cfloop from="1" to="#arrayLen(publicationProfiles)#" index="i">
+    <cfset local.serviceCode = lCase(trim(toString(publicationProfiles[i].SERVICECODE ?: "")))>
+    <cfif len(local.serviceCode)>
+        <cfset publicationProfilesByCode[local.serviceCode] = publicationProfiles[i]>
+    </cfif>
+</cfloop>
+
+<cfloop from="1" to="#arrayLen(publicationFetchSummary)#" index="i">
+    <cfset local.serviceCode = lCase(trim(toString(publicationFetchSummary[i].SERVICECODE ?: "")))>
+    <cfif len(local.serviceCode) AND NOT structKeyExists(publicationFetchByCode, local.serviceCode)>
+        <cfset publicationFetchByCode[local.serviceCode] = publicationFetchSummary[i]>
+    </cfif>
+</cfloop>
+
+<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
+    <cfset local.flagName = "">
+    <cfset local.flagId = 0>
+    <cfif structKeyExists(allFlags[i], "FLAGNAME") AND NOT isNull(allFlags[i].FLAGNAME)>
+        <cfset local.flagName = lCase(trim(toString(allFlags[i].FLAGNAME)))>
+    </cfif>
+    <cfif structKeyExists(allFlags[i], "FLAGID") AND NOT isNull(allFlags[i].FLAGID)>
+        <cfset local.flagId = val(allFlags[i].FLAGID)>
     </cfif>
 
-    <cfset html = "
-        <div class='btn-group btn-group-sm users-edit-tab-action-group' role='group' aria-label='Tab actions'>
-            <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-ui-outline'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
-            <a href='" & viewUserUrl & "' class='btn btn-sm btn-ui-outline'><i class='bi bi-eye-fill me-1'></i>View User Profile</a>
-            <button type='button' class='btn btn-sm btn-ui-outline' id='" & arguments.refreshButtonId & "'><i class='bi bi-arrow-clockwise me-1'></i>Refresh Data</button>
-            " & uhSyncButtonHtml & "
-        </div>
-    ">
+    <cfif local.flagName EQ "current-student" AND arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+        <cfset showCurrentStudent = true>
+    </cfif>
 
-    <cfreturn html>
-</cffunction>
+    <cfif local.flagName EQ "alumni" AND arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+        <cfset showAlumni = true>
+    </cfif>
+
+    <cfif listFindNoCase("clinical-attending,faculty-adjunct,faculty-fulltime", local.flagName)>
+        <cfif arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+            <cfset showFacultyProfile = true>
+        </cfif>
+    </cfif>
+    <cfif listFindNoCase("faculty-adjunct,faculty-fulltime", local.flagName) AND arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+        <cfset showFacultyFullOrAdjunct = true>
+    </cfif>
+
+    <cfif local.flagName EQ "staff">
+        <cfif arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+            <cfset showStaffProfile = true>
+        </cfif>
+    </cfif>
+
+    <cfif local.flagName EQ "professor-emeritus">
+        <cfset arrayAppend(emeritusFlagIDs, local.flagId)>
+        <cfif arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+            <cfset showEmeritusProfile = true>
+        </cfif>
+    </cfif>
+
+    <cfif listFindNoCase(publicationEligibleFlagNames, local.flagName) AND arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+        <cfset showPublicationsProfile = true>
+    </cfif>
+
+    <cfif local.flagName EQ "resident">
+        <cfset arrayAppend(residentFlagIDs, local.flagId)>
+        <cfif arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+            <cfset showResidentProfile = true>
+        </cfif>
+    </cfif>
+
+    <cfif local.flagName EQ "public-facing" AND arrayFindNoCase(userFlagIDs, local.flagId) GT 0>
+        <cfset showBio = true>
+    </cfif>
+</cfloop>
+
+<cfif showAlumni AND NOT (canViewAlumni OR (showFacultyFullOrAdjunct AND canManageFacultyAlumni))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
+
+<cfsavecontent variable="publicationsPaneHtml">
+    <cfoutput>
+        <div class="tab-pane fade users-edit-tab-pane" id="publications-pane" role="tabpanel" aria-labelledby="publications-tab">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3">
+                <div>
+                    <span class="navbar-text"><strong>ORCID Publications:</strong> ORCID profile settings can be saved and fetched from this tab.</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-ui-save" id="save-publications-btn"><i class="bi bi-floppy me-1"></i>Save ORCID Publications</button>
+                    <span id="save-publications-status" class="ms-1"></span>
+                </div>
+            </div>
+
+            <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex flex-column gap-2">
+                    <div>Eligible faculty can showcase up to #publicationMaxShowcased# publication(s). Imported ORCID results default to the past 5 years unless you turn that filter off before fetching.</div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="limitRecentPublicationYears" checked>
+                        <label class="form-check-label" for="limitRecentPublicationYears">Limit imported publications to the past 5 years</label>
+                    </div>
+                </div>
+                <span class="badge text-bg-light">Phase 1</span>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-6">
+                    <div class="border rounded p-3 h-100 panel-surface">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                            <h5 class="mb-0">ORCID</h5>
+                            <span class="badge text-bg-secondary">Primary provider</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label" for="orcidIdentifier">ORCID iD</label>
+                                <input class="form-control" id="orcidIdentifier" name="orcid_identifier" value="#encodeForHTMLAttribute(structKeyExists(publicationProfilesByCode, "orcid") ? (publicationProfilesByCode["orcid"].PROFILEIDENTIFIER ?: "") : "")#" placeholder="0000-0000-0000-0000">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="orcidUrl">ORCID URL</label>
+                                <input class="form-control" id="orcidUrl" name="orcid_url" value="#encodeForHTMLAttribute((structKeyExists(publicationProfilesByCode, "orcid") AND len(trim(publicationProfilesByCode["orcid"].PROFILEURL ?: ""))) ? publicationProfilesByCode["orcid"].PROFILEURL : "https://orcid.org/")#" placeholder="https://orcid.org/" readonly disabled>
+                            </div>
+                            <div class="col-12 form-check ms-2">
+                                <input class="form-check-input" type="checkbox" id="orcidEnabled" name="orcid_enabled" #((!structKeyExists(publicationProfilesByCode, "orcid") OR val(publicationProfilesByCode["orcid"].ISENABLED ?: 0) EQ 1) ? "checked" : "")#>
+                                <label class="form-check-label" for="orcidEnabled">Enable ORCID for this user</label>
+                            </div>
+                            <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+                                <button type="button" class="btn btn-sm btn-ui-filter" id="fetch-orcid-btn">Fetch ORCID Publications</button>
+                                <span class="small text-muted" id="fetch-orcid-status">Fetch creates canonical records and links them to this user.</span>
+                            </div>
+                            <div class="col-12 small text-muted">
+                                Last fetch: #encodeForHTML(structKeyExists(publicationFetchByCode, "orcid") ? (publicationFetchByCode["orcid"].STARTEDAT ?: "Never") : "Never")#
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3" id="publicationsPanels" data-max-showcased="#publicationMaxShowcased#">
+                <div class="col-12 col-xl-7">
+                    <div class="border rounded p-3 panel-surface h-100">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h5 class="mb-0">All Imported Publications</h5>
+                            <span class="small text-muted">Fetched ORCID records appear here. Use the right arrow to move a publication into the showcased list.</span>
+                        </div>
+                        <cfif arrayLen(userPublications) GT 0>
+                            <div class="row g-3">
+                                <cfloop from="1" to="#arrayLen(userPublications)#" index="local.pubIndex">
+                                    <cfset local.pub = userPublications[local.pubIndex]>
+                                    <cfset local.sourceLabel = listFindNoCase(local.pub.SOURCESERVICES ?: "", "ORCID") ? "ORCID" : "Imported source">
+                                    <div class="col-12">
+                                        <div class="border rounded p-3" data-publication-card="#val(local.pub.PUBLICATIONID)#">
+                                            <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                                                <div>
+                                                    <div class="fw-semibold">#encodeForHTML(local.pub.CANONICALTITLE ?: "Untitled publication")#</div>
+                                                    <div class="small text-muted">#encodeForHTML(local.pub.CANONICALAUTHORSTEXT ?: "")#</div>
+                                                    <div class="small text-muted">#encodeForHTML(local.pub.PUBLICATIONYEAR ?: "")# #encodeForHTML(local.pub.JOURNALORSOURCE ?: "")#</div>
+                                                    <div class="small text-muted">Source: #encodeForHTML(local.sourceLabel)#</div>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <cfif val(local.pub.ISSHOWCASED ?: 0) EQ 1>
+                                                        <span class="badge text-bg-success">Showcased</span>
+                                                    <cfelse>
+                                                        <button type="button" class="btn btn-sm btn-ui-add publication-showcase-move-btn" data-direction="add" data-publication-id="#val(local.pub.PUBLICATIONID)#" aria-label="Move publication to showcased list">&rarr;</button>
+                                                    </cfif>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </cfloop>
+                            </div>
+                        <cfelse>
+                            <p class="text-muted mb-0">No publication records have been imported yet. Save the ORCID settings, then fetch from ORCID.</p>
+                        </cfif>
+                    </div>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <div class="border rounded p-3 panel-surface h-100">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h5 class="mb-0">Showcased Publications</h5>
+                            <span class="small text-muted">Only records currently marked for showcase appear here. Use the left arrow to remove one.</span>
+                        </div>
+                        <cfif arrayLen(userPublications) GT 0>
+                            <cfset local.showcasedCount = 0>
+                            <div class="row g-3" id="showcasedPublicationsList">
+                                <cfloop from="1" to="#arrayLen(userPublications)#" index="local.pubIndex">
+                                    <cfset local.pub = userPublications[local.pubIndex]>
+                                    <cfif val(local.pub.ISSHOWCASED ?: 0) EQ 1>
+                                        <cfset local.showcasedCount++>
+                                        <div class="col-12 showcased-publication-item" data-publication-id="#val(local.pub.PUBLICATIONID)#">
+                                            <div class="border rounded p-3 bg-light-subtle">
+                                                <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                                                    <div>
+                                                        <div class="fw-semibold">#encodeForHTML(local.pub.CANONICALTITLE ?: "Untitled publication")#</div>
+                                                        <div class="small text-muted">#encodeForHTML(local.pub.CANONICALAUTHORSTEXT ?: "")#</div>
+                                                        <div class="small text-muted">Display order: #val(local.pub.DISPLAYORDER ?: local.pubIndex)#</div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-ui-delete publication-showcase-move-btn" data-direction="remove" data-publication-id="#val(local.pub.PUBLICATIONID)#" aria-label="Remove publication from showcased list">&larr;</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </cfif>
+                                </cfloop>
+                            </div>
+                            <cfif local.showcasedCount EQ 0>
+                                <p class="text-muted mb-0">No publications are currently set to showcase.</p>
+                            </cfif>
+                        <cfelse>
+                            <p class="text-muted mb-0">No publications are currently set to showcase.</p>
+                        </cfif>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </cfoutput>
+</cfsavecontent>
 
 <cfset content = "
 #usersTopToolBar#
 <div class='py-4 px-4 pt-2'>
-<div class='container-fluid users-edit-page'>
-
-" & uhSyncPanelHtml & " 
-
-
-<input type='hidden' id='pageUserID' value='#user.USERID#'>
-
-        <div class='d-flex justify-content-between mb-3 align-items-center users-edit-header'>
-            <h1>Edit User: #EncodeForHTML(editUserHeading)#</h1>
-            <div class='text-center text-white py-2 px-3 rounded users-edit-record-status #((userActiveRaw EQ 1) ? "users-edit-record-status-active" : "users-edit-record-status-inactive")#' tabindex='0' role='button' aria-label='Toggle record status'>
-                <label class='form-label d-block mb-1'><strong>Record Status</strong></label>
-
-                <div class='form-check form-switch d-inline-block text-start mb-0'>
+<div class='users-page-secondary-toolbar users-view-secondary-toolbar mb-4'>
+    <div class='users-page-secondary-toolbar-heading users-view-header'>
+        <img src='#editProfileThumbnail#' alt='Profile Thumbnail' class='rounded admin-object-cover users-view-profile-thumb'>
+        <div class='users-view-header-body'>
+            <h1 class='users-view-title'>#(len(editPrefix) ? EncodeForHTML(editPrefix) & ' ' : '')##EncodeForHTML(editUserHeading)##(len(editSuffix) ? ', ' & EncodeForHTML(editSuffix) : '')#<cfif len(editCombinedDegrees)><span class='users-view-degrees'>, #EncodeForHTML(editCombinedDegrees)#</span></cfif></h1>
+            <div class='users-view-subtitle'>#editSubTitle#</div>
+            <div class='users-edit-record-status #((userActiveRaw EQ 1) ? "users-edit-record-status-active" : "users-edit-record-status-inactive")#' tabindex='0' role='button' aria-label='Toggle record status'>
+                <label class='form-label mb-0' for='activeSwitch'><strong>Record Status:</strong></label>
+                <div class='form-check form-switch mb-0 users-edit-record-status-switch'>
                     <input class='form-check-input' type='checkbox' value='1'
                         id='activeSwitch'
                         data-userid='#val(user.USERID)#'
@@ -832,9 +848,29 @@
                         #((userActiveRaw EQ 1) ? 'Active' : 'Inactive')#
                     </label>
                 </div>
-                
             </div>
         </div>
+    </div>
+    <div class='users-page-secondary-toolbar-actions'>
+        <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-ui-cancel'><i class='bi bi-people-fill me-1'></i>Back to User List</a>
+        <a href='/admin/users/view.cfm?userID=#urlEncodedFormat(user.USERID)#' class='btn btn-sm btn-ui-go'><i class='bi bi-eye-fill me-1'></i>View User Profile</a>
+        <button type='button' class='btn btn-sm btn-ui-go' id='refreshPageBtn'><i class='bi bi-arrow-clockwise me-1'></i>Refresh Data</button>
+        <cfif request.hasPermission('settings.user_permissions.manage')>
+            <a href='/admin/settings/user-permissions/?userID=#user.USERID#&returnTo=#encodeForURL('/admin/users/edit.cfm?userID=' & user.USERID)#' class='btn btn-sm btn-ui-go'><i class='bi bi-shield-check me-1'></i>Permissions</a>
+        </cfif>
+        <cfif request.hasAnyPermission(['change_log.view','change_log.revert'])>
+            <a href='/admin/users/history.cfm?userID=#user.USERID#' class='btn btn-sm btn-ui-go'><i class='bi bi-clock-history me-1'></i>Change History</a>
+        </cfif>
+    </div>
+</div>
+<div class='container-fluid users-edit-page'
+    data-emeritus-flag-ids='#encodeForHTMLAttribute(arrayToList(emeritusFlagIDs))#'
+    data-resident-flag-ids='#encodeForHTMLAttribute(arrayToList(residentFlagIDs))#'>
+
+" & uhSyncPanelHtml & " 
+
+
+<input type='hidden' id='pageUserID' value='#user.USERID#'>
 
     <ul class='nav nav-pills mb-3 users-edit-tabs' id='editTabs' role='tablist'>
         <li class='nav-item' role='presentation'>
@@ -846,9 +882,6 @@
         <li class='nav-item' role='presentation'>
             <button class='nav-link' id='bio-info-tab' data-bs-toggle='tab' data-bs-target='##bio-info-pane' type='button' role='tab' aria-controls='bio-info-pane' aria-selected='false'>Biographical Information</button>
         </li>
-        <li class='nav-item d-none' id='bio-tab-li' role='presentation'>
-            <button class='nav-link' id='bio-tab' data-bs-toggle='tab' data-bs-target='##bio-pane' type='button' role='tab' aria-controls='bio-pane' aria-selected='false'>Bio</button>
-        </li>
         <li class='nav-item' role='presentation'>
             <button class='nav-link' id='flags-tab' data-bs-toggle='tab' data-bs-target='##flags-pane' type='button' role='tab' aria-controls='flags-pane' aria-selected='false'>Flags</button>
         </li>
@@ -858,23 +891,11 @@
         <li class='nav-item' role='presentation'>
             <button class='nav-link' id='extids-tab' data-bs-toggle='tab' data-bs-target='##extids-pane' type='button' role='tab' aria-controls='extids-pane' aria-selected='false'>External IDs</button>
         </li>
-        <li class='nav-item" & (isSuperAdmin ? " ms-auto" : " d-none") & "' role='presentation'>
+        <li class='nav-item#(showPublicationsProfile ? "" : " d-none")#' role='presentation'>
+            <button class='nav-link' id='publications-tab' data-bs-toggle='tab' data-bs-target='##publications-pane' type='button' role='tab' aria-controls='publications-pane' aria-selected='false'>ORCID Publications</button>
+        </li>
+        <li class='nav-item#(isSuperAdmin ? " ms-auto" : " d-none")#' role='presentation'>
             <button class='nav-link' id='admin-tab' data-bs-toggle='tab' data-bs-target='##admin-pane' type='button' role='tab' aria-controls='admin-pane' aria-selected='false'>Administrative</button>
-        </li>
-        <li class='nav-item d-none' id='student-profile-tab-li' role='presentation'>
-            <button class='nav-link' id='student-profile-tab' data-bs-toggle='tab' data-bs-target='##student-profile-pane' type='button' role='tab' aria-controls='student-profile-pane' aria-selected='false'>Student Profile</button>
-        </li>
-        <li class='nav-item d-none' id='faculty-profile-tab-li' role='presentation'>
-            <button class='nav-link' id='faculty-profile-tab' data-bs-toggle='tab' data-bs-target='##faculty-profile-pane' type='button' role='tab' aria-controls='faculty-profile-pane' aria-selected='false'>Faculty Profile</button>
-        </li>
-        <li class='nav-item d-none' id='staff-profile-tab-li' role='presentation'>
-            <button class='nav-link' id='staff-profile-tab' data-bs-toggle='tab' data-bs-target='##staff-profile-pane' type='button' role='tab' aria-controls='staff-profile-pane' aria-selected='false'>Staff Profile</button>
-        </li>
-        <li class='nav-item d-none' id='emeritus-profile-tab-li' role='presentation'>
-            <button class='nav-link' id='emeritus-profile-tab' data-bs-toggle='tab' data-bs-target='##emeritus-profile-pane' type='button' role='tab' aria-controls='emeritus-profile-pane' aria-selected='false'>Professor Emeritus Profile</button>
-        </li>
-        <li class='nav-item d-none' id='resident-profile-tab-li' role='presentation'>
-            <button class='nav-link' id='resident-profile-tab' data-bs-toggle='tab' data-bs-target='##resident-profile-pane' type='button' role='tab' aria-controls='resident-profile-pane' aria-selected='false'>Resident Profile</button>
         </li>
         
     </ul>
@@ -884,13 +905,13 @@
         <div class='tab-pane fade show active users-edit-tab-pane' id='general-pane' role='tabpanel' aria-labelledby='general-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
                 <div class='d-flex align-items-center flex-wrap gap-2'>
-                    #renderTabActionButtonGroup("refreshGeneralInfoBtn")#
+                    #editViewHelper.renderTabActionButtonGroup("refreshGeneralInfoBtn")#
                     <span class='navbar-text'><strong>Actions:</strong></span>
                     <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addAliasBtn'><i class='bi bi-person-plus me-1'></i>Add Name Alias</button>
                     <span id='aliasesSaveStatus' class='save-status ms-1'></span>
                 </div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-general-btn'><i class='bi bi-floppy me-1'></i>Save General Info</button>
+                    <button type='button' class='btn btn-sm btn-ui-save' id='save-general-btn'><i class='bi bi-floppy me-1'></i>Save General Info</button>
                     <span id='save-general-status' class='ms-1'></span>
                 </div>
             </div>
@@ -950,7 +971,7 @@
         <cfset local.setPrimaryButton = "">
     <cfelse>
         <cfset local.primaryBadge = "">
-        <cfset local.setPrimaryButton = "<button type='button' class='btn btn-sm btn-ui-outline set-primary-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Set Primary</button>">
+        <cfset local.setPrimaryButton = "<button type='button' class='btn btn-sm btn-ui-save set-primary-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'>Set Primary</button>">
     </cfif>
     <cfif val(local.al.ISACTIVE ?: 0)>
         <cfset local.activeBadge = "<span class='badge badge-success rounded-pill'>Active</span>">
@@ -971,8 +992,8 @@
                                 </div>
                                 <div>
                                     #local.setPrimaryButton#    
-                                    <button type='button' class='btn btn-sm btn-edit edit-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-remove remove-alias-btn users-edit-danger-button' data-idx='#(local.ai-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-ui-edit edit-alias-btn users-edit-secondary-button' data-idx='#(local.ai-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-ui-delete remove-alias-btn users-edit-danger-button' data-idx='#(local.ai-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1027,12 +1048,23 @@
                     <input class='form-control' name='Title3' value='#user.TITLE3#'>
                 </div>
             </div>
+" & (canManageDropboxFolder ? "
+            <div class='row mt-4 pt-3 border-top' id='dropboxFolderSection'>
+                <div class='col-12'>
+                    <h6 class='fw-semibold mb-1'><i class='bi bi-folder2-open me-1'></i>User's Dropbox Folder</h6>
+                    <p class='text-muted small mb-2'>Checks for <code>[lastname]-[firstname]-[peoplesoftid]</code> under the configured Dropbox root.</p>
+                    <button type='button' id='verifyDropboxFolderBtn' class='btn btn-sm btn-ui-filter' data-userid='#val(user.USERID)#'><i class='bi bi-cloud-check me-1'></i>Verify Dropbox Folder</button>
+                    <span id='dropboxFolderCheckStatus' class='ms-2 small text-muted'></span>
+                    <div id='dropboxFolderCheckResult' class='#dropboxFolderResultClass#'>#dropboxFolderResultHtml#</div>
+                </div>
+            </div>
+" : "") & "
         </div>
 
         <div class='tab-pane fade users-edit-tab-pane' id='contact-pane' role='tabpanel' aria-labelledby='contact-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
                 <div class='d-flex align-items-center flex-wrap gap-2'>
-                    #renderTabActionButtonGroup("refreshContactInfoBtn")#
+                    #editViewHelper.renderTabActionButtonGroup("refreshContactInfoBtn")#
                     <span class='navbar-text'><strong>Actions:</strong></span>
                     <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addEmailBtn'><i class='bi bi-envelope-plus me-1'></i>Add Email</button>
                     <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addPhoneBtn'><i class='bi bi-telephone-plus me-1'></i>Add Phone</button>
@@ -1061,8 +1093,8 @@
                                     <cfif val(local.em.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-edit edit-email-btn users-edit-secondary-button' data-idx='#(local.ei-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-remove remove-email-btn users-edit-danger-button' data-idx='#(local.ei-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-ui-edit edit-email-btn users-edit-secondary-button' data-idx='#(local.ei-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-ui-delete remove-email-btn users-edit-danger-button' data-idx='#(local.ei-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1101,8 +1133,8 @@
                                     <cfif val(local.ph.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 </div>
                                 <div>
-                                    <button type='button' class='btn btn-sm btn-edit edit-phone-btn users-edit-secondary-button' data-idx='#(local.pi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                    <button type='button' class='btn btn-sm btn-remove remove-phone-btn users-edit-danger-button' data-idx='#(local.pi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                    <button type='button' class='btn btn-sm btn-ui-edit edit-phone-btn users-edit-secondary-button' data-idx='#(local.pi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-ui-delete remove-phone-btn users-edit-danger-button' data-idx='#(local.pi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1151,8 +1183,8 @@
                                 </small>
                             </div>
                             <div>
-                                <button type='button' class='btn btn-sm btn-edit edit-address-btn users-edit-secondary-button' data-idx='#(local.adi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
-                                <button type='button' class='btn btn-sm btn-remove remove-address-btn users-edit-danger-button' data-idx='#(local.adi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                <button type='button' class='btn btn-sm btn-ui-edit edit-address-btn users-edit-secondary-button' data-idx='#(local.adi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                <button type='button' class='btn btn-sm btn-ui-delete remove-address-btn users-edit-danger-button' data-idx='#(local.adi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
                             </div>
                         </div>
                     </div>
@@ -1182,12 +1214,12 @@
             </div>
         </div>
 
-        <div class='tab-pane fade' id='flags-pane' role='tabpanel' aria-labelledby='flags-tab'>
+        <div class='tab-pane fade users-edit-tab-pane' id='flags-pane' role='tabpanel' aria-labelledby='flags-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
-                <div>#renderTabActionButtonGroup("refreshFlagsBtn")#</div>
+                <div>#editViewHelper.renderTabActionButtonGroup("refreshFlagsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-flags-btn'><i class='bi bi-floppy me-1'></i>Save Flags</button>
+                    <button type='button' class='btn btn-sm btn-ui-save' id='save-flags-btn'><i class='bi bi-floppy me-1'></i>Save Flags</button>
                     <span id='save-flags-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1195,18 +1227,32 @@
 " />
 
 <cfif arrayLen(allFlags) gt 0>
+    <cfset content &= "<div class='row g-3'>">
     <cfloop from="1" to="#arrayLen(allFlags)#" index="i">
         <cfset flag = allFlags[i]>
+        <cfif NOT canViewAlumni AND compareNoCase(trim(flag.FLAGNAME ?: ""), "Alumni") EQ 0>
+            <cfcontinue>
+        </cfif>
         <cfset isChecked = arrayFindNoCase(userFlagIDs, flag.FLAGID) gt 0>
+        <cfset flagDescription = "">
+        <cfif structKeyExists(flag, "FLAGDESCRIPTION") AND NOT isNull(flag.FLAGDESCRIPTION)>
+            <cfset flagDescription = trim(toString(flag.FLAGDESCRIPTION))>
+        </cfif>
         <cfset content &= "
-            <div class='form-check form-check-inline'>
-                <input class='form-check-input' type='checkbox' name='Flags' value='#flag.FLAGID#' id='flag#flag.FLAGID#' data-flagname='#lCase(flag.FLAGNAME)#' " & (isChecked ? "checked" : "") & ">
-                <label class='form-check-label' for='flag#flag.FLAGID#'>
-                    #flag.FLAGNAME#
-                </label>
+            <div class='col-12 col-lg-6'>
+                <div class='border rounded p-3 h-100 panel-surface users-edit-flag-card' data-flag-checkbox-id='flag#flag.FLAGID#'>
+                    <div class='form-check mb-2'>
+                        <input class='form-check-input' type='checkbox' name='Flags' value='#flag.FLAGID#' id='flag#flag.FLAGID#' data-flagname='#lCase(flag.FLAGNAME)#' " & (isChecked ? "checked" : "") & ">
+                        <label class='form-check-label fw-semibold' for='flag#flag.FLAGID#'>
+                            #encodeForHTML(flag.FLAGNAME)#
+                        </label>
+                    </div>
+                    <div class='small text-muted ps-4'>#len(flagDescription) ? encodeForHTML(flagDescription) : "&nbsp;"#</div>
+                </div>
             </div>
         ">
     </cfloop>
+    <cfset content &= "</div>">
 <cfelse>
     <cfset content &= "<p class='text-muted'>No flags available</p>">
 </cfif>
@@ -1215,75 +1261,45 @@
             </div>
         </div>
 
-        <div class='tab-pane fade' id='orgs-pane' role='tabpanel' aria-labelledby='orgs-tab'>
+        <div class='tab-pane fade users-edit-tab-pane' id='orgs-pane' role='tabpanel' aria-labelledby='orgs-tab'>
 
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
-                <div>#renderTabActionButtonGroup("refreshOrgsBtn")#</div>
+                <div>#editViewHelper.renderTabActionButtonGroup("refreshOrgsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-orgs-btn'><i class='bi bi-floppy me-1'></i>Save Organizations</button>
+                    <button type='button' class='btn btn-sm btn-ui-save' id='save-orgs-btn'><i class='bi bi-floppy me-1'></i>Save Organizations</button>
                     <span id='save-orgs-status' class='ms-1'></span>
                 </div>
             </div>
 
 " />
 
-<cfset content &= renderOrgPanels(userOrgIDs)>
+<cfset content &= editViewHelper.renderOrgPanels(selectedOrgIDs=userOrgIDs, orgChildrenByParent=orgChildrenByParent, orgRoleMap=orgRoleMap)>
 
 <cfset content &= "
         </div>
 
-        <div class='tab-pane fade' id='extids-pane' role='tabpanel' aria-labelledby='extids-tab'>
+        <div class='tab-pane fade users-edit-tab-pane' id='extids-pane' role='tabpanel' aria-labelledby='extids-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
-                <div>#renderTabActionButtonGroup("refreshExtidsBtn")#</div>
+                <div>#editViewHelper.renderTabActionButtonGroup("refreshExtidsBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-extids-btn'><i class='bi bi-floppy me-1'></i>Save External IDs</button>
+                    <button type='button' class='btn btn-sm btn-ui-save' id='save-extids-btn'><i class='bi bi-floppy me-1'></i>Save External IDs</button>
                     <span id='save-extids-status' class='ms-1'></span>
                 </div>
             </div>
             #extIDHtml#
-            <div id='extids-ldap-status' class='small text-muted mb-2'></div>
         </div>
 
-        <div class='modal fade' id='extidsLdapModal' tabindex='-1' aria-labelledby='extidsLdapModalLabel' aria-hidden='true'>
-            <div class='modal-dialog modal-lg modal-dialog-scrollable'>
-                <div class='modal-content'>
-                    <div class='modal-header'>
-                        <h5 class='modal-title' id='extidsLdapModalLabel'>Select CougarNet Account</h5>
-                        <button type='button' class='btn-close' data-bs-dismiss='modal' aria-label='Close'></button>
-                    </div>
-                    <div class='modal-body p-0'>
-                        <div class='table-responsive'>
-                            <table class='table table-sm table-hover mb-0 align-middle'>
-                                <thead class='table-light'>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>COUGARNET</th>
-                                        <th>PEOPLESOFT</th>
-                                        <th>Email</th>
-                                        <th class='text-end'>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id='extidsLdapResultsBody'>
-                                    <tr>
-                                        <td colspan='7' class='text-muted p-3'>No results loaded.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            #publicationsPaneHtml#
 
 " & (isSuperAdmin ? "
-        <div class='tab-pane fade' id='admin-pane' role='tabpanel' aria-labelledby='admin-tab'>
+        <div class='tab-pane fade users-edit-tab-pane' id='admin-pane' role='tabpanel' aria-labelledby='admin-tab'>
             <div class='d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3'>
-                <div>#renderTabActionButtonGroup("refreshUhBtn")#</div>
+                <div>#editViewHelper.renderTabActionButtonGroup("refreshUhBtn")#</div>
                 <div></div>
                 <div class='d-flex align-items-center gap-2'>
-                    <button type='button' class='btn btn-sm btn-ui-success' id='save-uh-btn'><i class='bi bi-floppy me-1'></i>Save UH Info</button>
+                    <button type='button' class='btn btn-sm btn-ui-save' id='save-uh-btn'><i class='bi bi-floppy me-1'></i>Save UH Info</button>
                     <span id='save-uh-status' class='ms-1'></span>
                 </div>
             </div>
@@ -1350,7 +1366,7 @@
                     <label class='form-label'>Office Mailing Address</label>
                     <div class='input-group'>
                         <input class='form-control' name='Office_Mailing_Address' id='officeMailingAddress' value='#(user.OFFICE_MAILING_ADDRESS ?: "")#'>
-                        <button type='button' class='btn btn-ui-outline' id='copyToAddressesBtn' title='Parse and copy to Addresses tab'>
+                        <button type='button' class='btn btn-ui-go' id='copyToAddressesBtn' title='Parse and copy to Addresses tab'>
                             <i class='bi bi-arrow-right-square'></i> Copy to Addresses
                         </button>
                     </div>
@@ -1394,42 +1410,25 @@
 ">
 
 <!--- Precompute biographical degree/award visibility and safe composite value --->
-<cfset showCurrentStudent = false>
-<cfset showAlumni = false>
-<cfloop from="1" to="#arrayLen(allFlags)#" index="i">
-    <cfset local.flagName = "">
-    <cfif structKeyExists(allFlags[i], "FLAGNAME") AND NOT isNull(allFlags[i].FLAGNAME)>
-        <cfset local.flagName = trim(toString(allFlags[i].FLAGNAME))>
-    </cfif>
-    <cfset local.fn = lCase(local.flagName)>
-    <cfif local.fn EQ "current-student" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-        <cfset showCurrentStudent = true>
-    </cfif>
-    <cfif local.fn EQ "alumni" AND arrayFindNoCase(userFlagIDs, allFlags[i].FLAGID) GT 0>
-        <cfset showAlumni = true>
-    </cfif>
-</cfloop>
-
 <!--- ── Biographical Information pane ── --->
 <cfset showDegreesAwards = showFacultyProfile OR showAlumni OR showCurrentStudent OR showEmeritusProfile OR showResidentProfile>
 <cfset local.bioDegreesDisplayStyle = showDegreesAwards ? "" : " style='display:none'">
-<cfset local.compositeDegreesValue = "">
-<cfif structKeyExists(user, "DEGREES") AND NOT isNull(user.DEGREES)>
-    <cfset local.compositeDegreesValue = trim(toString(user.DEGREES))>
-</cfif>
+<cfset local.compositeDegreesValue = trim(degreesService.buildDegreesString(val(url.userID)))>
 <cfsavecontent variable="local.bioTabContent"><!--- Use cfsavecontent to prevent # expression re-parsing by layout.cfm --->
-    <div class="tab-pane fade" id="bio-info-pane" role="tabpanel" aria-labelledby="bio-info-tab">
+    <div class="tab-pane fade users-edit-tab-pane" id="bio-info-pane" role="tabpanel" aria-labelledby="bio-info-tab">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-3">
             <div class="d-flex align-items-center flex-wrap gap-2">
-                <cfoutput>#renderTabActionButtonGroup("refreshBiographicalInfoBtn")#</cfoutput>
+                <cfoutput>#editViewHelper.renderTabActionButtonGroup("refreshBiographicalInfoBtn")#</cfoutput>
                 <span id="bioActionsLabel" class="navbar-text" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><strong>Actions:</strong></span>
                 <button type="button" class="btn btn-sm btn-ui-add" id="addDegreeBtn" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><i class="bi bi-mortarboard me-1"></i>Add Degree</button>
                 <button type="button" class="btn btn-sm btn-ui-add" id="addAwardBtn" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><i class="bi bi-award me-1"></i>Add Award</button>
+                <button type="button" class="btn btn-sm btn-ui-add" id="addResidencyBtn" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>><i class="bi bi-plus-circle me-1"></i>Add Residency</button>
                 <span id="degreesSaveStatus" class="save-status ms-1" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>></span>
                 <span id="awardsSaveStatus" class="save-status ms-1" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>></span>
+                <span id="residenciesSaveStatus" class="save-status ms-1"></span>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <button type="button" class="btn btn-sm btn-ui-success" id="save-bioinfo-btn"><i class="bi bi-floppy me-1"></i>Save Biographical Info</button>
+                <button type="button" class="btn btn-sm btn-ui-save" id="save-bioinfo-btn"><i class="bi bi-floppy me-1"></i>Save Biographical Info</button>
                 <span id="save-bioinfo-status" class="ms-1"></span>
             </div>
         </div>
@@ -1452,9 +1451,9 @@
         </div>
         <hr id="bioDegreesAwardsDivider" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>>
         <h6 id="bioDegreesAwardsHeading" class="fw-bold mb-3" <cfoutput>#local.bioDegreesDisplayStyle#</cfoutput>>Degrees &amp; Awards</h6>
-        <cfif isSuperAdmin AND len(local.compositeDegreesValue)>
+        <cfif isSuperAdmin AND NOT showStaffProfile>
             <div class="row mb-3">
-                <div class="col-md-8">
+                <div class="col-auto">
                     <label class="form-label text-muted">Combined Degrees (auto-generated, read-only)</label>
                     <input class="form-control form-control-sm" id="bio_composite" value="<cfoutput>#EncodeForHTMLAttribute(local.compositeDegreesValue)#</cfoutput>" readonly disabled>
                 </div>
@@ -1522,8 +1521,8 @@
                                         <strong><cfoutput>#local.dv.nameEncoded#</cfoutput></strong><cfif len(local.dv.university)> | <cfoutput>#local.dv.univEncoded#</cfoutput></cfif><cfif len(local.dv.gradYear)> <span class="badge badge-secondary"><cfoutput>#local.dv.gradYearEncoded#</cfoutput></span></cfif><cfoutput>#local.uhcoBadge##local.programBadge#</cfoutput>
                                     </div>
                                     <div>
-                                        <button type="button" class="btn btn-sm btn-edit edit-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                                        <button type="button" class="btn btn-sm btn-remove remove-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
+                                        <button type="button" class="btn btn-sm btn-ui-edit edit-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-ui-delete remove-degree-btn" data-idx="<cfoutput>#local.dv.idx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
                                     </div>
                                 </div>
                             </div>
@@ -1552,6 +1551,9 @@
             <div id="awardsContainer">
                 <cfif showDegreesAwards>
                     <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
+                    <cfif arrayLen(spAwards) EQ 0>
+                        <p class="text-muted fst-italic">No Awards or Honors</p>
+                    </cfif>
                     <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
                         <cfset aw = spAwards[ai]>
                         <cfset local.awName = trim(aw.AWARDNAME)>
@@ -1566,8 +1568,8 @@
                                         <strong><cfoutput>#local.awNameEncoded#</cfoutput></strong><cfif len(local.awType)> <span class="badge badge-secondary"><cfoutput>#local.awTypeEncoded#</cfoutput></span></cfif>
                                     </div>
                                     <div>
-                                        <button type="button" class="btn btn-sm btn-edit edit-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                                        <button type="button" class="btn btn-sm btn-remove remove-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
+                                        <button type="button" class="btn btn-sm btn-ui-edit edit-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-ui-delete remove-award-btn" data-idx="<cfoutput>#local.awIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
                                     </div>
                                 </div>
                             </div>
@@ -1590,8 +1592,8 @@
             <input type="hidden" name="processBio" value="1">
             <div class="mb-4">
                 <label class="form-label fw-bold">Bio / About Me</label>
-                <div id="bio-editor" class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
-                <input type="hidden" name="bioContent" id="bioContentHidden" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+                <div class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
+                <input type="hidden" name="bioContent" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
             </div>
         </cfif>
         <cfif showStaffProfile>
@@ -1601,8 +1603,8 @@
                 <input type="hidden" name="processBio" value="1">
                 <div class="mb-4">
                     <label class="form-label fw-bold">Bio (Public-Facing)</label>
-                    <div id="bio-editor" class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
-                    <input type="hidden" name="bioContent" id="bioContentHidden" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+                    <div class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
+                    <input type="hidden" name="bioContent" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
                 </div>
             <cfelseif NOT showBio>
                 <p class="text-muted">Bio is available when the <em>public-facing</em> flag is enabled.</p>
@@ -1615,7 +1617,7 @@
             <h6 class="fw-bold mb-3">Student Data</h6>
             <input type="hidden" name="processAcademicInfo" value="1">
             <input type="hidden" name="processStudentProfile" value="1">
-            <cfif isSuperAdmin>
+            <!---<cfif isSuperAdmin>
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label">Current Grad Year <span class="badge badge-warning">Legacy / Super Admin</span></label>
@@ -1632,17 +1634,16 @@
             <cfelse>
                 <input type="hidden" name="CurrentGradYear" value="<cfoutput>#EncodeForHTMLAttribute(currentGradYear)#</cfoutput>">
                 <input type="hidden" name="OriginalGradYear" value="<cfoutput>#EncodeForHTMLAttribute(originalGradYear)#</cfoutput>">
-            </cfif>
+            </cfif>--->
             <div class="row mb-3">
-                <div class="col-md-3">
-                    <label class="form-label">Commencement Age</label>
+                <!---<div class="col-auto"><label class="form-label">Age At Commencement</label>
                     <input class="form-control" type="number" name="sp_commencement_age" min="0" max="120" value="<cfoutput>#EncodeForHTMLAttribute(spCommAge)#</cfoutput>">
-                </div>
-                <div class="col-md-4">
+                </div>--->
+                <div class="col-md-5">
                     <label class="form-label">First Externship</label>
                     <input class="form-control" name="sp_first_externship" value="<cfoutput>#EncodeForHTMLAttribute(spFirstExt)#</cfoutput>">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <label class="form-label">Second Externship</label>
                     <input class="form-control" name="sp_second_externship" value="<cfoutput>#EncodeForHTMLAttribute(spSecondExt)#</cfoutput>">
                 </div>
@@ -1654,14 +1655,9 @@
                 </div>
             </div>
 
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <label class="form-label fw-semibold mb-0">Residencies</label>
-                <div>
-                    <button type="button" class="btn btn-sm btn-ui-add" id="addResidencyBtn"><i class="bi bi-plus-circle me-1"></i>Add Residency</button>
-                    <span id="residenciesSaveStatus" class="save-status ms-1"></span>
-                </div>
-            </div>
+            <label class="form-label fw-semibold">Residencies</label>
             <div id="residenciesContainer" class="mb-3">
+            <cfif arrayLen(spResidencies) GT 0>
                 <cfloop from="1" to="#arrayLen(spResidencies)#" index="local.ri">
                     <cfset local.rr = spResidencies[local.ri]>
                     <cfset local.resIdx = local.ri - 1>
@@ -1681,8 +1677,8 @@
                                     <cfif local.isCurrent EQ 1><span class="badge bg-success ms-1">Current</span></cfif>
                                 </div>
                                 <div>
-                                    <button type="button" class="btn btn-sm btn-edit edit-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
-                                    <button type="button" class="btn btn-sm btn-remove remove-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
+                                    <button type="button" class="btn btn-sm btn-ui-edit edit-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+                                    <button type="button" class="btn btn-sm btn-ui-delete remove-residency-btn" data-idx="<cfoutput>#local.resIdx#</cfoutput>"><i class="bi bi-trash me-1"></i>Remove</button>
                                 </div>
                             </div>
                         </div>
@@ -1693,19 +1689,22 @@
                     <input type="hidden" data-residency-field="isuhco" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#local.isUHCO#</cfoutput>">
                     <input type="hidden" data-residency-field="iscurrent" data-residency-idx="<cfoutput>#local.resIdx#</cfoutput>" value="<cfoutput>#local.isCurrent#</cfoutput>">
                 </cfloop>
+            <cfelse>
+                <p class="text-muted fst-italic">No Residencies Entered</p>
+            </cfif>
             </div>
         </cfif>
 </cfsavecontent>
 <cfset content &= local.bioTabContent>
 
-<!--- ── Alumni Data section ── --->
+<!--- ── Alumni Data section ── 
 <cfif showAlumni>
     <cfset content &= "
             <hr>
             <h6 class='fw-bold mb-3'>Alumni Data</h6>
             <p class='text-muted'>Academic data is shared with the Student Data section above.</p>
     ">
-</cfif>
+</cfif>--->
 
 <!--- ── Emeritus section (bio if no faculty) ── --->
 <cfif showEmeritusProfile>
@@ -1715,8 +1714,8 @@
             <input type='hidden' name='processBio' value='1'>
             <div class='mb-4'>
                 <label class='form-label fw-bold'>Bio / About Me</label>
-                <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
-                <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
+                <div class='users-edit-bio-editor'>#bioContent#</div>
+                <input type='hidden' name='bioContent' value='#EncodeForHTMLAttribute(bioContent)#'>
             </div>
         ">
     <cfelse>
@@ -1732,8 +1731,8 @@
             <input type='hidden' name='processBio' value='1'>
             <div class='mb-4'>
                 <label class='form-label fw-bold'>Bio / About Me</label>
-                <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
-                <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
+                <div class='users-edit-bio-editor'>#bioContent#</div>
+                <input type='hidden' name='bioContent' value='#EncodeForHTMLAttribute(bioContent)#'>
             </div>
         ">
     <cfelse>
@@ -1745,451 +1744,8 @@
     </div>
 ">
 
-<!--- ── Student Profile pane ── --->
-<cfset content &= "<div class='tab-pane fade' id='student-profile-pane' role='tabpanel' aria-labelledby='student-profile-tab'>">
-<cfif showStudentProfile>
-    <cfset content &= "
-        <div class='row mb-3'>
-            <div class='col-md-6'>
-                <label class='form-label'>Current Grad Year</label>
-                <input class='form-control' name='CurrentGradYear' id='currentGradYear' value='#currentGradYear#' placeholder='e.g. 2028'>
-            </div>
-            <div class='col-md-6'>
-                <label class='form-label'>Original Grad Year</label>
-                <input class='form-control' name='OriginalGradYear' id='originalGradYear' value='#originalGradYear#' placeholder='e.g. 2027' #(len(currentGradYear) ? '' : 'disabled')#>
-                <div class='form-text'>Requires a Current Grad Year.</div>
-            </div>
-        </div>
-        <div class='row mb-3'>
-            <div class='col-md-4'>
-                <label class='form-label'>Hometown City</label>
-                <input class='form-control' name='sp_hometown_city' value='#EncodeForHTMLAttribute(spHometownCity)#'>
-            </div>
-            <div class='col-md-2'>
-                <label class='form-label'>State</label>
-                <select class='form-select' name='sp_hometown_state'>
-                    <option value=''>--</option>
-                    ">
-    <cfloop list="AL,AK,AZ,AR,CA,CO,CT,DE,FL,GA,HI,ID,IL,IN,IA,KS,KY,LA,ME,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,OH,OK,OR,PA,RI,SC,SD,TN,TX,UT,VT,VA,WA,WV,WI,WY,DC" index="st">
-        <cfset content &= "<option value='#st#' #(spHometownState EQ st ? 'selected' : '')#>#st#</option>">
-    </cfloop>
-    <cfset content &= "
-                </select>
-            </div>
-            <div class='col-md-3'>
-                <label class='form-label'>Date of Birth</label>
-                <input class='form-control' type='date' name='sp_dob' value='#(isDate(spDOB) ? dateFormat(spDOB, "yyyy-mm-dd") : "")#'>
-            </div>
-            <div class='col-md-3'>
-                <label class='form-label'>Gender</label>
-                <select class='form-select' name='sp_gender'>
-                    <option value=''>--</option>
-                    <option value='Male' #(spGender EQ 'Male' ? 'selected' : '')#>Male</option>
-                    <option value='Female' #(spGender EQ 'Female' ? 'selected' : '')#>Female</option>
-                </select>
-            </div>
-        </div>
-        <div class='row mb-3'>
-            <div class='col-md-3'>
-                <label class='form-label'>Commencement Age</label>
-                <input class='form-control' type='number' name='sp_commencement_age' min='0' max='120' value='#EncodeForHTMLAttribute(spCommAge)#'>
-            </div>
-            <div class='col-md-4'>
-                <label class='form-label'>First Externship</label>
-                <input class='form-control' name='sp_first_externship' value='#EncodeForHTMLAttribute(spFirstExt)#'>
-            </div>
-            <div class='col-md-4'>
-                <label class='form-label'>Second Externship</label>
-                <input class='form-control' name='sp_second_externship' value='#EncodeForHTMLAttribute(spSecondExt)#'>
-            </div>
-        </div>
-    ">
-    <cfset content &= renderDegreesPanel(userDegrees, "sp", false, "")>
-    <cfset content &= "
-        <div class='mb-4'>
-            <label class='form-label fw-semibold'>Awards &amp; Honors</label>
-            <div id='spAwardsContainer'>
-    ">
-    <cfset awardOptions = 'Gold Key,Summa cum laude,Magna cum laude,BSK Gold,BSK Black & Gold,AOSA Honors,NOSA Honors,Other'>
-    <cfloop from="1" to="#arrayLen(spAwards)#" index="ai">
-        <cfset aw = spAwards[ai]>
-        <cfset awName = trim(aw.AWARDNAME)>
-        <cfset isOther = (listFindNoCase(awardOptions, awName) EQ 0 AND len(awName))>
-        <cfset selVal = isOther ? "Other" : awName>
-        <cfset content &= "<div class='row g-2 mb-2 award-row'>
-                <div class='col-md-4'>
-                    <select class='form-select form-select-sm award-select' data-field='select'>
-                        <option value=''>-- Select --</option>">
-        <cfloop list="#awardOptions#" index="aOpt">
-            <cfset content &= "<option value='#EncodeForHTMLAttribute(aOpt)#' #(selVal EQ aOpt ? 'selected' : '')#>#EncodeForHTML(aOpt)#</option>">
-        </cfloop>
-        <cfset content &= "</select>
-                </div>
-                <div class='col-md-3 award-other-col #(isOther ? '' : 'd-none')#'>
-                    <input class='form-control form-control-sm award-other-input' placeholder='Specify award' value='#(isOther ? EncodeForHTMLAttribute(awName) : "")#'>
-                </div>
-                <input type='hidden' class='award-name-hidden' data-field='name' value='#EncodeForHTMLAttribute(awName)#'>
-                <div class='col-md-3'>
-                    <select class='form-select form-select-sm' data-field='type'>
-                        <option value=''>-- Type --</option>
-                        <option value='Honor' #(aw.AWARDTYPE EQ 'Honor' ? 'selected' : '')#>Honor</option>
-                        <option value='Award' #(aw.AWARDTYPE EQ 'Award' ? 'selected' : '')#>Award</option>
-                    </select>
-                </div>
-                <div class='col-md-2'><button type='button' class='btn btn-sm btn-remove remove-award-row w-100'><i class='bi bi-trash me-1'></i>Remove</button></div>
-            </div>">
-    </cfloop>
-    <cfset content &= "
-            </div>
-            <input type='hidden' id='spAwardCount' value='#arrayLen(spAwards)#'>
-            <button type='button' class='btn btn-sm btn-ui-add mt-2' id='addSpAwardRow'><i class='bi bi-plus-circle me-1'></i>Add Award / Honor</button>
-        </div>
-    ">
-</cfif>
-<cfset content &= "
-    <div class='mt-3'>
-        <button type='button' class='btn btn-ui-success' id='save-studentprofile-btn'>Save Student Profile</button>
-        <span id='save-studentprofile-status' class='ms-2'></span>
-    </div>
-</div>">
-
-<!--- ── Faculty Profile pane ── --->
-<cfset content &= "
-    <div class='tab-pane fade' id='faculty-profile-pane' role='tabpanel' aria-labelledby='faculty-profile-tab'>
-">
-<cfset content &= renderDegreesPanel(userDegrees, "fac", isSuperAdmin, user.DEGREES ?: "")>
-<cfset content &= "
-    <div class='mt-3'>
-        <button type='button' class='btn btn-ui-success' id='save-facultydeg-btn'>Save Faculty Degrees</button>
-        <span id='save-facultydeg-status' class='ms-2'></span>
-    </div>
-    </div>
-">
-
-<!--- ── Staff Profile pane ── --->
-<cfset content &= "
-    <div class='tab-pane fade' id='staff-profile-pane' role='tabpanel' aria-labelledby='staff-profile-tab'>
-        <p class='text-muted'>Staff profile fields coming soon.</p>
-    </div>
-">
-
-<!--- ── Professor Emeritus Profile pane ── --->
-<cfset content &= "
-    <div class='tab-pane fade' id='emeritus-profile-pane' role='tabpanel' aria-labelledby='emeritus-profile-tab'>
-">
-<cfset content &= renderDegreesPanel(userDegrees, "emer", isSuperAdmin, user.DEGREES ?: "")>
-<cfset content &= "
-    <div class='mt-3'>
-        <button type='button' class='btn btn-ui-success' id='save-emeritusdeg-btn'>Save Emeritus Degrees</button>
-        <span id='save-emeritusdeg-status' class='ms-2'></span>
-    </div>
-    </div>
-">
-
-<!--- ── Resident Profile pane ── --->
-<cfset content &= "
-    <div class='tab-pane fade' id='resident-profile-pane' role='tabpanel' aria-labelledby='resident-profile-tab'>
-">
-<cfset content &= renderDegreesPanel(userDegrees, "res", isSuperAdmin, user.DEGREES ?: "")>
-<cfset content &= "
-    <div class='mt-3'>
-        <button type='button' class='btn btn-ui-success' id='save-residentdeg-btn'>Save Resident Degrees</button>
-        <span id='save-residentdeg-status' class='ms-2'></span>
-    </div>
-    </div>
-">
-
-<!--- ── Bio pane ── --->
-<cfset content &= "
-    <div class='tab-pane fade' id='bio-pane' role='tabpanel' aria-labelledby='bio-tab'>
-        <label class='form-label fw-bold'>Bio / About Me</label>
-        <div id='bio-editor' class='users-edit-bio-editor'>#bioContent#</div>
-        <input type='hidden' name='bioContent' id='bioContentHidden' value='#EncodeForHTMLAttribute(bioContent)#'>
-        <div class='mt-3'>
-            <button type='button' class='btn btn-ui-success' id='save-bio-btn'>Save Bio</button>
-            <span id='save-bio-status' class='ms-2'></span>
-        </div>
-    </div>
-">
-
 <cfset content &= "
     </div>
-
-    <script>
-    (function () {
-        var epEl  = document.getElementById('emailPrimary');
-        var epErr = document.getElementById('emailPrimaryErr');
-        function showError(el, errEl, msg) { el.classList.add('is-invalid'); errEl.textContent = msg; }
-        function clearError(el, errEl)     { el.classList.remove('is-invalid'); errEl.textContent = ''; }
-        function validatePrimary() {
-            var val = (epEl ? epEl.value : '').trim().toLowerCase();
-            if (val && !val.endsWith('@uh.edu')) {
-                showError(epEl, epErr, 'Must be a @uh.edu address (e.g. jsmith@uh.edu).');
-                return false;
-            }
-            if (epEl) clearError(epEl, epErr);
-            return true;
-        }
-        if (epEl) epEl.addEventListener('blur', validatePrimary);
-        var form = epEl ? epEl.closest('form') : null;
-        if (form) {
-            form.addEventListener('submit', function (e) {
-                if (!validatePrimary()) { e.preventDefault(); var inv = document.querySelector('.is-invalid'); if (inv) inv.focus(); }
-            });
-        }
-    })();
-    </script>
-
-    <script>
-    /* ── Email rows removed — now modal-based ── */
-    </script>
-
-    <script>
-    /* ── Phone rows removed — now modal-based ── */
-    </script>
-">
-
-<cfset aliasTypeOptsJS = "''">
-<cfset aliasTypeLblsJS = "'-- Type --'">
-<cfloop from="1" to="#arrayLen(aliasTypes)#" index="local._ati">
-    <cfset aliasTypeOptsJS &= ",'" & jsStringFormat(aliasTypes[local._ati].ALIASTYPECODE) & "'">
-    <cfset aliasTypeLblsJS &= ",'" & jsStringFormat(aliasTypes[local._ati].DESCRIPTION) & "'">
-</cfloop>
-
-<cfset content &= "
-    <script>
-    /* ── Alias rows removed — now modal-based ── */
-    /* Alias type options preserved for modal */
-    var aliasTypeOptions = [#aliasTypeOptsJS#];
-    var aliasTypeLabels  = [#aliasTypeLblsJS#];
-    </script>
-
-    <script>
-    (function () {
-        function getTabFromUrl() {
-            var url = new URL(window.location.href);
-            return (url.searchParams.get('tab') || '').trim();
-        }
-
-        function activateTabById(tabId) {
-            if (!tabId) {
-                return;
-            }
-            var tabBtn = document.getElementById(tabId);
-            if (!tabBtn || tabBtn.getAttribute('data-bs-toggle') !== 'tab') {
-                return;
-            }
-            bootstrap.Tab.getOrCreateInstance(tabBtn).show();
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.bootstrap) {
-                document.querySelectorAll('[data-bs-toggle=""tooltip""]').forEach(function (el) {
-                    bootstrap.Tooltip.getOrCreateInstance(el);
-                });
-            }
-
-            var tabList = document.getElementById('editTabs');
-            if (!tabList) {
-                return;
-            }
-
-            // Restore requested tab after a refresh.
-            activateTabById(getTabFromUrl());
-
-            // Keep URL in sync and notify tab refresh handler.
-            tabList.addEventListener('shown.bs.tab', function (event) {
-                var tabBtn = event && event.target ? event.target : null;
-                if (!tabBtn) {
-                    return;
-                }
-
-                var tabId = tabBtn.id || '';
-                if (!tabId) {
-                    return;
-                }
-
-                var targetUrl = new URL(window.location.href);
-                targetUrl.searchParams.set('tab', tabId);
-                history.replaceState(null, '', targetUrl.toString());
-
-                window.dispatchEvent(new CustomEvent('users-edit-tab-selected', {
-                    detail: { tabId: tabId }
-                }));
-            });
-        });
-    })();
-    </script>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var orgCheckboxes = Array.prototype.slice.call(document.querySelectorAll('input.org-checkbox'));
-        if (!orgCheckboxes.length) return;
-
-        var byOrgId = {};
-        var childrenByParent = {};
-
-        orgCheckboxes.forEach(function (cb) {
-            var orgId    = cb.getAttribute('data-orgid')       || '';
-            var parentId = cb.getAttribute('data-parentorgid') || '';
-            byOrgId[orgId] = cb;
-            if (!childrenByParent[parentId]) childrenByParent[parentId] = [];
-            childrenByParent[parentId].push(cb);
-        });
-
-        // ── Ancestor cascade helpers ──────────────────────────────────────
-        function checkAncestors(cb) {
-            var parentId = cb.getAttribute('data-parentorgid') || '';
-            while (parentId && byOrgId[parentId]) {
-                byOrgId[parentId].checked = true;
-                parentId = byOrgId[parentId].getAttribute('data-parentorgid') || '';
-            }
-        }
-
-        function hasAnyCheckedDescendant(orgId) {
-            var stack = (childrenByParent[orgId] || []).slice();
-            while (stack.length) {
-                var child = stack.pop();
-                if (child.checked) return true;
-                var grandChildren = childrenByParent[child.getAttribute('data-orgid') || ''] || [];
-                for (var i = 0; i < grandChildren.length; i++) stack.push(grandChildren[i]);
-            }
-            return false;
-        }
-
-        function uncheckAncestorsIfNoCheckedChildren(cb) {
-            var parentId = cb.getAttribute('data-parentorgid') || '';
-            while (parentId && byOrgId[parentId]) {
-                if (!hasAnyCheckedDescendant(parentId)) byOrgId[parentId].checked = false;
-                parentId = byOrgId[parentId].getAttribute('data-parentorgid') || '';
-            }
-        }
-
-        // ── Role modal ────────────────────────────────────────────────────
-        var modalEl      = document.getElementById('orgRoleModal');
-        var bsModal      = new bootstrap.Modal(modalEl);
-        var modalOrgName = document.getElementById('orgRoleModalOrgName');
-        var modalTitle   = document.getElementById('modalRoleTitle');
-        var modalOrder   = document.getElementById('modalRoleOrder');
-        var modalSaveBtn = document.getElementById('save-orgRoleModal-btn');
-        var pendingCheckbox = null;   // set when modal opened by a new check
-
-        function getEditBtn(orgId) {
-            var cb = byOrgId[orgId];
-            return cb ? cb.parentNode.querySelector('.org-role-edit') : null;
-        }
-
-        function setOrgRole(orgId, roleTitle, roleOrder) {
-            var tEl = document.getElementById('roleTitle_' + orgId);
-            var oEl = document.getElementById('roleOrder_' + orgId);
-            var cb  = byOrgId[orgId];
-            if (!tEl) {
-                tEl = document.createElement('input');
-                tEl.type = 'hidden'; tEl.name = 'roleTitle_' + orgId; tEl.id = 'roleTitle_' + orgId;
-                if (cb) cb.parentNode.appendChild(tEl);
-            }
-            if (!oEl) {
-                oEl = document.createElement('input');
-                oEl.type = 'hidden'; oEl.name = 'roleOrder_' + orgId; oEl.id = 'roleOrder_' + orgId;
-                if (cb) cb.parentNode.appendChild(oEl);
-            }
-            tEl.value = roleTitle;
-            oEl.value = roleOrder;
-        }
-
-        function removeOrgRole(orgId) {
-            ['roleTitle_', 'roleOrder_'].forEach(function (prefix) {
-                var el = document.getElementById(prefix + orgId);
-                if (el) el.remove();
-            });
-        }
-
-        function openRoleModal(cb) {
-            var orgId   = cb.getAttribute('data-orgid');
-            var orgName = cb.getAttribute('data-orgname');
-            var tEl     = document.getElementById('roleTitle_' + orgId);
-            var oEl     = document.getElementById('roleOrder_' + orgId);
-            modalOrgName.textContent = orgName;
-            modalTitle.value = tEl ? tEl.value : '';
-            modalOrder.value = oEl ? oEl.value : '';
-            modalEl.setAttribute('data-current-orgid', orgId);
-            bsModal.show();
-        }
-
-        modalSaveBtn.addEventListener('click', function () {
-            var orgId = modalEl.getAttribute('data-current-orgid');
-            setOrgRole(orgId, modalTitle.value.trim(), modalOrder.value.trim());
-            var btn = getEditBtn(orgId);
-            if (btn) btn.classList.add('is-visible');
-            pendingCheckbox = null;
-            bsModal.hide();
-        });
-
-        // Cancel / backdrop: if triggered by a new check, undo it
-        modalEl.addEventListener('hidden.bs.modal', function () {
-            if (pendingCheckbox) {
-                var orgId = pendingCheckbox.getAttribute('data-orgid');
-                pendingCheckbox.checked = false;
-                uncheckAncestorsIfNoCheckedChildren(pendingCheckbox);
-                orgCheckboxes.forEach(function (c) {
-                    var btn = getEditBtn(c.getAttribute('data-orgid'));
-                    if (btn) btn.classList.toggle('is-visible', c.checked);
-                });
-                removeOrgRole(orgId);
-                pendingCheckbox = null;
-            }
-        });
-
-        // Edit button click (existing assignments)
-        document.querySelectorAll('.org-role-edit').forEach(function (btn) {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                var orgId = btn.getAttribute('data-orgid');
-                var cb = byOrgId[orgId];
-                if (!cb) return;
-                pendingCheckbox = null;
-                openRoleModal(cb);
-            });
-        });
-
-        // ── Wire up checkboxes ────────────────────────────────────────────
-        orgCheckboxes.forEach(function (cb) {
-            if (cb.checked) checkAncestors(cb);
-
-            cb.addEventListener('change', function () {
-                var isParent = cb.getAttribute('data-isparent') === '1';
-                var hasRoles = cb.getAttribute('data-additionalroles') === '1';
-                if (cb.checked) {
-                    checkAncestors(cb);
-                    if (!isParent && hasRoles) {
-                        pendingCheckbox = cb;
-                        openRoleModal(cb);
-                    }
-                } else {
-                    uncheckAncestorsIfNoCheckedChildren(cb);
-                    if (!isParent && hasRoles) {
-                        var orgId = cb.getAttribute('data-orgid');
-                        var btn = getEditBtn(orgId);
-                        if (btn) btn.classList.remove('is-visible');
-                        removeOrgRole(orgId);
-                    }
-                }
-            });
-        });
-
-        // Expand card panel when parent org checkbox is checked
-        orgCheckboxes.forEach(function (cb) {
-            var panelId = cb.getAttribute('data-panelid');
-            if (!panelId) return;
-            cb.addEventListener('change', function () {
-                if (cb.checked) {
-                    var el = document.getElementById(panelId);
-                    if (el) bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).show();
-                }
-            });
-        });
-    });
-    </script>
 
 </form>
 
@@ -2216,427 +1772,19 @@
                 </div>
             </div>
             <div class='modal-footer py-2'>
-                <button type='button' class='btn btn-sm btn-ui-neutral' data-bs-dismiss='modal'>Cancel</button>
-                <button type='button' class='btn btn-sm btn-ui-success' id='save-orgRoleModal-btn'>Save Role</button>
+                <button type='button' class='btn btn-sm btn-ui-cancel' data-bs-dismiss='modal'>Cancel</button>
+                <button type='button' class='btn btn-sm btn-ui-save' id='save-orgRoleModal-btn'>Save Role</button>
             </div>
         </div>
     </div>
 </div>
 
-    <script>
-    /* ── Award rows removed — now modal-based ── */
-    var awardOptions = ['Gold Key','Summa cum laude','Magna cum laude','BSK Gold','BSK Black & Gold','AOSA Honors','NOSA Honors','Other'];
-    var honorsSet = {'Gold Key':1,'Summa cum laude':1,'Magna cum laude':1,'BSK Gold':1,'BSK Black & Gold':1,'AOSA Honors':1,'NOSA Honors':1};
-    </script>
-
-    <script>
-    (function () {
-        var studentFlagIDs = [#arrayToList(studentFlagIDs)#];
-        var spTabLi  = document.getElementById('student-profile-tab-li');
-        var spTabBtn = document.getElementById('student-profile-tab');
-        var curr     = document.getElementById('currentGradYear');
-        var orig     = document.getElementById('originalGradYear');
-
-        function syncOriginal() {
-            if (!curr || !orig) return;
-            var hasValue = curr.value.trim().length > 0;
-            orig.disabled = !hasValue;
-            if (!hasValue) orig.value = '';
-        }
-
-        function isStudentFlagChecked() {
-            return studentFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-
-        function syncSpTabVisibility() {
-            if (!spTabLi) return;
-            if (isStudentFlagChecked()) {
-                spTabLi.classList.remove('d-none');
-            } else {
-                spTabLi.classList.add('d-none');
-                if (curr) curr.value = '';
-                if (orig) { orig.value = ''; orig.disabled = true; }
-                if (spTabBtn && spTabBtn.classList.contains('active')) {
-                    var generalTab = document.getElementById('general-tab');
-                    if (generalTab) generalTab.click();
-                }
-            }
-        }
-
-        if (curr) curr.addEventListener('input', syncOriginal);
-
-        studentFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncSpTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    (function () {
-        var facultyFlagIDs = [#arrayToList(facultyFlagIDs)#];
-        var tabLi  = document.getElementById('faculty-profile-tab-li');
-        var tabBtn = document.getElementById('faculty-profile-tab');
-        function isFacultyFlagChecked() {
-            return facultyFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-        function syncFacultyTabVisibility() {
-            if (!tabLi) return;
-            if (isFacultyFlagChecked()) {
-                tabLi.classList.remove('d-none');
-            } else {
-                tabLi.classList.add('d-none');
-                if (tabBtn && tabBtn.classList.contains('active')) {
-                    document.getElementById('general-tab').click();
-                }
-            }
-        }
-        facultyFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncFacultyTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    (function () {
-        var staffFlagIDs = [#arrayToList(staffFlagIDs)#];
-        var tabLi  = document.getElementById('staff-profile-tab-li');
-        var tabBtn = document.getElementById('staff-profile-tab');
-        function isStaffFlagChecked() {
-            return staffFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-        function syncStaffTabVisibility() {
-            if (!tabLi) return;
-            if (isStaffFlagChecked()) {
-                tabLi.classList.remove('d-none');
-            } else {
-                tabLi.classList.add('d-none');
-                if (tabBtn && tabBtn.classList.contains('active')) {
-                    document.getElementById('general-tab').click();
-                }
-            }
-        }
-        staffFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncStaffTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    (function () {
-        var emeritusFlagIDs = [#arrayToList(emeritusFlagIDs)#];
-        var tabLi  = document.getElementById('emeritus-profile-tab-li');
-        var tabBtn = document.getElementById('emeritus-profile-tab');
-        function isEmeritusFlagChecked() {
-            return emeritusFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-        function syncEmeritusTabVisibility() {
-            if (!tabLi) return;
-            if (isEmeritusFlagChecked()) {
-                tabLi.classList.remove('d-none');
-            } else {
-                tabLi.classList.add('d-none');
-                if (tabBtn && tabBtn.classList.contains('active')) {
-                    document.getElementById('general-tab').click();
-                }
-            }
-        }
-        emeritusFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncEmeritusTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    (function () {
-        var triggerNames = ['clinical-attending','faculty-adjunct','faculty-fulltime','professor-emeritus','accepting-patients'];
-        var publicFacingCb = document.querySelector('input[name=""Flags""][data-flagname=""public-facing""]');
-        if (!publicFacingCb) return;
-        var allFlagCbs = document.querySelectorAll('input[name=""Flags""]');
-        allFlagCbs.forEach(function (cb) {
-            var fn = (cb.getAttribute('data-flagname') || '').toLowerCase();
-            if (triggerNames.indexOf(fn) === -1) return;
-            cb.addEventListener('change', function () {
-                if (this.checked) publicFacingCb.checked = true;
-            });
-        });
-    })();
-    </script>
-
-    <script>
-    (function () {
-        var residentFlagIDs = [#arrayToList(residentFlagIDs)#];
-        var tabLi  = document.getElementById('resident-profile-tab-li');
-        var tabBtn = document.getElementById('resident-profile-tab');
-        function isResidentFlagChecked() {
-            return residentFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-        function syncResidentTabVisibility() {
-            if (!tabLi) return;
-            if (isResidentFlagChecked()) {
-                tabLi.classList.remove('d-none');
-            } else {
-                tabLi.classList.add('d-none');
-                if (tabBtn && tabBtn.classList.contains('active')) {
-                    document.getElementById('general-tab').click();
-                }
-            }
-        }
-        residentFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncResidentTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    /* ── Bio tab toggle (tied to public-facing flag) ── */
-    (function () {
-        var bioFlagIDs = [#arrayToList(bioFlagIDs)#];
-        var tabLi  = document.getElementById('bio-tab-li');
-        var tabBtn = document.getElementById('bio-tab');
-        function isBioFlagChecked() {
-            return bioFlagIDs.some(function (id) {
-                var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-                return cb && cb.checked;
-            });
-        }
-        function syncBioTabVisibility() {
-            if (!tabLi) return;
-            if (isBioFlagChecked()) {
-                tabLi.classList.remove('d-none');
-            } else {
-                tabLi.classList.add('d-none');
-                if (tabBtn && tabBtn.classList.contains('active')) {
-                    document.getElementById('general-tab').click();
-                }
-            }
-        }
-        bioFlagIDs.forEach(function (id) {
-            var cb = document.querySelector('input[name=""Flags""][value=""' + id + '""]');
-            if (cb) cb.addEventListener('change', syncBioTabVisibility);
-        });
-    })();
-    </script>
-
-    <script>
-    /* ── Degrees rows (shared across fac / emer / res tabs) ── */
-    document.addEventListener('DOMContentLoaded', function () {
-        var prefixes = ['fac', 'emer', 'res'];
-
-        function initDegreePanel(prefix) {
-            var container  = document.getElementById(prefix + '_degreesContainer');
-            var countInput = document.getElementById(prefix + '_degreeCount');
-            if (!container || !countInput) return;
-
-            function reindex() {
-                var rows = container.querySelectorAll('.degree-row');
-                rows.forEach(function (row, idx) {
-                    var n = row.querySelector('[data-field=deg_name]');
-                    var u = row.querySelector('[data-field=deg_univ]');
-                    var y = row.querySelector('[data-field=deg_year]');
-                    if (n) n.name = prefix + '_deg_name_' + idx;
-                    if (u) u.name = prefix + '_deg_univ_' + idx;
-                    if (y) y.name = prefix + '_deg_year_' + idx;
-                });
-                countInput.value = rows.length;
-                updateComposite(prefix);
-            }
-
-            function makeRemovable(btn) {
-                btn.addEventListener('click', function () {
-                    this.closest('.degree-row').remove();
-                    reindex();
-                });
-            }
-
-            container.querySelectorAll('.remove-degree-row').forEach(makeRemovable);
-        }
-
-        function updateComposite(prefix) {
-            var container  = document.getElementById(prefix + '_degreesContainer');
-            var composite  = document.getElementById(prefix + '_composite');
-            if (!container || !composite) return;
-            var names = [];
-            container.querySelectorAll('[data-field=deg_name]').forEach(function (inp) {
-                var v = inp.value.trim();
-                if (v) names.push(v);
-            });
-            composite.value = names.join(', ');
-        }
-
-        /* Delegate click for all Add Degree buttons */
-        document.addEventListener('click', function (e) {
-            var addBtn = e.target.closest('.add-degree-row');
-            if (!addBtn) return;
-            var prefix     = addBtn.getAttribute('data-prefix');
-            var container  = document.getElementById(prefix + '_degreesContainer');
-            var countInput = document.getElementById(prefix + '_degreeCount');
-            if (!container || !countInput) return;
-            var idx = parseInt(countInput.value, 10);
-            var row = document.createElement('div');
-            row.className = 'row g-2 mb-2 degree-row';
-
-            var c1 = document.createElement('div'); c1.className = 'col-md-4';
-            var n  = document.createElement('input');
-            n.className = 'form-control form-control-sm'; n.name = prefix + '_deg_name_' + idx;
-            n.setAttribute('data-field', 'deg_name'); n.placeholder = 'Degree (required)'; n.required = true;
-            n.addEventListener('input', function () { updateComposite(prefix); });
-            c1.appendChild(n);
-
-            var c2 = document.createElement('div'); c2.className = 'col-md-4';
-            var u  = document.createElement('input');
-            u.className = 'form-control form-control-sm'; u.name = prefix + '_deg_univ_' + idx;
-            u.setAttribute('data-field', 'deg_univ'); u.placeholder = 'University';
-            c2.appendChild(u);
-
-            var c3 = document.createElement('div'); c3.className = 'col-md-2';
-            var y  = document.createElement('input');
-            y.className = 'form-control form-control-sm'; y.name = prefix + '_deg_year_' + idx;
-            y.setAttribute('data-field', 'deg_year'); y.placeholder = 'Year';
-            c3.appendChild(y);
-
-            var c4  = document.createElement('div'); c4.className = 'col-md-2';
-            var btn = document.createElement('button');
-            btn.type = 'button'; btn.className = 'btn btn-sm btn-remove remove-degree-row w-100';
-            var removeIcon = document.createElement('i');
-            removeIcon.className = 'bi bi-trash me-1';
-            btn.appendChild(removeIcon);
-            btn.appendChild(document.createTextNode('Remove'));
-            btn.addEventListener('click', function () {
-                row.remove();
-                /* reindex */
-                var rows = container.querySelectorAll('.degree-row');
-                rows.forEach(function (r, ri) {
-                    var nn = r.querySelector('[data-field=deg_name]');
-                    var uu = r.querySelector('[data-field=deg_univ]');
-                    var yy = r.querySelector('[data-field=deg_year]');
-                    if (nn) nn.name = prefix + '_deg_name_' + ri;
-                    if (uu) uu.name = prefix + '_deg_univ_' + ri;
-                    if (yy) yy.name = prefix + '_deg_year_' + ri;
-                });
-                countInput.value = rows.length;
-                updateComposite(prefix);
-            });
-            c4.appendChild(btn);
-
-            row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); row.appendChild(c4);
-            container.appendChild(row);
-            countInput.value = idx + 1;
-        });
-
-        /* Bind existing name inputs for composite update */
-        prefixes.forEach(function (prefix) {
-            initDegreePanel(prefix);
-            var container = document.getElementById(prefix + '_degreesContainer');
-            if (container) {
-                container.querySelectorAll('[data-field=deg_name]').forEach(function (inp) {
-                    inp.addEventListener('input', function () { updateComposite(prefix); });
-                });
-            }
-        });
-    });
-    </script>
-
-    <script>
-    (function () {
-        var sw    = document.getElementById('activeSwitch');
-        var label = document.getElementById('activeSwitchLabel');
-        var statusCard = document.querySelector('.users-edit-record-status');
-        if (!sw) return;
-
-        function setStatusCardState(isActive) {
-            if (!statusCard) return;
-            statusCard.classList.toggle('users-edit-record-status-active', !!isActive);
-            statusCard.classList.toggle('users-edit-record-status-inactive', !isActive);
-        }
-
-        function triggerStatusToggle() {
-            if (!sw || sw.disabled) return;
-            sw.click();
-        }
-
-        setStatusCardState(sw.checked);
-
-        if (statusCard) {
-            statusCard.addEventListener('click', function (event) {
-                // Ignore clicks from the switch/label block to prevent double toggles.
-                if (event.target && event.target.closest('.form-check')) {
-                    return;
-                }
-                triggerStatusToggle();
-            });
-
-            statusCard.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    triggerStatusToggle();
-                }
-            });
-        }
-
-        sw.addEventListener('change', function () {
-            var newActive = sw.checked ? 1 : 0;
-            var userID    = sw.dataset.userid;
-            sw.disabled   = true;
-
-            var body = new URLSearchParams();
-            body.append('userID', userID);
-            body.append('active', newActive);
-
-            fetch('/admin/users/toggleActive.cfm', {
-                method:      'POST',
-                headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
-                credentials: 'same-origin',
-                body:        body.toString()
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.success) {
-                    label.textContent = data.active ? 'Active' : 'Inactive';
-                    setStatusCardState(data.active);
-                } else {
-                    // Revert the toggle on failure
-                    sw.checked = !sw.checked;
-                    setStatusCardState(sw.checked);
-                    alert('Could not update status: ' + (data.message || 'Unknown error'));
-                }
-            })
-            .catch(function () {
-                sw.checked = !sw.checked;
-                setStatusCardState(sw.checked);
-                alert('Network error — status not saved.');
-            })
-            .finally(function () {
-                sw.disabled = false;
-            });
-        });
-    })();
-    </script>
 "  />
 
 <!--- ── Data Quality Exclusions panel ── --->
 <cfsavecontent variable="local.dqPanel">
 <cfoutput>
-<div class='card mt-4 border-warning'>
+<div class='card mt-4 border-warning d-none' id='dataQualityPanel'>
     <div class='card-header bg-warning bg-opacity-10 d-flex align-items-center justify-content-between'>
         <strong><i class='bi bi-funnel'></i> Data Quality Report Exclusions</strong>
         <span class='text-muted small'>Checked = included in report &nbsp;|&nbsp; Unchecked = excluded</span>
@@ -2685,54 +1833,10 @@
 
 ">
 
-<!--- ── Quill.js WYSIWYG for Bio tab ── --->
+<!--- ── Quill.js WYSIWYG for bio editors ── --->
 <cfsavecontent variable="pageScripts">
-<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
-<style>
-/* Keep Bio/About Me editor at a usable fixed viewport and scroll within editor content. */
-.users-edit-bio-editor.ql-container {
-    min-height: 220px;
-    max-height: 360px;
-    height: 360px;
-    overflow: hidden;
-}
-
-.users-edit-bio-editor .ql-editor {
-    min-height: 100%;
-    max-height: 100%;
-    overflow-y: auto;
-}
-</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css">
 <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var editorEl = document.getElementById('bio-editor');
-    if (!editorEl) return;
-
-    var quill = new Quill('#bio-editor', {
-        theme: 'snow',
-        placeholder: 'Write a short bio...',
-        modules: {
-            toolbar: [
-                ['bold', 'italic'],
-                ['link'],
-                [{ list: 'ordered' }, { list: 'bullet' }],
-                ['clean']
-            ],
-            clipboard: { matchVisual: false }
-        }
-    });
-
-    /* ── Paste as plain text ── */
-    var Delta = Quill.import('delta');
-    quill.clipboard.addMatcher(Node.ELEMENT_NODE, function (node, delta) {
-        var plaintext = node.textContent || '';
-        return new Delta().insert(plaintext);
-    });
-
-    /* ── Quill editor initialized; no form sync needed (AJAX save reads from .ql-editor directly) ── */
-});
-</script>
 
 <!--- ── Email Modal ── --->
 <div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
@@ -2764,8 +1868,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveEmailModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveEmailModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2799,8 +1903,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="savePhoneModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="savePhoneModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2844,8 +1948,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveAliasModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveAliasModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2917,8 +2021,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveDegreeModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveDegreeModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -2939,8 +2043,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <select class="form-select" id="awardSelect">
                         <option value="">-- Select --</option>
                         <option value="Gold Key">Gold Key</option>
-                        <option value="Summa cum laude">Summa cum laude</option>
-                        <option value="Magna cum laude">Magna cum laude</option>
+                        <option value="Summa Cum Laude">Summa Cum Laude</option>
+                        <option value="Magna Cum Laude">Magna Cum Laude</option>
                         <option value="BSK Gold">BSK Gold</option>
                         <option value="BSK Black &amp; Gold">BSK Black &amp; Gold</option>
                         <option value="AOSA Honors">AOSA Honors</option>
@@ -2962,8 +2066,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveAwardModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveAwardModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -3001,8 +2105,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveResidencyModalBtn">Save</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveResidencyModalBtn">Save</button>
             </div>
         </div>
     </div>
@@ -3070,15 +2174,88 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ui-neutral" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ui-success" id="saveAddressBtn">Save Address</button>
-                <button type="button" class="btn btn-ui-success d-none" id="saveAddressToDbBtn">Save to Database</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveAddressBtn">Save Address</button>
+                <button type="button" class="btn btn-ui-save d-none" id="saveAddressToDbBtn">Save to Database</button>
             </div>
         </div>
     </div>
 </div>
 
+<!--- ── Dropbox Confirm Modal ── --->
+<div class="modal fade" id="dropboxConfirmModal" tabindex="-1" aria-labelledby="dropboxConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold mb-0" id="dropboxConfirmModalLabel">Confirm</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="dropboxConfirmModalBody" class="mb-0 small"></p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-ui-save" id="dropboxConfirmModalBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--- ── LDAP Lookup Modal ── --->
+<div class="modal fade" id="extidsLdapModal" tabindex="-1" aria-labelledby="extidsLdapModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="extidsLdapModalLabel">LDAP Lookup Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="extids-ldap-status" class="small text-muted mb-3"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>CougarNet</th>
+                                <th>Employee ID</th>
+                                <th>Email</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="extidsLdapResultsBody">
+                            <tr>
+                                <td colspan="5" class="text-muted">Run a lookup to see LDAP matches.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<cfoutput>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+var aliasTypeOptions = [#aliasTypeOptsJS#];
+var aliasTypeLabels  = [#aliasTypeLblsJS#];
+</script>
+</cfoutput>
 <script src="/assets/js/admin/users-edit.js"></script>
+<cfif len(uhSyncFlashMessage)>
+<cfoutput>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+(function () {
+    if (!window.AdminUI || typeof window.AdminUI.showToast !== 'function') { return; }
+    window.AdminUI.showToast("#encodeForJavaScript(uhSyncFlashMessage)#", {
+        tone: #uhSyncFlashIsError ? '"danger"' : '"success"'#
+    });
+})();
+</script>
+</cfoutput>
+</cfif>
 </cfsavecontent>
 
 <!--- ── Save toast ── --->

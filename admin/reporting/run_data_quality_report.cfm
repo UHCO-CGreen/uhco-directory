@@ -15,6 +15,8 @@
     <cfset triggeredBy = trim(form.triggeredBy)>
 </cfif>
 
+<cfinclude template="/admin/settings/scheduled-tasks/tasks/_scheduled_task_auth.cfm">
+
 <cfset returnJson = structKeyExists(url, "format") AND trim(url.format) EQ "json">
 
 <cfset dqDAO     = createObject("component", "dao.dataQuality_DAO").init()>

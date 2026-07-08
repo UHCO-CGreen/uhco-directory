@@ -8,33 +8,23 @@
 <cfparam name="url.issueCode" default="">
 <cfparam name="url.returnTo"  default="">
 
+<cfset quarantineMode = "redirect">
+<cfset quarantineReturnTo = "/admin/users/index.cfm">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
 <cfif NOT request.hasPermission("users.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
 <!--- Validate userID --->
 <cfif NOT (isNumeric(url.userID) AND val(url.userID) GT 0)>
-    <cfset content = "<h1>Quick Sync</h1><div class='alert alert-danger'>Invalid user ID.</div><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a>">
+    <cfset content = "<h1>Quick Sync</h1><div class='alert alert-danger'>Invalid user ID.</div><a href='/admin/users/index.cfm' class='btn btn-ui-cancel'>Back to Users</a>">
     <cfinclude template="/admin/layout.cfm">
     <cfabort>
 </cfif>
 <cfset targetUserID = val(url.userID)>
-<cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabled = usersService.isTestModeEnabled()>
-<cfif (NOT canViewTestUsers) AND (NOT testModeEnabled)>
-    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
-    <cfset targetUserFlags = flagsService.getUserFlags(targetUserID).data>
-    <cfset isTestUser = false>
-    <cfloop array="#targetUserFlags#" index="targetFlag">
-        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
-            <cfset isTestUser = true>
-            <cfbreak>
-        </cfif>
-    </cfloop>
-    <cfif isTestUser>
-        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
-    </cfif>
+<cfif NOT request.canAccessUserByID(targetUserID)>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
 <!--- Validate returnTo: only allow root-relative paths to prevent open redirect --->
@@ -74,6 +64,20 @@
     <cflocation url="#returnTo##sep#err=#urlEncodedFormat('User ' & targetUserID & ' not found')#" addtoken="false">
     <cfabort>
 </cfif>
+<cfset _qsIsAlumni = false>
+<cfset _qsIsFaculty = false>
+<cfloop from="1" to="#arrayLen(profile.flags)#" index="_qsf">
+    <cfif compareNoCase(trim(profile.flags[_qsf].FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _qsIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(profile.flags[_qsf].FLAGNAME ?: ""))>
+        <cfset _qsIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _qsIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_qsIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 <cfset dbUser  = profile.user>
 <cfset uhApiId = trim(dbUser.UH_API_ID ?: "")>
 <cfif uhApiId EQ "">
@@ -83,21 +87,14 @@
 </cfif>
 
 <!--- API credentials --->
-<cfset uhApiToken  = structKeyExists(application, "uhApiToken")  ? trim(application.uhApiToken  ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken  = trim(server.system.environment["UH_API_TOKEN"])>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])>
-    </cfif>
-</cfif>
-<cfif uhApiToken EQ "">
-    <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-</cfif>
-<cfif uhApiSecret EQ "">
-    <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
+
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cfset sep = find("?", returnTo) ? "&" : "?">
+    <cflocation url="#returnTo##sep#err=#urlEncodedFormat('UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.')#" addtoken="false">
+    <cfabort>
 </cfif>
 
 <!--- Fetch person from UH API --->

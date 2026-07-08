@@ -1,0 +1,203 @@
+﻿<cfif NOT request.hasPermission("orgs.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
+<cfset orgsService = createObject("component", "cfc.organizations_service").init()>
+<cfset orgsResult = orgsService.getAllOrgs()>
+<cfset allOrgs = orgsResult.data />
+
+<!--- Build name lookup and parent-keyed grouping --->
+<cfset orgNameLookup = {}>
+<cfset orgsByParent  = {}>
+<cfset rootOrgs      = []>
+
+<cfloop from="1" to="#arrayLen(allOrgs)#" index="i">
+    <cfset orgNameLookup[toString(allOrgs[i].ORGID)] = allOrgs[i].ORGNAME>
+</cfloop>
+
+<cfloop from="1" to="#arrayLen(allOrgs)#" index="i">
+    <cfset o    = allOrgs[i]>
+    <cfset pVal = trim((o.PARENTORGID ?: "") & "")>
+    <cfset isChild = len(pVal) AND isNumeric(pVal) AND structKeyExists(orgNameLookup, pVal)>
+    <cfset pKey = isChild ? pVal : "ROOT">
+
+    <cfif NOT structKeyExists(orgsByParent, pKey)>
+        <cfset orgsByParent[pKey] = []>
+    </cfif>
+    <cfset arrayAppend(orgsByParent[pKey], o)>
+
+    <cfif NOT isChild>
+        <cfset arrayAppend(rootOrgs, o)>
+    </cfif>
+</cfloop>
+
+<!--- Recursively collect all descendants with their nesting depth --->
+<cffunction name="collectDescendants" returntype="array" access="private" output="false">
+    <cfargument name="parentKey" type="string" required="true">
+    <cfargument name="depth"     type="numeric" required="true">
+    <cfset var result = []>
+    <cfset var k      = 0>
+    <cfset var child  = {}>
+    <cfset var nested = []>
+    <cfset var n      = 0>
+
+    <cfif NOT structKeyExists(orgsByParent, arguments.parentKey)>
+        <cfreturn result>
+    </cfif>
+
+    <cfloop from="1" to="#arrayLen(orgsByParent[arguments.parentKey])#" index="k">
+        <cfset child = orgsByParent[arguments.parentKey][k]>
+        <cfset arrayAppend(result, { org=child, depth=arguments.depth })>
+        <cfset nested = collectDescendants(toString(child.ORGID), arguments.depth + 1)>
+        <cfloop from="1" to="#arrayLen(nested)#" index="n">
+            <cfset arrayAppend(result, nested[n])>
+        </cfloop>
+    </cfloop>
+
+    <cfreturn result>
+</cffunction>
+
+<!--- ── Render ── --->
+<cfset content = "<div class='orgs-page'><nav aria-label='breadcrumb'><ol class='breadcrumb'><li class='breadcrumb-item'><a href='/admin/settings/'>Settings</a></li><li class='breadcrumb-item active'>Manage Organizations</li></ol></nav><h1>Organizational Units</h1>">
+
+<cfif arrayLen(allOrgs) EQ 0>
+    <cfset content &= "<p class='text-muted mt-3'>No organizational units found.</p>">
+<cfelse>
+    <cfset content &= "<div class='accordion mt-4 orgs-accordion p-3' id='orgAccordion'>">
+
+    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="i">
+        <cfset ro          = rootOrgs[i]>
+        <cfset collapseID  = "collapseOrg" & ro.ORGID>
+        <cfset headingID   = "headingOrg"  & ro.ORGID>
+        <cfset descendants = collectDescendants(toString(ro.ORGID), 1)>
+        <cfset hasChildren = arrayLen(descendants) GT 0>
+
+        <!--- Pre-compute fragments to avoid nested quotes in the string --->
+        <cfset ariaExpanded = (i EQ 1 AND hasChildren) ? "true" : "false">
+        <cfset showClass    = (i EQ 1 AND hasChildren) ? " show" : "">
+        <cfset typeHtml  = len(trim(ro.ORGTYPE ?: "")) ? " <span class='badge fw-normal orgs-type-badge'>" & EncodeForHTML(trim(ro.ORGTYPE)) & "</span>" : "">
+        <cfset countBadge = hasChildren ? " <span class='badge border fw-normal ms-1 orgs-count-badge'>" & arrayLen(descendants) & "</span>" : "">
+
+        <cfset content &= "
+        <div class='accordion-item mb-3 orgs-root-item'>
+            <div class='orgs-root-header' id='#headingID#'>
+                <button class='btn btn-link text-start text-decoration-none flex-grow-1 px-0 py-0 orgs-root-toggle'
+                        type='button'
+                        data-bs-toggle='collapse'
+                        data-bs-target='###collapseID#'
+                        aria-expanded='#ariaExpanded#'
+                        aria-controls='#collapseID#'>
+                    #EncodeForHTML(ro.ORGNAME)##typeHtml##countBadge#
+                </button>
+                <div class='orgs-root-actions d-flex flex-wrap gap-1 align-items-start flex-shrink-0'>
+                    <a href='/admin/settings/orgs/edit.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                    <a href='/admin/settings/orgs/delete.cfm?orgID=#ro.ORGID#' class='btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
+                </div>
+            </div>
+            <div id='#collapseID#' class='accordion-collapse collapse#showClass#'>
+        ">
+
+        <cfif hasChildren>
+            <cfset content &= "
+                <table class='table table-sm table-hover mb-0 orgs-table'>
+                    <thead>
+                        <tr>
+                            <th class='ps-3'>Name</th>
+                            <th>Type</th>
+                            <th class='text-end pe-3'>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            ">
+
+            <cfloop from="1" to="#arrayLen(descendants)#" index="d">
+                <cfset desc   = descendants[d]>
+                <cfset indent = repeatString("&nbsp;&nbsp;&nbsp;&nbsp;", desc.depth - 1)>
+                <cfset prefix = desc.depth GT 1 ? indent & "&##x2514;&nbsp;" : "">
+                <cfset dType  = EncodeForHTML(trim(desc.org.ORGTYPE ?: ""))>
+
+                <cfset content &= "
+                        <tr>
+                            <td class='ps-3 orgs-name-cell'>#prefix##EncodeForHTML(desc.org.ORGNAME)#</td>
+                            <td>#dType#</td>
+                            <td class='text-end pe-3'>
+                                <div class='d-flex flex-wrap gap-1 align-items-start justify-content-end'>
+                                    <a href='/admin/settings/orgs/edit.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit' title='Edit Organization' data-bs-toggle='tooltip' data-bs-title='Edit Organization' aria-label='Edit Organization'><i class='bi bi-pencil-square'></i></a>
+                                    <a href='/admin/settings/orgs/delete.cfm?orgID=#desc.org.ORGID#' class='btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete' title='Delete Organization' data-bs-toggle='tooltip' data-bs-title='Delete Organization' aria-label='Delete Organization'><i class='bi bi-trash'></i></a>
+                                </div>
+                            </td>
+                        </tr>
+                ">
+            </cfloop>
+
+            <cfset content &= "
+                    </tbody>
+                </table>
+            ">
+        <cfelse>
+            <cfset content &= "<p class='text-muted small ps-3 py-2 mb-0'>No sub-organizational units.</p>">
+        </cfif>
+
+        <cfset content &= "
+            </div>
+        </div>
+        ">
+    </cfloop>
+
+    <cfset content &= "</div>">
+</cfif>
+
+<cfset content &= "
+<div class='card mt-5 orgs-add-card'>
+    <div class='card-header fw-semibold'>Add New Organizational Unit</div>
+    <div class='card-body'>
+        <form class='row g-3' method='post' action='saveOrg.cfm'>
+            <div class='col-md-4'>
+                <label class='form-label'>Organizational Unit Name</label>
+                <input class='form-control' name='OrgName' required>
+            </div>
+            <div class='col-md-4'>
+                <label class='form-label'>Organizational Unit Type</label>
+                <input class='form-control' name='OrgType'>
+            </div>
+            <div class='col-md-4'>
+                <label class='form-label'>Parent Organizational Unit</label>
+                <select class='form-select' name='ParentOrgID'>
+                    <option value=''>-- None --</option>
+">
+
+<cfloop from="1" to="#arrayLen(rootOrgs)#" index="i">
+    <cfset ro = rootOrgs[i]>
+    <cfset content &= "<option value='#ro.ORGID#'>#EncodeForHTML(ro.ORGNAME)#</option>">
+    <cfset descendants = collectDescendants(toString(ro.ORGID), 1)>
+    <cfloop from="1" to="#arrayLen(descendants)#" index="d">
+        <cfset desc   = descendants[d]>
+        <cfset indent = repeatString("&nbsp;&nbsp;", desc.depth)>
+        <cfset content &= "<option value='#desc.org.ORGID#'>#indent##EncodeForHTML(desc.org.ORGNAME)#</option>">
+    </cfloop>
+</cfloop>
+
+<cfset content &= "
+                </select>
+            </div>
+            <div class='col-md-4'>
+                <div class='form-check mt-4 pt-2'>
+                    <input class='form-check-input' type='checkbox' name='AdditionalRoles' value='1' id='newAdditionalRoles'>
+                    <label class='form-check-label' for='newAdditionalRoles'>Additional Roles</label>
+                </div>
+                <div class='form-text'>Allow role title &amp; order when assigning users.</div>
+            </div>
+            <div class='col-12'>
+                <label class='form-label'>Description</label>
+                <textarea class='form-control' name='OrgDescription' rows='2' placeholder='Optional description shown on user edit/new pages for parent organizations.'></textarea>
+            </div>
+            <div class='col-12'>
+                <button class='btn btn-ui-add'><i class='bi bi-plus-circle me-1'></i>Add Organization</button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+" />
+
+<cfinclude template="/admin/layout.cfm">

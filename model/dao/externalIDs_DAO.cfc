@@ -40,6 +40,17 @@ component extends="dao.BaseDAO" output="false" singleton {
         );
     }
 
+    public void function deleteExternalID( required numeric userID, required numeric systemID ) {
+        executeQueryWithRetry(
+            "DELETE FROM UserExternalIDs WHERE UserID = :uid AND SystemID = :sid",
+            {
+                uid={ value=userID, cfsqltype="cf_sql_integer" },
+                sid={ value=systemID, cfsqltype="cf_sql_integer" }
+            },
+            { datasource=variables.datasource, timeout=30 }
+        );
+    }
+
     public array function getAllExternalIDs() {
         var qry = executeQueryWithRetry(
             "SELECT UserID, SystemID, ExternalValue FROM UserExternalIDs",

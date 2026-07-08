@@ -91,6 +91,24 @@
                   <cfset condMatches = exactMatch
                     ? _userSearchEquals(titleValue, fieldVal)
                     : _userSearchContains(titleValue, fieldVal)>
+                <cfelseif fieldName EQ "flags" OR fieldName EQ "flag">
+                  <cfset condMatches = _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_FLAGS"), fieldVal)>
+                <cfelseif fieldName EQ "orgs" OR fieldName EQ "org">
+                  <cfset condMatches = _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_ORGS"), fieldVal)>
+                <cfelseif fieldName EQ "phone">
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(_userSearchGetValue(arguments.u, "SEARCH_PHONE"), fieldVal)
+                    : _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_PHONE"), fieldVal)>
+                <cfelseif fieldName EQ "cougarnet">
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(_userSearchGetValue(arguments.u, "SEARCH_COUGARNET"), fieldVal)
+                    : _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_COUGARNET"), fieldVal)>
+                <cfelseif fieldName EQ "psid" OR fieldName EQ "peoplesoft">
+                  <cfset condMatches = exactMatch
+                    ? _userSearchEquals(_userSearchGetValue(arguments.u, "SEARCH_PSID"), fieldVal)
+                    : _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_PSID"), fieldVal)>
+                <cfelseif fieldName EQ "gradyear" OR fieldName EQ "grad">
+                  <cfset condMatches = _userSearchContains(_userSearchGetValue(arguments.u, "SEARCH_GRADYEARS"), fieldVal)>
                 <cfelse>
                     <!--- Unknown field: fall back to any-field match on the full original token --->
                   <cfset condMatches = _userSearchContains(firstName, cond) OR
@@ -118,6 +136,28 @@
                              _userSearchContains(lastName, cond) OR
                              _userSearchContains(primaryEmail, cond) OR
                              _userSearchContains(preferredName, cond)>
+                  <!--- Also detect "Firstname Lastname" and "Lastname, Firstname" name patterns --->
+                  <cfif NOT condMatches>
+                    <cfset nameCommaPos = find(",", cond)>
+                    <cfif nameCommaPos GT 1>
+                      <!--- "Lastname, Firstname" pattern --->
+                      <cfset nameLN = trim(left(cond, nameCommaPos - 1))>
+                      <cfset nameFN = trim(mid(cond, nameCommaPos + 1, len(cond)))>
+                      <cfif len(nameLN) AND len(nameFN)>
+                        <cfset condMatches = (_userSearchContains(firstName, nameFN) AND _userSearchContains(lastName, nameLN)) OR
+                                             (_userSearchContains(preferredName, nameFN) AND _userSearchContains(lastName, nameLN))>
+                      </cfif>
+                    <cfelseif find(" ", cond) GT 0>
+                      <!--- "Firstname Lastname" pattern --->
+                      <cfset nameSpacePos = find(" ", cond)>
+                      <cfset nameFN = trim(left(cond, nameSpacePos - 1))>
+                      <cfset nameLN = trim(mid(cond, nameSpacePos + 1, len(cond)))>
+                      <cfif len(nameFN) AND len(nameLN)>
+                        <cfset condMatches = (_userSearchContains(firstName, nameFN) AND _userSearchContains(lastName, nameLN)) OR
+                                             (_userSearchContains(preferredName, nameFN) AND _userSearchContains(lastName, nameLN))>
+                      </cfif>
+                    </cfif>
+                  </cfif>
                 </cfif>
             </cfif>
 
@@ -195,6 +235,16 @@
           </tbody>
         </table>
 
+        <h6 class="fw-bold">Basic Name Search</h6>
+        <p class="text-muted small mb-2">You can search by full name in either order — no field prefix needed.</p>
+        <table class="table table-sm table-bordered mb-4">
+          <thead class="table-light"><tr><th>Query</th><th>Matches</th></tr></thead>
+          <tbody>
+            <tr><td><code>Chris Green</code></td><td>First name contains "Chris" AND last name contains "Green"</td></tr>
+            <tr><td><code>Green, Chris</code></td><td>Last name contains "Green" AND first name contains "Chris"</td></tr>
+          </tbody>
+        </table>
+
         <h6 class="fw-bold">Field Operators</h6>
         <p class="text-muted small mb-2">Target a specific field with <code>field:value</code>. Performs a <em>contains</em> search.</p>
         <table class="table table-sm table-bordered mb-4">
@@ -202,9 +252,13 @@
           <tbody>
             <tr><td><code>lastname:Doe</code></td><td>Last name contains "Doe"</td></tr>
             <tr><td><code>firstname:Jane</code></td><td>First name contains "Jane"</td></tr>
-            <tr><td><code>email:uh.edu</code></td><td>Either email contains "uh.edu"</td></tr>
-            <tr><td><code>primaryemail:jdoe@uh.edu</code></td><td>Primary email contains that value</td></tr>
-            <tr><td><code>secondaryemail:jdoe@gmail.com</code></td><td>Secondary email contains that value</td></tr>
+            <tr><td><code>email:uh.edu</code></td><td>Email contains "uh.edu"</td></tr>
+            <tr><td><code>phone:713</code></td><td>Phone number contains "713"</td></tr>
+            <tr><td><code>cougarnet:jdoe</code></td><td>CougarNet ID contains "jdoe"</td></tr>
+            <tr><td><code>psid:12345</code></td><td>PeopleSoft ID contains "12345"</td></tr>
+            <tr><td><code>flags:Alumni</code></td><td>Has a flag whose name contains "Alumni"</td></tr>
+            <tr><td><code>orgs:Clinic</code></td><td>Belongs to an org whose name contains "Clinic"</td></tr>
+            <tr><td><code>gradyear:2024</code></td><td>Has grad year containing "2024"</td></tr>
             <tr><td><code>title:Professor</code></td><td>Title contains "Professor"</td></tr>
           </tbody>
         </table>
@@ -234,7 +288,7 @@
 
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

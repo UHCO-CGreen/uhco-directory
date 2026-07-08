@@ -8,50 +8,50 @@
 
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
-<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
-<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
-<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
-<cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
 <cfset profile = directoryService.getFullProfile(form.userID)>
-<cfset isTestUser = false>
-<cfloop from="1" to="#arrayLen(profile.flags ?: [])#" index="flagIndex">
-    <cfif compareNoCase(trim(profile.flags[flagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
-        <cfset isTestUser = true>
-        <cfbreak>
+<cfif NOT request.canAccessUserProfile(profile)>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+<cfset _dpIsAlumni = false>
+<cfset _dpIsFaculty = false>
+<cfloop from="1" to="#arrayLen(profile.flags)#" index="_dpf">
+    <cfif compareNoCase(trim(profile.flags[_dpf].FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _dpIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(profile.flags[_dpf].FLAGNAME ?: ""))>
+        <cfset _dpIsFaculty = true>
     </cfif>
 </cfloop>
-<cfif hideTestUsersForAdmin AND isTestUser>
-    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+<cfif _dpIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_dpIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
 </cfif>
 
 <!--- Perform the deletion --->
 <cfset result = usersService.deleteUser(
     userID = form.userID,
-    forceDeleteRelatedDuplicatePairs = canViewTestUsers
+    forceDeleteRelatedDuplicatePairs = application.authService.hasRole("SUPER_ADMIN")
 )>
 
 <cfif result.success>
     <cfset content = "
     <div class='alert alert-success alert-dismissible fade show' role='alert'>
-        <h4 class='alert-heading'>✓ User Deleted</h4>
+        <h4 class='alert-heading'>User Deleted</h4>
         <p>#result.message#</p>
         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
     </div>
 
-    <p><a href='/admin/users/index.cfm' class='btn btn-primary'>Back to Users</a></p>
+    <p><a href='/admin/users/index.cfm' class='btn btn-ui-cancel'>Back to Users</a></p>
     " />
 <cfelse>
     <cfset content = "
     <div class='alert alert-danger alert-dismissible fade show' role='alert'>
-        <h4 class='alert-heading'>✗ Error Deleting User</h4>
+        <h4 class='alert-heading'>Error Deleting User</h4>
         <p>#result.message#</p>
         <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
     </div>
 
-    <p><a href='/admin/users/index.cfm' class='btn btn-secondary'>Back to Users</a></p>
+    <p><a href='/admin/users/index.cfm' class='btn btn-ui-cancel'>Back to Users</a></p>
     " />
 </cfif>
 

@@ -1,779 +1,130 @@
 <cfsetting showdebugoutput="false">
 <cfcontent type="application/json">
 
+<cffunction name="toCaseSafeJsonValue" access="private" returntype="any" output="false">
+    <cfargument name="value" required="true">
+
+    <cfset var resultStruct = "">
+    <cfset var resultArray = []>
+    <cfset var keyName = "">
+    <cfset var itemValue = "">
+
+    <cfif isStruct(arguments.value)>
+        <cfset resultStruct = structNew("ordered-casesensitive")>
+        <cfloop collection="#arguments.value#" item="keyName">
+            <cfset resultStruct[lCase(keyName)] = toCaseSafeJsonValue(arguments.value[keyName])>
+        </cfloop>
+        <cfreturn resultStruct>
+    </cfif>
+
+    <cfif isArray(arguments.value)>
+        <cfloop array="#arguments.value#" item="itemValue">
+            <cfset arrayAppend(resultArray, toCaseSafeJsonValue(itemValue))>
+        </cfloop>
+        <cfreturn resultArray>
+    </cfif>
+
+    <cfreturn arguments.value>
+</cffunction>
+
+<cffunction name="emitAsyncSuccess" access="private" returntype="void" output="false">
+    <cfargument name="message" type="string" required="true">
+    <cfargument name="data" required="false" default="#{}#">
+
+    <cfset var payload = structNew("ordered-casesensitive")>
+    <cfset payload.success = true>
+    <cfset payload.message = trim(arguments.message ?: "")>
+    <cfset payload.errors = []>
+    <cfset payload.data = toCaseSafeJsonValue(arguments.data)>
+
+    <cfheader statusCode="200">
+    <cfoutput>#serializeJSON(payload)#</cfoutput>
+    <cfabort>
+</cffunction>
+
+<cffunction name="emitAsyncError" access="private" returntype="void" output="false">
+    <cfargument name="statusCode" type="numeric" required="true">
+    <cfargument name="message" type="string" required="true">
+    <cfargument name="errors" required="false" default="#[]#">
+    <cfargument name="data" required="false" default="#{}#">
+
+    <cfset var payload = structNew("ordered-casesensitive")>
+    <cfset payload.success = false>
+    <cfset payload.message = trim(arguments.message ?: "")>
+    <cfset payload.errors = toCaseSafeJsonValue(arguments.errors)>
+    <cfset payload.data = toCaseSafeJsonValue(arguments.data)>
+
+    <cfheader statusCode="#arguments.statusCode#">
+    <cfoutput>#serializeJSON(payload)#</cfoutput>
+    <cfabort>
+</cffunction>
+
+<cffunction name="emitAsyncServiceResult" access="private" returntype="void" output="false">
+    <cfargument name="result" type="struct" required="true">
+
+    <cfif structKeyExists(arguments.result, "success") AND arguments.result.success>
+        <cfset emitAsyncSuccess(arguments.result.message ?: "Saved.", structKeyExists(arguments.result, "data") ? arguments.result.data : {})>
+    <cfelse>
+        <cfset emitAsyncError(
+            structKeyExists(arguments.result, "statusCode") ? val(arguments.result.statusCode) : 400,
+            arguments.result.message ?: "Save failed.",
+            structKeyExists(arguments.result, "errors") ? arguments.result.errors : [],
+            structKeyExists(arguments.result, "data") ? arguments.result.data : {}
+        )>
+    </cfif>
+</cffunction>
+
 <cfif NOT request.hasPermission("users.edit")>
-    <cfoutput>{"success":false,"message":"Unauthorized: users.edit permission required."}</cfoutput><cfabort>
+    <cfset emitAsyncError(403, "Unauthorized: users.edit permission required.", ["users.edit permission required"])>
 </cfif>
 
 <cfif NOT structKeyExists(form, "userID") OR NOT isNumeric(form.userID)>
-    <cfoutput>{"success":false,"message":"Missing userID."}</cfoutput><cfabort>
+    <cfset emitAsyncError(400, "Missing userID.", ["userID is required and must be numeric"] )>
 </cfif>
 <cfif NOT structKeyExists(form, "section")>
-    <cfoutput>{"success":false,"message":"Missing section."}</cfoutput><cfabort>
+    <cfset emitAsyncError(400, "Missing section.", ["section is required"] )>
 </cfif>
 
 <cfset userID = val(form.userID)>
 <cfset section = lCase(trim(form.section))>
-<cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
-<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
-<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
-<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
-<cfif NOT showTestUsersForAdmin>
-    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
-    <cfset targetUserFlags = flagsService.getUserFlags(userID).data>
-    <cfset isTestUser = false>
-    <cfloop array="#targetUserFlags#" index="targetFlag">
-        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
-            <cfset isTestUser = true>
-            <cfbreak>
-        </cfif>
-    </cfloop>
-    <cfif isTestUser>
-        <cfoutput>{"success":false,"message":"Unauthorized."}</cfoutput><cfabort>
-    </cfif>
+<cfset userEditSaveService = createObject("component", "cfc.userEditSave_service").init()>
+<cfif NOT request.canAccessUserByID(userID)>
+    <cfset emitAsyncError(403, "Unauthorized.", ["test user access is restricted"] )>
 </cfif>
-
-<cffunction name="getFieldValue" access="private" returntype="string" output="false">
-    <cfargument name="value" required="true">
-    <cfif isStruct(arguments.value) AND structKeyExists(arguments.value, "value")>
-        <cfreturn trim(arguments.value.value ?: "")>
+<cfset _ssFlagsSvc = createObject("component", "cfc.flags_service").init()>
+<cfset _ssFlags = _ssFlagsSvc.getUserFlags(userID).data>
+<cfset _ssIsAlumni = false>
+<cfset _ssIsFaculty = false>
+<cfloop array="#_ssFlags#" index="_ssf">
+    <cfif compareNoCase(trim(_ssf.FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _ssIsAlumni = true>
     </cfif>
-    <cfreturn trim(arguments.value ?: "")>
-</cffunction>
-
-<cffunction name="isStudentHometownSyncUser" access="private" returntype="boolean" output="false">
-    <cfargument name="userID" type="numeric" required="true">
-    <cfset var flagsService = createObject("component", "cfc.flags_service").init()>
-    <cfset var userFlags = flagsService.getUserFlags(arguments.userID).data>
-    <cfset var userFlag = {}>
-    <cfloop array="#userFlags#" index="userFlag">
-        <cfif listFindNoCase("current-student,current student,alumni", trim(userFlag.FLAGNAME ?: "")) GT 0>
-            <cfreturn true>
-        </cfif>
-    </cfloop>
-    <cfreturn false>
-</cffunction>
-
-<cffunction name="syncStudentProfileHometownFromAddresses" access="private" returntype="void" output="false">
-    <cfargument name="userID" type="numeric" required="true">
-    <cfargument name="addresses" type="array" required="true">
-    <cfset var studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-    <cfset var addressRow = {}>
-    <cfset var hometownCity = "">
-    <cfset var hometownState = "">
-
-    <cfif NOT isStudentHometownSyncUser(arguments.userID)>
-        <cfreturn>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_ssf.FLAGNAME ?: ""))>
+        <cfset _ssIsFaculty = true>
     </cfif>
-
-    <cfloop array="#arguments.addresses#" index="addressRow">
-        <cfif compareNoCase(getFieldValue(addressRow.AddressType ?: ""), "Hometown") EQ 0>
-            <cfset hometownCity = getFieldValue(addressRow.City ?: "")>
-            <cfset hometownState = getFieldValue(addressRow.State ?: "")>
-        </cfif>
-    </cfloop>
-
-    <cfset studentProfileSvc.syncHometown(arguments.userID, hometownCity, hometownState)>
-</cffunction>
-
-<!--- Proper-case helper: "JANE DOE" / "jane doe" → "Jane Doe", handles McX / O'X / hyphens --->
-<cffunction name="toProperName" access="private" returntype="string" output="false">
-    <cfargument name="input" type="string" required="true">
-    <cfset var raw = trim(arguments.input)>
-    <cfif NOT len(raw)><cfreturn ""></cfif>
-    <cfset var words = listToArray(raw, " ")>
-    <cfset var result = []>
-    <cfloop array="#words#" index="local.w">
-        <cfset var hParts = listToArray(local.w, "-")>
-        <cfset var hResult = []>
-        <cfloop array="#hParts#" index="local.h">
-            <cfset var part = lCase(local.h)>
-            <cfif len(part) GT 2 AND left(part, 2) EQ "mc">
-                <cfset part = "Mc" & uCase(mid(part, 3, 1)) & mid(part, 4, len(part) - 3)>
-            <cfelseif len(part) GT 2 AND left(part, 2) EQ "o'">
-                <cfset part = "O'" & uCase(mid(part, 3, 1)) & mid(part, 4, len(part) - 3)>
-            <cfelse>
-                <cfset part = uCase(left(part, 1)) & mid(part, 2, len(part) - 1)>
-            </cfif>
-            <cfset arrayAppend(hResult, part)>
-        </cfloop>
-        <cfset arrayAppend(result, arrayToList(hResult, "-"))>
-    </cfloop>
-    <cfreturn arrayToList(result, " ")>
-</cffunction>
-
-<cffunction name="parseDisplayNameParts" access="private" returntype="struct" output="false">
-    <cfargument name="displayName" type="string" required="true">
-
-    <cfset var nameRaw = trim(arguments.displayName)>
-    <cfset var cleaned = "">
-    <cfset var parts = []>
-    <cfset var structOut = { firstName = "", middleName = "", lastName = "" }>
-    <cfset var firstMiddle = "">
-    <cfset var firstParts = []>
-    <cfset var i = 0>
-
-    <cfif NOT len(nameRaw)>
-        <cfreturn structOut>
-    </cfif>
-
-    <cfset cleaned = rereplace(nameRaw, "\s+", " ", "all")>
-
-    <!--- Last, First Middle --->
-    <cfif find(",", cleaned) GT 0>
-        <cfset structOut.lastName = toProperName(trim(listFirst(cleaned, ",")))>
-        <cfset firstMiddle = trim(listRest(cleaned, ","))>
-        <cfif len(firstMiddle)>
-            <cfset firstParts = listToArray(firstMiddle, " ")>
-            <cfif arrayLen(firstParts) GTE 1>
-                <cfset structOut.firstName = toProperName(trim(firstParts[1]))>
-            </cfif>
-            <cfif arrayLen(firstParts) GTE 2>
-                <cfset structOut.middleName = toProperName(trim(arrayToList(arraySlice(firstParts, 2, arrayLen(firstParts) - 1), " ")))>
-            </cfif>
-        </cfif>
-        <cfreturn structOut>
-    </cfif>
-
-    <!--- First Middle Last --->
-    <cfset parts = listToArray(cleaned, " ")>
-    <cfif arrayLen(parts) EQ 1>
-        <cfset structOut.firstName = toProperName(trim(parts[1]))>
-    <cfelseif arrayLen(parts) EQ 2>
-        <cfset structOut.firstName = toProperName(trim(parts[1]))>
-        <cfset structOut.lastName = toProperName(trim(parts[2]))>
-    <cfelse>
-        <cfset structOut.firstName = toProperName(trim(parts[1]))>
-        <cfset structOut.lastName = toProperName(trim(parts[arrayLen(parts)]))>
-        <cfset structOut.middleName = toProperName(trim(arrayToList(arraySlice(parts, 2, arrayLen(parts) - 2), " ")))>
-    </cfif>
-
-    <cfreturn structOut>
-</cffunction>
-
-<!--- Helper: builds a full userData struct from existing record, overlaying only supplied keys --->
-<cffunction name="buildUserData" access="private" returntype="struct" output="false">
-    <cfargument name="existing" type="struct" required="true">
-    <cfargument name="overrides" type="struct" required="false" default="#{}#">
-    <cfset var e = arguments.existing>
-    <cfset var o = arguments.overrides>
-    <cfset var ud = {
-        FirstName  = structKeyExists(o, "FirstName")  ? o.FirstName  : (e.FIRSTNAME ?: ""),
-        MiddleName = structKeyExists(o, "MiddleName") ? o.MiddleName : (e.MIDDLENAME ?: ""),
-        LastName   = structKeyExists(o, "LastName")   ? o.LastName   : (e.LASTNAME ?: ""),
-        Prefix     = structKeyExists(o, "Prefix")     ? o.Prefix     : (e.PREFIX ?: ""),
-        Suffix     = structKeyExists(o, "Suffix")     ? o.Suffix     : (e.SUFFIX ?: ""),
-        Pronouns   = structKeyExists(o, "Pronouns")   ? o.Pronouns   : (e.PRONOUNS ?: ""),
-        Title1     = structKeyExists(o, "Title1")     ? o.Title1     : (e.TITLE1 ?: ""),
-        Title2     = structKeyExists(o, "Title2")     ? o.Title2     : (e.TITLE2 ?: ""),
-        Title3     = structKeyExists(o, "Title3")     ? o.Title3     : (e.TITLE3 ?: ""),
-        EmailPrimary = structKeyExists(o, "EmailPrimary") ? o.EmailPrimary : (e.EMAILPRIMARY ?: ""),
-        Phone      = structKeyExists(o, "Phone")      ? o.Phone      : (e.PHONE ?: ""),
-        Room       = structKeyExists(o, "Room")       ? o.Room       : (e.ROOM ?: ""),
-        Building   = structKeyExists(o, "Building")   ? o.Building   : (e.BUILDING ?: ""),
-        UH_API_ID  = structKeyExists(o, "UH_API_ID")  ? o.UH_API_ID  : (e.UH_API_ID ?: ""),
-        Degrees    = structKeyExists(o, "Degrees")    ? o.Degrees    : (e.DEGREES ?: ""),
-        Campus     = structKeyExists(o, "Campus")     ? o.Campus     : (e.CAMPUS ?: ""),
-        Division   = structKeyExists(o, "Division")   ? o.Division   : (e.DIVISION ?: ""),
-        DivisionName = structKeyExists(o, "DivisionName") ? o.DivisionName : (e.DIVISIONNAME ?: ""),
-        Department   = structKeyExists(o, "Department")   ? o.Department   : (e.DEPARTMENT ?: ""),
-        DepartmentName = structKeyExists(o, "DepartmentName") ? o.DepartmentName : (e.DEPARTMENTNAME ?: ""),
-        Office_Mailing_Address = structKeyExists(o, "Office_Mailing_Address") ? o.Office_Mailing_Address : (e.OFFICE_MAILING_ADDRESS ?: ""),
-        Mailcode   = structKeyExists(o, "Mailcode")   ? o.Mailcode   : (e.MAILCODE ?: ""),
-        Notes      = structKeyExists(o, "Notes")      ? o.Notes      : (e.NOTES ?: ""),
-        Active     = val(e.ACTIVE ?: 1)
-    }>
-    <!--- DOB / Gender: use override if present, else existing --->
-    <cfset var dobVal = structKeyExists(o, "DOB") ? o.DOB : (e.DOB ?: "")>
-    <cfset var genVal = structKeyExists(o, "Gender") ? o.Gender : (e.GENDER ?: "")>
-    <cfset ud.DOB = { value=(len(dobVal) ? dobVal : ""), cfsqltype="cf_sql_date", null=(NOT len(dobVal)) }>
-    <cfset ud.Gender = { value=genVal, cfsqltype="cf_sql_nvarchar", null=(NOT len(genVal)) }>
-    <cfreturn ud>
-</cffunction>
+</cfloop>
+<cfif _ssIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_ssIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cfset emitAsyncError(403, "Access denied.", ["alumni.view role required"])>
+</cfif>
 
 <cftry>
 <cfswitch expression="#section#">
-
-    <!--- ── Emails ── --->
-    <cfcase value="emails">
-        <cfset emailsSvc = createObject("component", "cfc.emails_service").init()>
-        <cfset emailCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset primaryIdx = structKeyExists(form, "primary_idx") ? val(form.primary_idx) : -1>
-        <cfset emailsToSave = []>
-        <cfloop from="0" to="#emailCount - 1#" index="i">
-            <cfset eAddr = structKeyExists(form, "addr_#i#") ? trim(form["addr_#i#"]) : "">
-            <cfset eType = structKeyExists(form, "type_#i#") ? trim(form["type_#i#"]) : "">
-            <cfif len(eAddr) AND NOT reFindNoCase('@uh\.edu$', eAddr)>
-                <cfset arrayAppend(emailsToSave, { address=eAddr, type=eType, isPrimary=(i EQ primaryIdx) })>
-            </cfif>
-        </cfloop>
-        <cfset emailsSvc.replaceEmails(userID, emailsToSave)>
-        <cfoutput>{"success":true,"message":"Emails saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Add LDAP email if missing (no-op if exists) ── --->
-    <cfcase value="addldapemailifmissing">
-        <cfset emailsSvc = createObject("component", "cfc.emails_service").init()>
-        <cfset ldapEmail = structKeyExists(form, "email") ? trim(form.email) : "">
-        <cfset ldapEmailType = "@Cougarnet">
-
-        <cfif NOT len(ldapEmail)>
-            <cfoutput>{"success":false,"message":"Missing email."}</cfoutput><cfabort>
-        </cfif>
-
-        <cfif reFindNoCase("@central", ldapEmail)>
-            <cfset ldapEmailType = "@Central">
-        </cfif>
-
-        <cfset wasInserted = emailsSvc.addEmailIfMissing(userID=userID, emailAddress=ldapEmail, emailType=ldapEmailType)>
-        <cfif wasInserted>
-            <cfoutput>{"success":true,"inserted":true,"message":"Email added."}</cfoutput>
-        <cfelse>
-            <cfoutput>{"success":true,"inserted":false,"message":"Email already exists."}</cfoutput>
-        </cfif>
-    </cfcase>
-
-    <!--- ── Add LDAP alias from displayName if missing (no-op if exists) ── --->
-    <cfcase value="addldapaliasifmissing">
-        <cfset aliasesSvc = createObject("component", "cfc.aliases_service").init()>
-        <cfset ldapDisplayName = structKeyExists(form, "displayName") ? trim(form.displayName) : "">
-        <cfset aliasTypeCode = "SOURCE_VARIANT">
-        <cfset sourceSystem = "LDAP">
-        <cfset parsed = {}>
-        <cfset existingAliases = []>
-        <cfset aliasesToSave = []>
-        <cfset existing = {}>
-        <cfset alreadyExists = false>
-
-        <cfif NOT len(ldapDisplayName)>
-            <cfoutput>{"success":false,"message":"Missing displayName."}</cfoutput><cfabort>
-        </cfif>
-
-        <cfset parsed = parseDisplayNameParts(ldapDisplayName)>
-        <cfif NOT len(parsed.firstName) AND NOT len(parsed.middleName) AND NOT len(parsed.lastName)>
-            <cfoutput>{"success":false,"message":"Could not parse displayName into alias parts."}</cfoutput><cfabort>
-        </cfif>
-
-        <cfset existingAliases = aliasesSvc.getAliases(userID).data>
-
-        <cfloop array="#existingAliases#" index="existing">
-            <cfif
-                lCase(trim(existing.ALIASTYPE ?: "")) EQ lCase(aliasTypeCode)
-                AND lCase(trim(existing.SOURCESYSTEM ?: "")) EQ lCase(sourceSystem)
-                AND lCase(trim(existing.FIRSTNAME ?: "")) EQ lCase(parsed.firstName)
-                AND lCase(trim(existing.MIDDLENAME ?: "")) EQ lCase(parsed.middleName)
-                AND lCase(trim(existing.LASTNAME ?: "")) EQ lCase(parsed.lastName)
-            >
-                <cfset alreadyExists = true>
-                <cfbreak>
-            </cfif>
-        </cfloop>
-
-        <cfif alreadyExists>
-            <cfoutput>{"success":true,"inserted":false,"message":"Alias already exists."}</cfoutput><cfabort>
-        </cfif>
-
-        <cfloop array="#existingAliases#" index="existing">
-            <cfset arrayAppend(aliasesToSave, {
-                firstName = trim(existing.FIRSTNAME ?: ""),
-                middleName = trim(existing.MIDDLENAME ?: ""),
-                lastName = trim(existing.LASTNAME ?: ""),
-                aliasType = trim(existing.ALIASTYPE ?: ""),
-                sourceSystem = trim(existing.SOURCESYSTEM ?: ""),
-                isActive = val(existing.ISACTIVE ?: 0),
-                isPrimary = val(existing.ISPRIMARY ?: 0)
-            })>
-        </cfloop>
-
-        <cfset arrayAppend(aliasesToSave, {
-            firstName = parsed.firstName,
-            middleName = parsed.middleName,
-            lastName = parsed.lastName,
-            aliasType = aliasTypeCode,
-            sourceSystem = sourceSystem,
-            isActive = 1,
-            isPrimary = 0
-        })>
-
-        <cfset aliasesSvc.replaceAliases(userID, aliasesToSave)>
-        <cfoutput>{"success":true,"inserted":true,"message":"Alias added."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Phones ── --->
-    <cfcase value="phones">
-        <cfset phoneSvc = createObject("component", "cfc.phone_service").init()>
-        <cfset phoneCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset primaryIdx = structKeyExists(form, "primary_idx") ? val(form.primary_idx) : -1>
-        <cfset phonesToSave = []>
-        <cfloop from="0" to="#phoneCount - 1#" index="i">
-            <cfset pNum  = structKeyExists(form, "number_#i#") ? trim(form["number_#i#"]) : "">
-            <cfset pType = structKeyExists(form, "type_#i#") ? trim(form["type_#i#"]) : "">
-            <cfif len(pNum)>
-                <cfset arrayAppend(phonesToSave, { number=pNum, type=pType, isPrimary=(i EQ primaryIdx) })>
-            </cfif>
-        </cfloop>
-        <cfset phoneSvc.replacePhones(userID, phonesToSave)>
-        <cfoutput>{"success":true,"message":"Phones saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Aliases ── --->
-    <cfcase value="aliases">
-        <cfset aliasesSvc = createObject("component", "cfc.aliases_service").init()>
-        <cfset aliasCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset aliasesToSave = []>
-        <cfloop from="0" to="#aliasCount - 1#" index="i">
-            <cfset aFirst  = structKeyExists(form, "first_#i#")  ? trim(form["first_#i#"])  : "">
-            <cfset aMiddle = structKeyExists(form, "middle_#i#") ? trim(form["middle_#i#"]) : "">
-            <cfset aLast   = structKeyExists(form, "last_#i#")   ? trim(form["last_#i#"])   : "">
-            <cfset aType   = structKeyExists(form, "type_#i#")   ? trim(form["type_#i#"])   : "">
-            <cfset aSource = structKeyExists(form, "source_#i#") ? trim(form["source_#i#"]) : "">
-            <cfset aActive = structKeyExists(form, "active_#i#") ? val(form["active_#i#"])  : 0>
-            <cfset aPrimary = structKeyExists(form, "primary_#i#") ? val(form["primary_#i#"]) : 0>
-            <cfif len(aType) AND (len(aFirst) OR len(aMiddle) OR len(aLast))>
-                <cfset arrayAppend(aliasesToSave, {
-                    firstName=aFirst,
-                    middleName=aMiddle,
-                    lastName=aLast,
-                    aliasType=aType,
-                    sourceSystem=aSource,
-                    isActive=aActive,
-                    isPrimary=aPrimary
-                })>
-            </cfif>
-        </cfloop>
-        <cfset aliasesSvc.replaceAliases(userID, aliasesToSave)>
-        <cfoutput>{"success":true,"message":"Aliases saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Awards ── --->
-    <cfcase value="awards">
-        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-        <cfset awardCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset awardsToSave = []>
-        <cfloop from="0" to="#awardCount - 1#" index="i">
-            <cfset aName = structKeyExists(form, "name_#i#") ? trim(form["name_#i#"]) : "">
-            <cfset aType = structKeyExists(form, "type_#i#") ? trim(form["type_#i#"]) : "">
-            <cfif len(aName)>
-                <cfset arrayAppend(awardsToSave, { name=aName, type=aType })>
-            </cfif>
-        </cfloop>
-        <cfset studentProfileSvc.replaceAwards(userID, awardsToSave)>
-        <cfoutput>{"success":true,"message":"Awards saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Residencies ── --->
-    <cfcase value="residencies">
-        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-        <cfset residencyCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset residenciesToSave = []>
-        <cfloop from="0" to="#residencyCount - 1#" index="i">
-            <cfset rLocation = structKeyExists(form, "location_#i#") ? trim(form["location_#i#"]) : "">
-            <cfset rSpecialty = structKeyExists(form, "specialty_#i#") ? trim(form["specialty_#i#"]) : "">
-            <cfset rStartingYear = structKeyExists(form, "startingyear_#i#") ? trim(form["startingyear_#i#"]) : "">
-            <cfset rIsUHCO = structKeyExists(form, "isuhco_#i#") ? (val(form["isuhco_#i#"]) EQ 1) : false>
-            <cfset rIsCurrent = structKeyExists(form, "iscurrent_#i#") ? (val(form["iscurrent_#i#"]) EQ 1) : false>
-            <cfif len(rLocation) OR len(rSpecialty) OR len(rStartingYear)>
-                <cfset arrayAppend(residenciesToSave, {
-                    location = rLocation,
-                    specialty = rSpecialty,
-                    startingYear = rStartingYear,
-                    isUHCO = rIsUHCO,
-                    isCurrent = rIsCurrent
-                })>
-            </cfif>
-        </cfloop>
-        <cfset studentProfileSvc.replaceResidencies(userID, residenciesToSave)>
-        <cfoutput>{"success":true,"message":"Residencies saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Degrees ── --->
-    <cfcase value="degrees">
-        <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
-        <cfset degCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset degreesToSave = []>
-        <cfloop from="0" to="#degCount - 1#" index="i">
-            <cfset dName         = structKeyExists(form, "name_#i#")            ? trim(form["name_#i#"])            : "">
-            <cfset dUniv         = structKeyExists(form, "univ_#i#")            ? trim(form["univ_#i#"])            : "">
-            <cfset dYear         = structKeyExists(form, "year_#i#")            ? trim(form["year_#i#"])            : "">
-            <cfset dIsUHCO       = structKeyExists(form, "isuhco_#i#")     ? (val(form["isuhco_#i#"]) EQ 1)      : false>
-            <cfset dIsEnrolled   = structKeyExists(form, "isenrolled_#i#") ? (val(form["isenrolled_#i#"]) EQ 1)  : false>
-            <cfset dHasChange    = structKeyExists(form, "haschange_#i#")  ? (val(form["haschange_#i#"]) EQ 1)   : false>
-            <cfset dOrigExpGrad  = "">
-            <cfif structKeyExists(form, "origexpgrad_#i#") AND isNumeric(trim(form["origexpgrad_#i#"]))>
-                <cfset dOrigExpGrad = val(form["origexpgrad_#i#"])>
-            </cfif>
-            <cfset dExpGrad      = "">
-            <cfif structKeyExists(form, "expgrad_#i#") AND isNumeric(trim(form["expgrad_#i#"]))>
-                <cfset dExpGrad = val(form["expgrad_#i#"])>
-            </cfif>
-            <cfset dProgram      = structKeyExists(form, "program_#i#")         ? trim(form["program_#i#"])         : "">
-            <cfif len(dName)>
-                <cfset arrayAppend(degreesToSave, {
-                    name                 = dName,
-                    university           = dUniv,
-                    year                 = dYear,
-                    isUHCO               = dIsUHCO,
-                    isEnrolled           = dIsEnrolled,
-                    hasYearChange        = dHasChange,
-                    originalExpectedGradYear = dOrigExpGrad,
-                    expectedGradYear     = dExpGrad,
-                    program              = dProgram
-                })>
-            </cfif>
-        </cfloop>
-        <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
-        <cfset compositeStr = degreesSvc.buildDegreesString(userID)>
-        <cfoutput>{"success":true,"message":"Degrees saved.","composite":"#jsStringFormat(compositeStr)#"}</cfoutput>
-    </cfcase>
-
-    <!--- ── Addresses ── --->
-    <cfcase value="addresses">
-        <cfset addressesSvc = createObject("component", "cfc.addresses_service").init()>
-        <cfset addrCount = (structKeyExists(form, "count") AND isNumeric(form.count)) ? val(form.count) : 0>
-        <cfset addressesToSave = []>
-        <cfloop from="0" to="#addrCount - 1#" index="i">
-            <cfset aType     = structKeyExists(form, "type_#i#")     ? trim(form["type_#i#"])     : "">
-            <cfset aAddr1    = structKeyExists(form, "addr1_#i#")    ? trim(form["addr1_#i#"])    : "">
-            <cfset aAddr2    = structKeyExists(form, "addr2_#i#")    ? trim(form["addr2_#i#"])    : "">
-            <cfset aCity     = structKeyExists(form, "city_#i#")     ? trim(form["city_#i#"])     : "">
-            <cfset aState    = structKeyExists(form, "state_#i#")    ? trim(form["state_#i#"])    : "">
-            <cfset aZip      = structKeyExists(form, "zip_#i#")      ? trim(form["zip_#i#"])      : "">
-            <cfset aBuilding = structKeyExists(form, "building_#i#") ? trim(form["building_#i#"]) : "">
-            <cfset aRoom     = structKeyExists(form, "room_#i#")     ? trim(form["room_#i#"])     : "">
-            <cfset aMailcode = structKeyExists(form, "mailcode_#i#") ? trim(form["mailcode_#i#"]) : "">
-            <cfset aPrimary  = structKeyExists(form, "primary_#i#")  ? val(form["primary_#i#"])   : 0>
-            <cfif len(aType)>
-                <cfset arrayAppend(addressesToSave, {
-                    AddressType = { value=aType, cfsqltype="cf_sql_varchar" },
-                    Address1    = { value=aAddr1, cfsqltype="cf_sql_varchar" },
-                    Address2    = { value=aAddr2, cfsqltype="cf_sql_varchar" },
-                    City        = { value=aCity, cfsqltype="cf_sql_varchar" },
-                    State       = { value=aState, cfsqltype="cf_sql_varchar" },
-                    Zipcode     = { value=aZip, cfsqltype="cf_sql_varchar" },
-                    Building    = { value=aBuilding, cfsqltype="cf_sql_varchar" },
-                    Room        = { value=aRoom, cfsqltype="cf_sql_varchar" },
-                    MailCode    = { value=aMailcode, cfsqltype="cf_sql_varchar" },
-                    isPrimary   = { value=aPrimary, cfsqltype="cf_sql_bit" }
-                })>
-            </cfif>
-        </cfloop>
-        <cfset addressesSvc.replaceAddresses(userID, addressesToSave)>
-        <cfset syncStudentProfileHometownFromAddresses(userID, addressesToSave)>
-        <cfoutput>{"success":true,"message":"Addresses saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Add Single Address ── --->
-    <cfcase value="addAddress">
-        <cfset addressesSvc = createObject("component", "cfc.addresses_service").init()>
-        <cfset addrData = {
-            UserID      = { value=userID, cfsqltype="cf_sql_integer" },
-            AddressType = { value=trim(form.type ?: ""), cfsqltype="cf_sql_varchar" },
-            Address1    = { value=trim(form.addr1 ?: ""), cfsqltype="cf_sql_varchar" },
-            Address2    = { value=trim(form.addr2 ?: ""), cfsqltype="cf_sql_varchar" },
-            City        = { value=trim(form.city ?: ""), cfsqltype="cf_sql_varchar" },
-            State       = { value=trim(form.state ?: ""), cfsqltype="cf_sql_varchar" },
-            Zipcode     = { value=trim(form.zip ?: ""), cfsqltype="cf_sql_varchar" },
-            Building    = { value=trim(form.building ?: ""), cfsqltype="cf_sql_varchar" },
-            Room        = { value=trim(form.room ?: ""), cfsqltype="cf_sql_varchar" },
-            MailCode    = { value=trim(form.mailcode ?: ""), cfsqltype="cf_sql_varchar" },
-            isPrimary   = { value=val(form.primary ?: 0), cfsqltype="cf_sql_bit" }
-        }>
-        <cfset result = addressesSvc.addAddress(addrData)>
-        <cfif compareNoCase(trim(form.type ?: ""), "Hometown") EQ 0>
-            <cfset syncStudentProfileHometownFromAddresses(userID, [addrData])>
-        </cfif>
-        <cfoutput>{"success":true,"message":"Address added.","addressID":#result.addressID#}</cfoutput>
-    </cfcase>
-
-    <!--- ── General (name, titles, pronouns) ── --->
-    <cfcase value="general">
-        <cfset usersService = createObject("component", "cfc.users_service").init()>
-        <cfset existing = usersService.getUser(userID).data>
-        <cfset firstName = structKeyExists(form, "FirstName") ? toProperName(form.FirstName) : (existing.FIRSTNAME ?: "")>
-        <cfset middleName = structKeyExists(form, "MiddleName") ? toProperName(form.MiddleName) : (existing.MIDDLENAME ?: "")>
-        <cfif len(trim(middleName)) EQ 1 AND reFind("^[A-Za-z]$", trim(middleName))>
-            <cfset middleName = trim(middleName) & ".">
-        </cfif>
-        <cfset lastName = structKeyExists(form, "LastName") ? toProperName(form.LastName) : (existing.LASTNAME ?: "")>
-        <cfset overrides = {
-            FirstName  = firstName,
-            MiddleName = middleName,
-            LastName   = lastName,
-            Prefix     = structKeyExists(form, "Prefix")   ? trim(form.Prefix)   : (existing.PREFIX ?: ""),
-            Suffix     = structKeyExists(form, "Suffix")   ? trim(form.Suffix)   : (existing.SUFFIX ?: ""),
-            Pronouns   = structKeyExists(form, "Pronouns") ? trim(form.Pronouns) : (existing.PRONOUNS ?: ""),
-            Title1     = structKeyExists(form, "Title1")   ? trim(form.Title1)   : (existing.TITLE1 ?: ""),
-            Title2     = structKeyExists(form, "Title2")   ? trim(form.Title2)   : (existing.TITLE2 ?: ""),
-            Title3     = structKeyExists(form, "Title3")   ? trim(form.Title3)   : (existing.TITLE3 ?: "")
-        }>
-        <cfset userData = buildUserData(existing, overrides)>
-        <cfset usersService.updateUser(userID, userData)>
-        <cfoutput>{"success":true,"message":"General info saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Flags ── --->
-    <cfcase value="flags">
-        <cfset flagsService = createObject("component", "cfc.flags_service").init()>
-        <cfset currentFlagsResult = flagsService.getUserFlags(userID)>
-        <cfset currentFlags = currentFlagsResult.data>
-        <cfset currentFlagIDs = []>
-        <cfloop from="1" to="#arrayLen(currentFlags)#" index="i">
-            <cfset arrayAppend(currentFlagIDs, val(currentFlags[i].FLAGID))>
-        </cfloop>
-        <cfset submittedFlagIDs = []>
-        <cfif structKeyExists(form, "flagIDs") AND len(trim(form.flagIDs))>
-            <cfset flagList = listToArray(form.flagIDs)>
-            <cfloop from="1" to="#arrayLen(flagList)#" index="i">
-                <cfset arrayAppend(submittedFlagIDs, val(trim(flagList[i])))>
-            </cfloop>
-        </cfif>
-        <!--- Remove unchecked flags --->
-        <cfloop from="1" to="#arrayLen(currentFlagIDs)#" index="i">
-            <cfif arrayFindNoCase(submittedFlagIDs, currentFlagIDs[i]) EQ 0>
-                <cfset flagsService.removeFlag(userID, val(currentFlagIDs[i]))>
-            </cfif>
-        </cfloop>
-        <!--- Add newly checked flags --->
-        <cfloop from="1" to="#arrayLen(submittedFlagIDs)#" index="i">
-            <cfif arrayFindNoCase(currentFlagIDs, submittedFlagIDs[i]) EQ 0>
-                <cfset flagsService.addFlag(userID, val(submittedFlagIDs[i]))>
-            </cfif>
-        </cfloop>
-        <cfoutput>{"success":true,"message":"Flags saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Organizations ── --->
-    <cfcase value="orgs">
-        <cfset organizationsService = createObject("component", "cfc.organizations_service").init()>
-        <cfset currentOrgsResult = organizationsService.getUserOrgs(userID)>
-        <cfset currentOrgs = currentOrgsResult.data>
-        <cfset currentOrgIDs = []>
-        <cfset currentOrgMap = {}>
-        <cfloop from="1" to="#arrayLen(currentOrgs)#" index="i">
-            <cfset arrayAppend(currentOrgIDs, val(currentOrgs[i].ORGID))>
-            <cfset currentOrgMap[val(currentOrgs[i].ORGID)] = true>
-        </cfloop>
-        <cfset submittedOrgIDs = []>
-        <cfset submittedOrgMap = {}>
-        <cfif structKeyExists(form, "orgIDs") AND len(trim(form.orgIDs))>
-            <cfset orgList = listToArray(form.orgIDs)>
-            <cfloop from="1" to="#arrayLen(orgList)#" index="i">
-                <cfset arrayAppend(submittedOrgIDs, val(trim(orgList[i])))>
-                <cfset submittedOrgMap[val(trim(orgList[i]))] = true>
-            </cfloop>
-        </cfif>
-        <!--- Remove unchecked orgs --->
-        <cfloop from="1" to="#arrayLen(currentOrgIDs)#" index="i">
-            <cfif NOT structKeyExists(submittedOrgMap, currentOrgIDs[i])>
-                <cfset organizationsService.removeOrg(userID, val(currentOrgIDs[i]))>
-            </cfif>
-        </cfloop>
-        <!--- Add or update checked orgs --->
-        <cfloop from="1" to="#arrayLen(submittedOrgIDs)#" index="i">
-            <cfset orgID = val(submittedOrgIDs[i])>
-            <cfset roleTitle = structKeyExists(form, "roleTitle_" & orgID) ? trim(form["roleTitle_" & orgID]) : "">
-            <cfset roleOrder = (structKeyExists(form, "roleOrder_" & orgID) AND isNumeric(form["roleOrder_" & orgID])) ? val(form["roleOrder_" & orgID]) : 0>
-            <cfif NOT structKeyExists(currentOrgMap, orgID)>
-                <cfset organizationsService.assignOrg(userID, orgID, roleTitle, roleOrder)>
-            <cfelse>
-                <cfset organizationsService.updateOrgAssignment(userID, orgID, roleTitle, roleOrder)>
-            </cfif>
-        </cfloop>
-        <cfoutput>{"success":true,"message":"Organizations saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── External IDs ── --->
-    <cfcase value="extids">
-        <cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
-        <cfset allSystemsResult = externalIDService.getSystems()>
-        <cfset extSystems = allSystemsResult.data>
-        <cfloop from="1" to="#arrayLen(extSystems)#" index="i">
-            <cfset sys = extSystems[i]>
-            <cfset fieldName = "extID_" & sys.SYSTEMID>
-            <cfif structKeyExists(form, fieldName) AND len(trim(form[fieldName]))>
-                <cfset externalIDService.setExternalID(userID, sys.SYSTEMID, trim(form[fieldName]))>
-            </cfif>
-        </cfloop>
-        <cfoutput>{"success":true,"message":"External IDs saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── UH fields (SuperAdmin only) ── --->
-    <cfcase value="uh">
-        <cfset usersService = createObject("component", "cfc.users_service").init()>
-        <cfset existing = usersService.getUser(userID).data>
-        <cfset overrides = {
-            EmailPrimary = structKeyExists(form, "EmailPrimary") ? trim(form.EmailPrimary) : (existing.EMAILPRIMARY ?: ""),
-            UH_API_ID  = structKeyExists(form, "UH_API_ID") ? trim(form.UH_API_ID) : (existing.UH_API_ID ?: ""),
-            Room       = structKeyExists(form, "Room")     ? trim(form.Room)     : (existing.ROOM ?: ""),
-            Building   = structKeyExists(form, "Building") ? trim(form.Building) : (existing.BUILDING ?: ""),
-            Campus     = structKeyExists(form, "Campus")   ? trim(form.Campus)   : (existing.CAMPUS ?: ""),
-            Division   = structKeyExists(form, "Division") ? trim(form.Division) : (existing.DIVISION ?: ""),
-            DivisionName = structKeyExists(form, "DivisionName") ? trim(form.DivisionName) : (existing.DIVISIONNAME ?: ""),
-            Department   = structKeyExists(form, "Department")   ? trim(form.Department)   : (existing.DEPARTMENT ?: ""),
-            DepartmentName = structKeyExists(form, "DepartmentName") ? trim(form.DepartmentName) : (existing.DEPARTMENTNAME ?: ""),
-            Office_Mailing_Address = structKeyExists(form, "Office_Mailing_Address") ? trim(form.Office_Mailing_Address) : (existing.OFFICE_MAILING_ADDRESS ?: ""),
-            Mailcode   = structKeyExists(form, "Mailcode") ? trim(form.Mailcode) : (existing.MAILCODE ?: ""),
-            Notes      = structKeyExists(form, "Notes") ? trim(form.Notes) : (existing.NOTES ?: "")
-        }>
-        <cfset userData = buildUserData(existing, overrides)>
-        <cfset usersService.updateUser(userID, userData)>
-        <cfoutput>{"success":true,"message":"UH fields saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Biographical Info (DOB, Gender, Student Data) ── --->
-    <cfcase value="bioinfo">
-        <cfset usersService = createObject("component", "cfc.users_service").init()>
-        <cfset existing = usersService.getUser(userID).data>
-        <cfset overrides = {
-            DOB    = structKeyExists(form, "DOB") ? trim(form.DOB) : (existing.DOB ?: ""),
-            Gender = structKeyExists(form, "Gender") ? trim(form.Gender) : (existing.GENDER ?: "")
-        }>
-        <cfset userData = buildUserData(existing, overrides)>
-        <cfset usersService.updateUser(userID, userData)>
-
-        <!--- Student Data fields now live on the Biographical Information tab. --->
-        <cfset academicService = createObject("component", "cfc.academic_service").init()>
-        <cfset academicService.saveAcademicInfo(
-            userID,
-            structKeyExists(form, "CurrentGradYear")  ? trim(form.CurrentGradYear)  : "",
-            structKeyExists(form, "OriginalGradYear") ? trim(form.OriginalGradYear) : ""
-        )>
-
-        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-        <cfset studentProfileSvc.saveProfile(
-            userID,
-            structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
-            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
-            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : "",
-            structKeyExists(form, "sp_dissertation_thesis") ? trim(form.sp_dissertation_thesis) : ""
-        )>
-
-        <cfif structKeyExists(form, "bioContent")>
-            <cfset bioSvc = createObject("component", "cfc.bio_service").init()>
-            <cfset bioSvc.saveBio(userID, form.bioContent ?: "")>
-        </cfif>
-
-        <cfoutput>{"success":true,"message":"Biographical info saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Student Profile ── --->
-    <cfcase value="studentprofile">
-        <cfset academicService = createObject("component", "cfc.academic_service").init()>
-        <cfset academicService.saveAcademicInfo(
-            userID,
-            structKeyExists(form, "CurrentGradYear")  ? trim(form.CurrentGradYear)  : "",
-            structKeyExists(form, "OriginalGradYear") ? trim(form.OriginalGradYear) : ""
-        )>
-        <cfset studentProfileSvc = createObject("component", "cfc.studentProfile_service").init()>
-        <cfset studentProfileSvc.saveProfile(
-            userID,
-            structKeyExists(form, "sp_first_externship")  ? trim(form.sp_first_externship)  : "",
-            structKeyExists(form, "sp_second_externship") ? trim(form.sp_second_externship) : "",
-            structKeyExists(form, "sp_commencement_age")  ? trim(form.sp_commencement_age)  : "",
-            structKeyExists(form, "sp_dissertation_thesis") ? trim(form.sp_dissertation_thesis) : ""
-        )>
-        <!--- Process student profile degrees if present --->
-        <cfset spDegCount = (structKeyExists(form, "sp_degree_count") AND isNumeric(form.sp_degree_count)) ? val(form.sp_degree_count) : 0>
-        <cfif spDegCount GT 0>
-            <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
-            <cfset degreesToSave = []>
-            <cfloop from="0" to="#spDegCount - 1#" index="di">
-                <cfset dName        = structKeyExists(form, "sp_deg_name_#di#")       ? trim(form["sp_deg_name_#di#"])       : "">
-                <cfset dUniv        = structKeyExists(form, "sp_deg_univ_#di#")       ? trim(form["sp_deg_univ_#di#"])       : "">
-                <cfset dYear        = structKeyExists(form, "sp_deg_year_#di#")       ? trim(form["sp_deg_year_#di#"])       : "">
-                <cfset dIsUHCO      = structKeyExists(form, "sp_deg_isuhco_#di#")   ? (val(form["sp_deg_isuhco_#di#"]) EQ 1)   : false>
-                <cfset dIsEnrolled  = structKeyExists(form, "sp_deg_enrolled_#di#") ? (val(form["sp_deg_enrolled_#di#"]) EQ 1)  : false>
-                <cfset dHasChange   = structKeyExists(form, "sp_deg_haschange_#di#") ? (val(form["sp_deg_haschange_#di#"]) EQ 1) : false>
-                <cfset dOrigExpGrad = "">
-                <cfif structKeyExists(form, "sp_deg_origexpgrad_#di#") AND isNumeric(trim(form["sp_deg_origexpgrad_#di#"]))>
-                    <cfset dOrigExpGrad = val(form["sp_deg_origexpgrad_#di#"])>
-                </cfif>
-                <cfset dExpGrad     = "">
-                <cfif structKeyExists(form, "sp_deg_expgrad_#di#") AND isNumeric(trim(form["sp_deg_expgrad_#di#"]))>
-                    <cfset dExpGrad = val(form["sp_deg_expgrad_#di#"])>
-                </cfif>
-                <cfset dProgram     = structKeyExists(form, "sp_deg_program_#di#")    ? trim(form["sp_deg_program_#di#"])    : "">
-                <cfif len(dName)>
-                    <cfset arrayAppend(degreesToSave, {
-                        name                     = dName,
-                        university               = dUniv,
-                        year                     = dYear,
-                        isUHCO                   = dIsUHCO,
-                        isEnrolled               = dIsEnrolled,
-                        hasYearChange            = dHasChange,
-                        originalExpectedGradYear = dOrigExpGrad,
-                        expectedGradYear         = dExpGrad,
-                        program                  = dProgram
-                    })>
-                </cfif>
-            </cfloop>
-            <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
-        </cfif>
-        <cfoutput>{"success":true,"message":"Student profile saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Bio content ── --->
-    <cfcase value="bio">
-        <cfset bioSvc = createObject("component", "cfc.bio_service").init()>
-        <cfset bioSvc.saveBio(userID, structKeyExists(form, "bioContent") ? form.bioContent : "")>
-        <cfoutput>{"success":true,"message":"Bio saved."}</cfoutput>
-    </cfcase>
-
-    <!--- ── Tab degrees (fac/emer/res profile tabs) ── --->
-    <cfcase value="tabdegrees">
-        <cfset pfx = structKeyExists(form, "prefix") ? lCase(trim(form.prefix)) : "">
-        <cfif NOT listFindNoCase("fac,emer,res", pfx)>
-            <cfoutput>{"success":false,"message":"Invalid degree prefix."}</cfoutput>
-        <cfelse>
-            <cfset degreesSvc = createObject("component", "cfc.degrees_service").init()>
-            <cfset degCount = (structKeyExists(form, "#pfx#_degree_count") AND isNumeric(form["#pfx#_degree_count"])) ? val(form["#pfx#_degree_count"]) : 0>
-            <cfset degreesToSave = []>
-            <cfloop from="0" to="#degCount - 1#" index="di">
-                <cfset dName        = structKeyExists(form, "#pfx#_deg_name_#di#")        ? trim(form["#pfx#_deg_name_#di#"])        : "">
-                <cfset dUniv        = structKeyExists(form, "#pfx#_deg_univ_#di#")        ? trim(form["#pfx#_deg_univ_#di#"])        : "">
-                <cfset dYear        = structKeyExists(form, "#pfx#_deg_year_#di#")        ? trim(form["#pfx#_deg_year_#di#"])        : "">
-                <cfset dIsUHCO      = structKeyExists(form, "#pfx#_deg_isuhco_#di#")    ? (val(form["#pfx#_deg_isuhco_#di#"]) EQ 1)   : false>
-                <cfset dIsEnrolled  = structKeyExists(form, "#pfx#_deg_enrolled_#di#")  ? (val(form["#pfx#_deg_enrolled_#di#"]) EQ 1)  : false>
-                <cfset dHasChange   = structKeyExists(form, "#pfx#_deg_haschange_#di#") ? (val(form["#pfx#_deg_haschange_#di#"]) EQ 1) : false>
-                <cfset dOrigExpGrad = "">
-                <cfif structKeyExists(form, "#pfx#_deg_origexpgrad_#di#") AND isNumeric(trim(form["#pfx#_deg_origexpgrad_#di#"]))>
-                    <cfset dOrigExpGrad = val(form["#pfx#_deg_origexpgrad_#di#"])>
-                </cfif>
-                <cfset dExpGrad     = "">
-                <cfif structKeyExists(form, "#pfx#_deg_expgrad_#di#") AND isNumeric(trim(form["#pfx#_deg_expgrad_#di#"]))>
-                    <cfset dExpGrad = val(form["#pfx#_deg_expgrad_#di#"])>
-                </cfif>
-                <cfset dProgram     = structKeyExists(form, "#pfx#_deg_program_#di#")     ? trim(form["#pfx#_deg_program_#di#"])     : "">
-                <cfif len(dName)>
-                    <cfset arrayAppend(degreesToSave, {
-                        name                     = dName,
-                        university               = dUniv,
-                        year                     = dYear,
-                        isUHCO                   = dIsUHCO,
-                        isEnrolled               = dIsEnrolled,
-                        hasYearChange            = dHasChange,
-                        originalExpectedGradYear = dOrigExpGrad,
-                        expectedGradYear         = dExpGrad,
-                        program                  = dProgram
-                    })>
-                </cfif>
-            </cfloop>
-            <cfset degreesSvc.replaceDegrees(userID, degreesToSave)>
-            <cfset compositeStr = degreesSvc.buildDegreesString(userID)>
-            <cfoutput>{"success":true,"message":"Degrees saved.","composite":"#jsStringFormat(compositeStr)#"}</cfoutput>
-        </cfif>
+    <cfcase value="emails,addldapemailifmissing,addldapaliasifmissing,phones,aliases,awards,residencies,degrees,addresses,addAddress,general,flags,orgs,extids,publications,uh,bioinfo,studentprofile,bio,tabdegrees">
+        <cfset emitAsyncServiceResult(userEditSaveService.handle(section, userID, form))>
     </cfcase>
 
     <cfdefaultcase>
-        <cfoutput>{"success":false,"message":"Unknown section: #jsStringFormat(section)#"}</cfoutput>
+        <cfset emitAsyncError(400, "Unknown section: #section#", ["section is not supported"] )>
     </cfdefaultcase>
 
 </cfswitch>
 
 <cfcatch type="any">
-    <cfoutput>{"success":false,"message":"#jsStringFormat(cfcatch.message)#"}</cfoutput>
+    <cflog
+        file="admin-users-save-section"
+        type="error"
+        text="saveSection failed | section=#section# | userID=#userID# | message=#cfcatch.message# | detail=#cfcatch.detail#"
+    >
+    <cfset emitAsyncError(500, "Save failed. Please try again or contact support if the problem continues.")>
 </cfcatch>
 </cftry>

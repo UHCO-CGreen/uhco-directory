@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     UH Sync: Membership Changes
     Left UH and New in UH tracking.
     Split from the combined uh_sync_report.cfm — shows the Gone + New tabs.
@@ -7,6 +7,10 @@
 <cfif NOT request.hasPermission("settings.uh_sync.view")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
+
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/settings/uh-sync/">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
 
 <!--- ── URL params ── --->
 <cfset msgParam  = structKeyExists(url, "msg") ? url.msg : "">
@@ -42,6 +46,50 @@
 </cfcatch>
 </cftry>
 
+<!--- ── Sort params ── --->
+<cfset allowedGoneSortCols = ["LASTNAME","TITLE1"]>
+<cfset goneSortCol = (structKeyExists(url, "goneSortCol") AND arrayFindNoCase(allowedGoneSortCols, url.goneSortCol) GT 0) ? url.goneSortCol : "LASTNAME">
+<cfset goneSortDir = ((url.goneSortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+
+<cfset allowedNewSortCols = ["LASTNAME","EMAIL","DEPARTMENT"]>
+<cfset newSortCol = (structKeyExists(url, "newSortCol") AND arrayFindNoCase(allowedNewSortCols, url.newSortCol) GT 0) ? url.newSortCol : "LASTNAME">
+<cfset newSortDir = ((url.newSortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+
+<cfscript>
+    arraySort(goneRows, function(a, b) {
+        var aVal = lCase(toString(isNull(a[goneSortCol]) ? "" : a[goneSortCol]));
+        var bVal = lCase(toString(isNull(b[goneSortCol]) ? "" : b[goneSortCol]));
+        if (aVal LT bVal) return goneSortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return goneSortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    arraySort(newRows, function(a, b) {
+        var aVal = lCase(toString(isNull(a[newSortCol]) ? "" : a[newSortCol]));
+        var bVal = lCase(toString(isNull(b[newSortCol]) ? "" : b[newSortCol]));
+        if (aVal LT bVal) return newSortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return newSortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function goneSortLink(col) {
+        var dir = (goneSortCol EQ col AND goneSortDir EQ "ASC") ? "DESC" : "ASC";
+        var base = structIsEmpty(currentRun) ? "?" : "?runID=" & currentRun.RUNID & "&tab=gone&";
+        return base & "goneSortCol=" & col & "&goneSortDir=" & dir;
+    }
+    function goneSortArrow(col) {
+        if (goneSortCol EQ col) return goneSortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+    function newSortLink(col) {
+        var dir = (newSortCol EQ col AND newSortDir EQ "ASC") ? "DESC" : "ASC";
+        var base = structIsEmpty(currentRun) ? "?" : "?runID=" & currentRun.RUNID & "&tab=new&";
+        return base & "newSortCol=" & col & "&newSortDir=" & dir;
+    }
+    function newSortArrow(col) {
+        if (newSortCol EQ col) return newSortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <!--- ══════════════════════════════════════════════════════════════ --->
 <!--- ── Page content ────────────────────────────────────────────── --->
 <!--- ══════════════════════════════════════════════════════════════ --->
@@ -64,15 +112,15 @@
     
         <div class="mb-3 mt-2 d-flex gap-2">
             <cfif arrayLen(recentRuns)>
-            <button class="btn btn-outline-secondary btn-sm" type="button"
+            <button class="btn btn-ui-cancel btn-sm" type="button"
                     data-bs-toggle="collapse" data-bs-target="##historyPanel">
                 <i class="bi bi-clock-history me-1"></i> Run History
             </button>
             </cfif>
-            <a href="/admin/reporting/run_uh_sync_report.cfm" class="btn btn-primary btn-sm">
+            <a href="/admin/reporting/run_uh_sync_report.cfm" class="btn btn-ui-filter btn-sm js-spinner-nav">
                 <i class="bi bi-play-fill me-1"></i> Run Sync
             </a>
-            <a href="/admin/settings/uh-sync/changed-fields.cfm<cfif NOT structIsEmpty(currentRun)>?runID=#currentRun.RUNID#</cfif>" class="btn btn-outline-secondary btn-sm">
+            <a href="/admin/settings/uh-sync/changed-fields.cfm<cfif NOT structIsEmpty(currentRun)>?runID=#currentRun.RUNID#</cfif>" class="btn btn-ui-go btn-sm">
                 <i class="bi bi-arrow-left-right me-1"></i> Changed Fields
             </a>
         </div>
@@ -80,16 +128,6 @@
     <span class='badge bg-warning text-dark float-end'>Currently in: Alpha</span>
 </div>
 
-<!--- Status messages --->
-<cfif msgParam EQ "ran">
-    <div class="alert alert-success"><i class="bi bi-check-circle-fill me-1"></i> Sync report run complete.</div>
-<cfelseif msgParam EQ "error">
-    <div class="alert alert-danger"><strong>Error:</strong> #encodeForHTML(errParam)#</div>
-<cfelseif msgParam EQ "resolved">
-    <div class="alert alert-success"><i class="bi bi-check-circle-fill me-1"></i> #encodeForHTML(errParam)#</div>
-<cfelseif len(errParam)>
-    <div class="alert alert-danger">#encodeForHTML(errParam)#</div>
-</cfif>
 
 <cfif NOT dbOk>
     <div class="alert alert-danger">Database error: #encodeForHTML(dbError)# &mdash; have you run <code>create_uh_sync_report.sql</code>?</div>
@@ -120,7 +158,7 @@
                     <td><span class="badge #(r.TOTALDIFFS GT 0 ? 'bg-warning text-dark' : 'bg-success')#">#r.TOTALDIFFS#</span></td>
                     <td><span class="badge #(r.TOTALGONE GT 0 ? 'bg-danger' : 'bg-success')#">#r.TOTALGONE#</span></td>
                     <td><span class="badge #(r.TOTALNEW GT 0 ? 'bg-info text-dark' : 'bg-success')#">#r.TOTALNEW#</span></td>
-                    <td><a href="?runID=#r.RUNID#" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1">View</a></td>
+                    <td><a href="?runID=#r.RUNID#" class="btn btn-xs btn-sm btn-ui-go py-0 px-1">View</a></td>
                 </tr>
             </cfloop>
             </tbody>
@@ -189,11 +227,11 @@
         They may have left UH. Review each record and delete or keep as appropriate.
     </p>
     <div class="table-responsive settings-shell">
-    <table class="table table-sm table-striped table-hover align-middle settings-table mb-0">
+    <table class="table table-sm table-hover align-middle mb-0 settings-table">
         <thead>
             <tr>
-                <th>User</th>
-                <th>Title</th>
+                <th><a href="#goneSortLink('LASTNAME')#" class="settings-sort-link">User#goneSortArrow('LASTNAME')#</a></th>
+                <th><a href="#goneSortLink('TITLE1')#" class="settings-sort-link">Title#goneSortArrow('TITLE1')#</a></th>
                 <th>UH API ID</th>
                 <th class="text-end">Actions</th>
             </tr>
@@ -212,13 +250,16 @@
                 <td>#encodeForHTML(gr.TITLE1 ?: "")#</td>
                 <td><code class="small">#encodeForHTML(gr.UH_API_ID)#</code></td>
                 <td class="text-end text-nowrap">
-                    <form method="post" action="/admin/users/resolve_uh_sync_diff.cfm" class="d-inline"
-                          onsubmit="return confirm('Delete #encodeForJavaScript(gr.FIRSTNAME & ' ' & gr.LASTNAME)#? This cannot be undone.')">
+                    <form method="post" action="/admin/users/resolve_uh_sync_diff.cfm" class="d-inline js-confirm-submit"
+                          data-confirm-title="Delete User"
+                          data-confirm-message="Delete #encodeForJavaScript(gr.FIRSTNAME & ' ' & gr.LASTNAME)#? This cannot be undone."
+                          data-confirm-ok="Delete"
+                          data-confirm-class="danger">
                         <input type="hidden" name="goneID"     value="#gr.GONEID#">
                         <input type="hidden" name="resolution" value="deleted">
                         <input type="hidden" name="userID"     value="#gr.USERID#">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(goneReturnTo)#">
-                        <button type="submit" class="btn btn-sm btn-danger py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-delete py-0">
                             <i class="bi bi-trash"></i> Delete User
                         </button>
                     </form>
@@ -226,11 +267,11 @@
                         <input type="hidden" name="goneID"     value="#gr.GONEID#">
                         <input type="hidden" name="resolution" value="kept">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(goneReturnTo)#">
-                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-cancel py-0">
                             <i class="bi bi-person-check"></i> Keep
                         </button>
                     </form>
-                    <a href="/admin/users/view.cfm?userID=#gr.USERID#" class="btn btn-sm btn-outline-primary py-0 ms-1">
+                    <a href="/admin/users/view.cfm?userID=#gr.USERID#" class="btn btn-sm btn-ui-go py-0 ms-1">
                         <i class="bi bi-eye"></i> View
                     </a>
                 </td>
@@ -255,13 +296,13 @@
         You can import them as new users or ignore them.
     </p>
     <div class="table-responsive settings-shell">
-    <table class="table table-sm table-striped table-hover align-middle settings-table mb-0">
+    <table class="table table-sm table-hover align-middle mb-0 settings-table">
         <thead>
             <tr>
-                <th>Name</th>
-                <th>Email</th>
+                <th><a href="#newSortLink('LASTNAME')#" class="settings-sort-link">Name#newSortArrow('LASTNAME')#</a></th>
+                <th><a href="#newSortLink('EMAIL')#" class="settings-sort-link">Email#newSortArrow('EMAIL')#</a></th>
                 <th>Title</th>
-                <th>Department</th>
+                <th><a href="#newSortLink('DEPARTMENT')#" class="settings-sort-link">Department#newSortArrow('DEPARTMENT')#</a></th>
                 <th>UH API ID</th>
                 <th class="text-end">Actions</th>
             </tr>
@@ -281,7 +322,7 @@
                         <input type="hidden" name="newID"      value="#nr.NEWID#">
                         <input type="hidden" name="resolution" value="imported">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(newReturnTo)#">
-                        <button type="submit" class="btn btn-sm btn-success py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-save py-0">
                             <i class="bi bi-person-plus"></i> Import
                         </button>
                     </form>
@@ -289,7 +330,7 @@
                         <input type="hidden" name="newID"      value="#nr.NEWID#">
                         <input type="hidden" name="resolution" value="ignored">
                         <input type="hidden" name="returnTo"   value="#encodeForHTMLAttribute(newReturnTo)#">
-                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0">
+                        <button type="submit" class="btn btn-sm btn-ui-cancel py-0">
                             <i class="bi bi-x"></i> Ignore
                         </button>
                     </form>
@@ -305,7 +346,7 @@
 </div><!--- end tab-content --->
 
 <!--- ── JS to persist active tab ── --->
-<script>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
 (function () {
     'use strict';
     var tabs = document.querySelectorAll('##memberTabs button[data-bs-toggle="tab"]');
@@ -327,6 +368,32 @@
 
 </div>
 
+<cfinclude template="/admin/settings/_confirm_modal.cfm">
+
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif msgParam EQ "ran">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("Sync report run complete.", { tone: 'success' });
+}
+<cfelseif msgParam EQ "error">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("Error: #encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+<cfelseif msgParam EQ "resolved">
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'success' });
+}
+<cfelseif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

@@ -2,6 +2,7 @@ component output="false" singleton {
 
     public any function init() {
         variables.ProfileDAO = createObject("component", "dao.studentProfile_DAO").init();
+        variables.usersService = createObject("component", "cfc.users_service").init();
         variables.hometownStateCodeMap = {
             "alabama" = "AL", "alaska" = "AK", "arizona" = "AZ", "arkansas" = "AR",
             "california" = "CA", "colorado" = "CO", "connecticut" = "CT", "delaware" = "DE",
@@ -51,6 +52,43 @@ component output="false" singleton {
             CommencementAge  = { value=(len(trim(commencementAge)) AND isNumeric(trim(commencementAge)) ? val(trim(commencementAge)) : ""), cfsqltype="cf_sql_integer", null=(!len(trim(commencementAge)) OR !isNumeric(trim(commencementAge))) },
             DissertationThesis = { value=trim(arguments.dissertationThesis), cfsqltype="cf_sql_nvarchar", null=!len(trim(arguments.dissertationThesis)) }
         });
+    }
+
+    public void function saveImportedAcademicProfile(
+        required numeric userID,
+        string hometownCity = "",
+        string hometownState = "",
+        string firstExternship = "",
+        string secondExternship = "",
+        string dob = "",
+        string gender = "",
+        string commencementAge = ""
+    ) {
+        variables.ProfileDAO.saveProfile( arguments.userID, {
+            FirstExternship = trim(arguments.firstExternship),
+            SecondExternship = trim(arguments.secondExternship),
+            CommencementAge = {
+                value=(len(trim(arguments.commencementAge)) AND isNumeric(trim(arguments.commencementAge)) ? val(trim(arguments.commencementAge)) : ""),
+                cfsqltype="cf_sql_integer",
+                null=(!len(trim(arguments.commencementAge)) OR !isNumeric(trim(arguments.commencementAge)))
+            },
+            HometownCity = {
+                value=trim(arguments.hometownCity),
+                cfsqltype="cf_sql_nvarchar",
+                null=!len(trim(arguments.hometownCity))
+            },
+            HometownState = {
+                value=normalizeHometownState(arguments.hometownState),
+                cfsqltype="cf_sql_nvarchar",
+                null=!len(trim(arguments.hometownState))
+            }
+        } );
+
+        variables.usersService.updateDemographics(
+            userID = arguments.userID,
+            dob = trim(arguments.dob),
+            gender = trim(arguments.gender)
+        );
     }
 
     public void function syncHometown( required numeric userID, string hometownCity = "", string hometownState = "" ) {

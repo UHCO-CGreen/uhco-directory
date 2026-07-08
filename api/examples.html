@@ -52,25 +52,37 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
                         <label class="form-label fw-semibold">API Secret <span class="text-muted fw-normal small">(optional — for protected data)</span></label>
                         <input type="password" id="inp-secret" class="form-control font-monospace" placeholder="uhcs_sec_...">
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-md-6">
                         <label class="form-label fw-semibold">Endpoint</label>
                         <select id="inp-endpoint" class="form-select font-monospace">
                             <option value="/api/v1/people">/api/v1/people</option>
+                            <option value="/api/v1/people/128">/api/v1/people/128</option>
                             <option value="/api/v1/people?flag=Staff">/api/v1/people?flag=Staff</option>
                             <option value="/api/v1/people?flag=Faculty-Fulltime">/api/v1/people?flag=Faculty-Fulltime</option>
-                            <option value="/api/v1/people?flag=Current-Student">/api/v1/people?flag=Current-Student  ⚠ requires secret</option>
-                            <option value="/api/v1/people?flag=Alumni">/api/v1/people?flag=Alumni  ⚠ requires secret</option>
-                            <option value="/api/v1/people?org=OD+Program">/api/v1/people?org=OD Program  ⚠ requires secret</option>
+                            <option value="/api/v1/people?flag=Resident">/api/v1/people?flag=Resident  - Alumni+non-Public-Facing residents need secret</option>
+                            <option value="/api/v1/people?flag=Current-Student">/api/v1/people?flag=Current-Student  - requires secret</option>
+                            <option value="/api/v1/people?flag=Alumni">/api/v1/people?flag=Alumni  - requires secret</option>
+                            <option value="/api/v1/people?org=OD+Program">/api/v1/people?org=OD Program  - requires secret</option>
                             <option value="/api/v1/organizations">/api/v1/organizations</option>
                             <option value="/api/v1/flags">/api/v1/flags</option>
+                            <option value="/api/v1/access?userID=128">/api/v1/access?userID=128  - requires token + secret</option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Limit <span class="text-muted fw-normal small">(page size)</span></label>
+                        <input type="number" id="inp-limit" class="form-control font-monospace" value="10" min="1" max="500">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">Offset</label>
+                        <input type="number" id="inp-offset" class="form-control font-monospace" value="0" min="0">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
                         <button class="btn btn-primary w-100" onclick="runLiveTest()">
-                            <i class="bi bi-send me-1"></i>Send Request
+                            <i class="bi bi-send me-1"></i>Send
                         </button>
                     </div>
                 </div>
+                <p class="small text-muted mt-2 mb-0">Limit/Offset are sent as <code>?limit=</code>/<code>?offset=</code> query params — pagination is applied server-side (SQL <code>OFFSET</code>/<code>FETCH NEXT</code>), not sliced from a larger result in the browser. They only affect list endpoints like <code>/people</code>; single-record endpoints ignore them.</p>
 
                 <div class="mt-4">
                     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -78,8 +90,87 @@ X-API-Secret: uhcs_sec_your_secret_here</pre>
                         <span id="live-status" class="small text-muted"></span>
                     </div>
                     <div id="live-response" class="fst-italic">Response will appear here…</div>
+
+                    <div id="live-pagination" class="d-none align-items-center justify-content-between mt-2">
+                        <span id="live-pagination-summary" class="small text-muted"></span>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary" id="live-page-prev" onclick="pageLiveTest(-1)"><i class="bi bi-chevron-left"></i> Prev page</button>
+                            <button type="button" class="btn btn-outline-secondary" id="live-page-next" onclick="pageLiveTest(1)">Next page <i class="bi bi-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <hr class="my-5">
+
+    <!-- ── Access permissions endpoint ──────────────────────────────── -->
+    <section class="mb-5">
+        <h2 class="h4 fw-bold mb-3">Checking user permissions (<code>/access</code>)</h2>
+        <p>The <code>/access</code> endpoint returns all active module permissions for a given identity user. Both a token <strong>and</strong> a secret are required. Use this to enforce permission-based access control in external modules.</p>
+
+        <p class="mb-1 small text-muted">curl:</p>
+        <div class="position-relative">
+            <pre class="code" id="code-access-curl">curl -H "Authorization: Bearer uhcs_your_token" \
+     -H "X-API-Secret: uhcs_sec_your_secret" \
+     "http://127.0.0.1/api/v1/access?userID=128"</pre>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-access-curl')"><i class="bi bi-clipboard"></i></button>
+        </div>
+
+        <p class="mt-3 mb-1 small text-muted">JavaScript:</p>
+        <div class="position-relative">
+            <pre class="code" id="code-access-js">const token  = 'uhcs_your_token';
+const secret = 'uhcs_sec_your_secret';
+const userID = 128;
+
+const res = await fetch(`/api/v1/access?userID=${userID}`, {
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'X-API-Secret':  secret
+  }
+});
+
+if (!res.ok) throw new Error(`Auth failed: ${res.status}`);
+
+const { permissions } = await res.json();
+// permissions = ["directory.view", "documents.upload", "documents.view", "portal.admin"]
+
+if (permissions.includes('documents.view')) {
+  // show documents section
+}
+</pre>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-access-js')"><i class="bi bi-clipboard"></i></button>
+        </div>
+
+        <p class="mt-3 mb-1 small text-muted">Python:</p>
+        <div class="position-relative">
+            <pre class="code" id="code-access-python">import requests
+
+BASE   = "http://127.0.0.1/api/v1"
+TOKEN  = "uhcs_your_token"
+SECRET = "uhcs_sec_your_secret"
+
+session = requests.Session()
+session.headers["Authorization"] = f"Bearer {TOKEN}"
+session.headers["X-API-Secret"]  = SECRET
+
+r = session.get(f"{BASE}/access", params={"userID": 128})
+r.raise_for_status()
+
+data = r.json()
+perms = data["permissions"]
+# perms = ["directory.view", "documents.upload", "documents.view", "portal.admin"]
+
+if "portal.admin" in perms:
+    print("User has portal admin access")
+</pre>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-access-python')"><i class="bi bi-clipboard"></i></button>
+        </div>
+
+        <div class="alert alert-info d-flex gap-2 mt-3">
+            <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+            <div>An unknown user or a user with no permissions returns <code>200</code> with <code>"permissions": []</code> &mdash; never <code>404</code>. A missing or invalid token/secret returns <code>401</code>.</div>
         </div>
     </section>
 
@@ -141,8 +232,9 @@ if (!response.ok) {
 }
 
 const data = await response.json();
-console.log(`Total records: ${data.TOTAL}`);
-console.log(data.DATA);
+console.log(`Total records: ${data.total}`);
+console.log(data.data);
+console.log(data.data[0]?.SHOWCASED_PUBLICATIONS ?? []);
 </pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-js-basic')"><i class="bi bi-clipboard"></i></button>
         </div>
@@ -165,7 +257,9 @@ const response = await fetch(`/api/v1/people?${params}`, {
 });
 
 const data = await response.json();
-console.log(data);
+const firstPerson = data.data[0];
+console.log(firstPerson?.ORGANIZATIONS ?? []);
+console.log(firstPerson?.SHOWCASED_PUBLICATIONS ?? []);
 </pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-js-secret')"><i class="bi bi-clipboard"></i></button>
         </div>
@@ -236,16 +330,17 @@ async function apiGet(path, params = {}) {
 
 // 1. All people (first 10)
 const list = await apiGet('/people', { limit: 10 });
-console.log(`Total people: ${list.TOTAL}`);
-list.DATA.forEach(p => console.log(`  ${p.LASTNAME}, ${p.FIRSTNAME}`));
+console.log(`Total people: ${list.total}`);
+list.data.forEach(p => console.log(`  ${p.LASTNAME}, ${p.FIRSTNAME}`));
 
 // 2. Filter by flag (requires secret if flag is protected)
 const students = await apiGet('/people', { flag: 'Current-Student', limit: 5 });
-console.log(`\nCurrent students (visible): ${students.TOTAL}`);
+console.log(`\nCurrent students (visible): ${students.total}`);
+console.log('First student orgs:', students.data[0]?.ORGANIZATIONS ?? []);
 
 // 3. Single person by ID
 const person = await apiGet('/people/42');
-console.log('\nPerson:', person.USER);
+console.log('\nPerson:', person.user);
 </pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-node')"><i class="bi bi-clipboard"></i></button>
         </div>
@@ -285,21 +380,23 @@ def api_get(path, **params):
 
 # 1. First 10 people
 data = api_get("/people", limit=10)
-print(f"Total: {data['TOTAL']}")
-for p in data["DATA"]:
+print(f"Total: {data['total']}")
+for p in data["data"]:
     print(f"  {p['LASTNAME']}, {p['FIRSTNAME']}")
 
 # 2. Search by name
 results = api_get("/people", search="jones", limit=5)
-print(f"\nSearch 'jones': {results['TOTAL']} results")
+print(f"\nSearch 'jones': {results['total']} results")
 
 # 3. Filter by flag (will be empty without secret if flag is protected)
 students = api_get("/people", flag="Current-Student", limit=25)
-print(f"\nCurrent students (visible): {students['TOTAL']}")
+print(f"\nCurrent students (visible): {students['total']}")
+if students["data"]:
+    print("First student organizations:", students["data"][0].get("ORGANIZATIONS", []))
 
 # 4. All organizations
 orgs = api_get("/organizations")
-for o in orgs["DATA"]:
+for o in orgs["data"]:
     print(f"  [{o['ORGID']}] {o['ORGNAME']}")
 </pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-python')"><i class="bi bi-clipboard"></i></button>
@@ -395,19 +492,22 @@ function apiGet(path, struct params = {}) {
 
 // All people (first 10)
 var list = apiGet("/people", { limit: 10 });
-writeOutput("Total: #list.TOTAL#&lt;br&gt;");
+writeOutput("Total: #list.total#&lt;br&gt;");
 
 // Filter by flag
 var staff = apiGet("/people", { flag: "Staff", limit: 20 });
-writeOutput("Staff count: #staff.TOTAL#&lt;br&gt;");
+writeOutput("Staff count: #staff.total#&lt;br&gt;");
 
 // Protected data — returns 0 without a valid secret
 var students = apiGet("/people", { flag: "Current-Student" });
-writeOutput("Students visible: #students.TOTAL#&lt;br&gt;");
+writeOutput("Students visible: #students.total#&lt;br&gt;");
+if ( arrayLen(students.data ?: []) ) {
+    writeDump(var=students.data[1].ORGANIZATIONS ?: [], expand=false);
+}
 
 // Single person
 var person = apiGet("/people/42");
-writeDump(var=person.USER, expand=false);
+writeDump(var=person.user, expand=false);
 </pre>
             <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyCode('code-cf-script')"><i class="bi bi-clipboard"></i></button>
         </div>
@@ -432,12 +532,23 @@ function copyCode(elId) {
 }
 
 // ── Live tester ───────────────────────────────────────────────────────────
+function buildPagedUrl(endpoint, limit, offset) {
+    const [path, query] = endpoint.split('?');
+    const params = new URLSearchParams(query || '');
+    params.set('limit', limit);
+    params.set('offset', offset);
+    return `${path}?${params.toString()}`;
+}
+
 async function runLiveTest() {
     const token    = document.getElementById('inp-token').value.trim();
     const secret   = document.getElementById('inp-secret').value.trim();
     const endpoint = document.getElementById('inp-endpoint').value;
+    const limit    = Math.max(1, parseInt(document.getElementById('inp-limit').value, 10) || 10);
+    const offset   = Math.max(0, parseInt(document.getElementById('inp-offset').value, 10) || 0);
     const respEl   = document.getElementById('live-response');
     const statusEl = document.getElementById('live-status');
+    const pagerEl  = document.getElementById('live-pagination');
 
     if (!token) {
         respEl.textContent = 'Enter a token first.';
@@ -448,13 +559,16 @@ async function runLiveTest() {
     respEl.style.color = '#d4d4d4';
     respEl.textContent = 'Sending request…';
     statusEl.textContent = '';
+    pagerEl.classList.add('d-none');
+    pagerEl.classList.remove('d-flex');
 
     const headers = { 'Authorization': `Bearer ${token}` };
     if (secret) headers['X-API-Secret'] = secret;
 
     try {
+        const url   = buildPagedUrl(endpoint, limit, offset);
         const start = Date.now();
-        const res   = await fetch(endpoint, { headers });
+        const res   = await fetch(url, { headers });
         const ms    = Date.now() - start;
         const body  = await res.text();
 
@@ -462,10 +576,17 @@ async function runLiveTest() {
         statusEl.style.color = res.ok ? '#6ea84e' : '#f48771';
 
         // Try to pretty-print JSON
+        let parsed = null;
         try {
-            respEl.textContent = JSON.stringify(JSON.parse(body), null, 2);
+            parsed = JSON.parse(body);
+            respEl.textContent = JSON.stringify(parsed, null, 2);
         } catch {
             respEl.textContent = body;
+        }
+
+        // Server-side pagination fields (list endpoints only, e.g. /people)
+        if (parsed && typeof parsed.total === 'number' && typeof parsed.limit === 'number' && typeof parsed.offset === 'number') {
+            showLivePagination(parsed);
         }
     } catch (err) {
         statusEl.textContent = 'Network error';
@@ -473,6 +594,34 @@ async function runLiveTest() {
         respEl.textContent = err.message;
         respEl.style.color = '#f48771';
     }
+}
+
+function showLivePagination(page) {
+    const pagerEl   = document.getElementById('live-pagination');
+    const summaryEl = document.getElementById('live-pagination-summary');
+    const prevBtn   = document.getElementById('live-page-prev');
+    const nextBtn   = document.getElementById('live-page-next');
+
+    const shown = page.limit > 0 ? Math.min(page.limit, page.total - page.offset) : 0;
+    const from  = page.total === 0 ? 0 : page.offset + 1;
+    const to    = page.total === 0 ? 0 : page.offset + Math.max(shown, 0);
+
+    summaryEl.textContent = `Showing ${from}-${to} of ${page.total} (limit ${page.limit}, offset ${page.offset})`;
+    prevBtn.disabled = page.offset <= 0;
+    nextBtn.disabled = page.offset + page.limit >= page.total;
+
+    pagerEl.classList.remove('d-none');
+    pagerEl.classList.add('d-flex');
+}
+
+function pageLiveTest(direction) {
+    const limitEl  = document.getElementById('inp-limit');
+    const offsetEl = document.getElementById('inp-offset');
+    const limit    = Math.max(1, parseInt(limitEl.value, 10) || 10);
+    const offset   = Math.max(0, parseInt(offsetEl.value, 10) || 0);
+
+    offsetEl.value = Math.max(0, offset + (direction * limit));
+    runLiveTest();
 }
 </script>
 </body>

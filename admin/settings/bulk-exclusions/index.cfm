@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     Bulk Exclusions Dashboard — run, view status, recent history.
     Permission: settings.bulk_exclusions.manage.
 --->
@@ -50,19 +50,6 @@
     </cfif>
 </div>
 
-<!--- Status messages --->
-<cfif len(msgParam)>
-    <div class="alert alert-success alert-dismissible fade show mt-3">
-        #encodeForHTML(msgParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
-<cfif len(errParam)>
-    <div class="alert alert-danger alert-dismissible fade show mt-3">
-        #encodeForHTML(errParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
 
 <cfif NOT dbOk>
     <div class="alert alert-warning mt-3">
@@ -76,8 +63,8 @@
 <div class="mb-4 mt-3">
     <form method="post" action="/admin/settings/bulk-exclusions/run.cfm" class="d-inline">
         <input type="hidden" name="typeKey" value="ALL">
-        <button type="submit" class="btn btn-primary"
-                onclick="return confirm('Run ALL 6 exclusion types?')">
+        <button type="submit" class="btn btn-ui-filter"
+                data-confirm="Run ALL 6 exclusion types?">
             <i class="bi bi-play-fill me-1"></i>Run All Exclusions
         </button>
     </form>
@@ -95,7 +82,7 @@
                             <i class="bi #t.ICON# me-2 settings-hub-icon"></i>#encodeForHTML(t.LABEL)#
                         </h5>
                         <a href="/admin/settings/bulk-exclusions/edit.cfm?type=#encodeForURL(t.TYPE_KEY)#"
-                                    class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit flags &amp; codes" aria-label="Edit #encodeForHTMLAttribute(t.LABEL)#">
+                                    class="btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit" title="Edit flags &amp; codes" aria-label="Edit #encodeForHTMLAttribute(t.LABEL)#">
                             <i class="bi bi-pencil-square"></i>
                         </a>
                     </div>
@@ -119,7 +106,7 @@
                     </cfif>
                     <form method="post" action="/admin/settings/bulk-exclusions/run.cfm">
                         <input type="hidden" name="typeKey" value="#t.TYPE_KEY#">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <button type="submit" class="btn btn-sm btn-ui-filter">
                             <i class="bi bi-play me-1"></i>Run Now
                         </button>
                     </form>
@@ -174,6 +161,23 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(msgParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(msgParam)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

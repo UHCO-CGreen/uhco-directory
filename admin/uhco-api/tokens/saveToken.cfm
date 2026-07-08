@@ -1,9 +1,13 @@
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfif NOT (CGI.REQUEST_METHOD EQ "POST")
     OR NOT structKeyExists(form, "tokenName")
     OR NOT len(trim(form.tokenName))
     OR NOT structKeyExists(form, "appName")
     OR NOT len(trim(form.appName))>
-    <cflocation url="#request.webRoot#/admin/tokens/create.cfm" addtoken="false">
+    <cflocation url="#request.webRoot#/admin/settings/uhco-api/tokens/create.cfm" addtoken="false">
 </cfif>
 
 <cfset tokenService  = createObject("component", "cfc.token_service").init()>
@@ -28,7 +32,7 @@
     <cfset rawFlags = structKeyExists(form, "protectedFlags") ? trim(form.protectedFlags) : "">
     <cfif NOT len(rawFlags)>
         <!--- Redirect back with error if no flags selected --->
-        <cflocation url="#request.webRoot#/admin/tokens/create.cfm?err=noflags" addtoken="false">
+        <cflocation url="#request.webRoot#/admin/settings/uhco-api/tokens/create.cfm?err=noflags" addtoken="false">
     </cfif>
 
     <!--- Inherit IPs/expiry from token when secret fields left blank --->
@@ -52,7 +56,7 @@
     <p class='mb-2'>Copy the secret below. <strong>It will not be shown again.</strong></p>
     <div class='input-group mt-3'>
         <input type='text' class='form-control font-monospace' id='rawSecret' value='#EncodeForHTMLAttribute(secretResult.rawSecret)#' readonly>
-        <button class='btn btn-outline-secondary' type='button' onclick=""navigator.clipboard.writeText(document.getElementById('rawSecret').value).then(function(){this.textContent='Copied!';}.bind(this))"">
+        <button class='btn btn-ui-go' type='button' data-clipboard-source='rawSecret'>
             <i class='bi bi-clipboard'></i> Copy
         </button>
     </div>
@@ -69,7 +73,7 @@
     <p class='mb-2'>Copy the token below. <strong>It will not be shown again.</strong></p>
     <div class='input-group mt-3'>
         <input type='text' class='form-control font-monospace' id='rawToken' value='#EncodeForHTMLAttribute(result.rawToken)#' readonly>
-        <button class='btn btn-outline-secondary' type='button' onclick=""navigator.clipboard.writeText(document.getElementById('rawToken').value).then(function(){this.textContent='Copied!';}.bind(this))"">
+        <button class='btn btn-ui-go' type='button' data-clipboard-source='rawToken'>
             <i class='bi bi-clipboard'></i> Copy
         </button>
     </div>
@@ -80,7 +84,7 @@
 #secretBlock#
 
 <div class='mt-4'>
-    <a href='/admin/tokens/index.cfm' class='btn btn-primary'>Back to Tokens</a>
+    <a href='/admin/settings/uhco-api/tokens/index.cfm' class='btn btn-ui-cancel'>Back to Tokens</a>
 </div>
 ">
 

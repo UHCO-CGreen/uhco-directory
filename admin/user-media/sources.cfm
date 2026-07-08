@@ -1,4 +1,4 @@
-<!--- ── Authorization ─────────────────────────────────────────────────────── --->
+﻿<!--- ── Authorization ─────────────────────────────────────────────────────── --->
 <cfif NOT request.hasPermission("media.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -34,6 +34,20 @@
 <!--- ── Source data from service (local folder via service abstraction) ───── --->
 <cfset userExternalIDs = externalIDService.getExternalIDs(userID).data>
 <cfset userFlags       = flagsService.getUserFlags(userID).data>
+<cfset _srcIsAlumni = false>
+<cfset _srcIsFaculty = false>
+<cfloop array="#userFlags#" index="_srcf">
+    <cfif compareNoCase(trim(_srcf.FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _srcIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(_srcf.FLAGNAME ?: ""))>
+        <cfset _srcIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _srcIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_srcIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 <cfset sourceProvider  = sourceService.getSourceProvider()>
 <cfset sourceKeys = sourceService.getSourceKeys()>
 <cfset availableFiles = []>
@@ -248,7 +262,7 @@
         <cfif isActive>
             <cfset content &= "
                     <form method='post' class='d-inline ms-1'
-                          onsubmit=""return confirm('Deactivate this source? All related variants will be marked stale and must be regenerated manually.')"">
+                          data-confirm='Deactivate this source? All related variants will be marked stale and must be regenerated manually.'>
                         <input type='hidden' name='action'   value='deactivate'>
                         <input type='hidden' name='sourceID' value='#s.USERIMAGESOURCEID#'>
                         <button type='submit' class='btn btn-sm btn-warning'>Deactivate</button>
@@ -257,14 +271,14 @@
         </cfif>
         <cfset content &= "
                     <form method='post' class='d-inline ms-1'
-                          onsubmit=&quot;return confirm('Permanently delete this source record? This cannot be undone.')&quot;>
+                          data-confirm='Permanently delete this source record? This cannot be undone.'>
                         <input type='hidden' name='action'   value='delete'>
                         <input type='hidden' name='sourceID' value='#s.USERIMAGESOURCEID#'>
-                        <button type='submit' class='btn btn-sm btn-danger'>Delete</button>
+                        <button type='submit' class='btn btn-sm btn-ui-delete'>Delete</button>
                     </form>
         ">
         <cfset content &= "
-        <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#s.USERIMAGESOURCEID#' class='btn btn-sm btn-secondary ms-1'>Manage Variants</a>
+        <a href='/admin/user-media/variants.cfm?userid=#userID#&sourceid=#s.USERIMAGESOURCEID#' class='btn btn-sm btn-ui-go ms-1'>Manage Variants</a>
                 </td>
             </tr>
         ">
@@ -335,7 +349,7 @@
 <cfif sourceProvider EQ "dropbox">
     <cfset addPickerHtml = "
     <div class='mb-2'>
-        <button type='button' id='loadAddImagesBtn' class='btn btn-outline-primary btn-sm'>
+        <button type='button' id='loadAddImagesBtn' class='btn btn-ui-go btn-sm'>
             <i class='bi bi-cloud-download me-1'></i>Load Source Images
         </button>
     </div>
@@ -366,7 +380,7 @@
 <cfif sourceProvider EQ "dropbox">
     <cfset editPickerHtml = "
     <div class='mb-2'>
-        <button type='button' id='loadEditImagesBtn' class='btn btn-outline-primary btn-sm'>
+        <button type='button' id='loadEditImagesBtn' class='btn btn-ui-go btn-sm'>
             <i class='bi bi-cloud-download me-1'></i>Load Source Images
         </button>
     </div>
@@ -410,7 +424,7 @@
                     </select>
                 </div>
                 <div class='col-md-2'>
-                    <button type='submit' id='addSourceSubmit' class='btn btn-primary w-100'>
+                    <button type='submit' id='addSourceSubmit' class='btn btn-ui-add w-100'>
                         <i class='bi bi-plus'></i> Add
                     </button>
                 </div>
@@ -469,8 +483,8 @@
                     </p>
                 </div>
                 <div class='modal-footer'>
-                    <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Cancel</button>
-                    <button type='submit' class='btn btn-primary'>Save Changes</button>
+                    <button type='button' class='btn btn-ui-cancel' data-bs-dismiss='modal'>Cancel</button>
+                    <button type='submit' class='btn btn-ui-save'>Save Changes</button>
                 </div>
             </form>
         </div>
@@ -481,7 +495,7 @@
 
 <cfsavecontent variable="sourcesScript">
 <cfoutput>
-<script>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
 (function () {
     var sourceProvider = '#encodeForJavaScript(sourceProvider)#';
     var loadFilesUrl = '/admin/user-media/sources.cfm?userid=#userID#&ajax=loadfiles';

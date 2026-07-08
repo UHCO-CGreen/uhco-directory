@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UHCO API Explorer</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .section-card { margin-bottom: 1.25rem; }
+    .result-pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: .8rem;
+      max-height: 400px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .badge-method { font-size: .7rem; letter-spacing: .05em; }
+    .status-icon { width: 1.2rem; text-align: center; }
+    .spinner-border { width: 1rem; height: 1rem; border-width: 2px; }
+    .endpoint-path { font-family: monospace; font-size: .9rem; }
+    .card-header { cursor: pointer; user-select: none; }
+    .secret-required { font-size: .75rem; }
+  </style>
+</head>
+<body>
+
+<div class="container py-4" style="max-width: 900px;">
+
+  <div class="mb-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-braces me-2 text-primary"></i>UHCO Directory API Explorer</h2>
+    <p class="text-muted mb-0">Live demo of every v1 endpoint. All responses are rendered below.</p>
+  </div>
+
+  <!-- Credentials -->
+  <div class="card mb-4 border-primary">
+    <div class="card-body">
+      <h6 class="fw-semibold mb-3"><i class="bi bi-key me-2"></i>Credentials</h6>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label small fw-semibold">API Token <span class="text-danger">*</span></label>
+          <input id="inputToken" type="text" class="form-control form-control-sm font-monospace"
+                 value="uhcs_5d4148ed-0649-6c40-fa900e1bd87c9d169b4f58fb">
+        </div>
+        <div class="col-12">
+          <label class="form-label small fw-semibold">
+            API Secret
+            <span class="text-muted fw-normal">(optional — required for protected flags, /access, grad-class &amp; roster endpoints)</span>
+          </label>
+          <input id="inputSecret" type="text" class="form-control form-control-sm font-monospace"
+                 placeholder="uhcs_sec_…  leave blank if not needed">
+        </div>
+        <div class="col-12">
+          <label class="form-label small fw-semibold">Demo Person ID</label>
+          <input id="inputDemoID" type="number" class="form-control form-control-sm" value="42"
+                 placeholder="UserID used for /people/{id}/* sub-resource calls">
+        </div>
+      </div>
+      <div class="mt-3">
+        <button id="btnRun" class="btn btn-primary" onclick="runAll()">
+          <i class="bi bi-play-fill me-1"></i>Run All Examples
+        </button>
+        <button class="btn btn-outline-secondary ms-2" onclick="clearAll()">
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+</div>
+
+<script>
+const BASE = '/proxy';
+
+function token()  { return document.getElementById('inputToken').value.trim(); }
+function secret() { return document.getElementById('inputSecret').value.trim(); }
+function demoID() { return parseInt(document.getElementById('inputDemoID').value) || 42; }
+
+async function apiGet(path, params = {}) {
+  const url = new URL(BASE + path, location.origin);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const headers = { 'Authorization': `Bearer ${token()}` };
+  if (secret()) headers['X-API-Secret'] = secret();
+  const res = await fetch(url, { headers });
+  const body = await res.json();
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+  return body;
+}
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+
+let sectionIndex = 0;
+
+function makeSection(num, label, path, secretNeeded = false) {
+  const id = `sec-${++sectionIndex}`;
+  const container = document.getElementById('results');
+  const el = document.createElement('div');
+  el.className = 'card section-card shadow-sm';
+  el.innerHTML = `
+    <div class="card-header d-flex align-items-center gap-2 py-2" data-bs-toggle="collapse" data-bs-target="#${id}body">
+      <span class="badge bg-success badge-method">GET</span>
+      <span class="endpoint-path flex-grow-1">${path}</span>
+      ${secretNeeded ? '<span class="badge bg-warning text-dark secret-required"><i class="bi bi-shield-lock me-1"></i>secret</span>' : ''}
+      <span id="${id}-status" class="status-icon text-muted"><i class="bi bi-dash"></i></span>
+    </div>
+    <div id="${id}body" class="collapse show">
+      <div class="card-body p-2">
+        <div class="small text-muted fw-semibold mb-2">${num}. ${label}</div>
+        <div id="${id}-out"><span class="text-muted small fst-italic">Not yet run.</span></div>
+      </div>
+    </div>`;
+  container.appendChild(el);
+  return id;
+}
+
+function setLoading(id) {
+  document.getElementById(`${id}-status`).innerHTML = '<div class="spinner-border text-secondary"></div>';
+  document.getElementById(`${id}-out`).innerHTML = '<span class="text-muted small">Loading…</span>';
+}
+
+function setSuccess(id, data) {
+  document.getElementById(`${id}-status`).innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+  document.getElementById(`${id}-out`).innerHTML =
+    `<pre class="result-pre">${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+function setError(id, err) {
+  const detail = err.body ? JSON.stringify(err.body) : err.message;
+  document.getElementById(`${id}-status`).innerHTML = '<i class="bi bi-x-circle-fill text-danger"></i>';
+  document.getElementById(`${id}-out`).innerHTML =
+    `<div class="alert alert-danger mb-0 py-2 small"><strong>${err.message}</strong> — ${detail}</div>`;
+}
+
+function setSkipped(id, reason) {
+  document.getElementById(`${id}-status`).innerHTML = '<i class="bi bi-skip-forward-fill text-warning"></i>';
+  document.getElementById(`${id}-out`).innerHTML =
+    `<div class="alert alert-warning mb-0 py-2 small">${reason}</div>`;
+}
+
+function clearAll() {
+  document.getElementById('results').innerHTML = '';
+  sectionIndex = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Run all examples
+// ---------------------------------------------------------------------------
+
+async function runAll() {
+  clearAll();
+  document.getElementById('btnRun').disabled = true;
+
+  const id = demoID();
+
+  // ── 1. API Root ────────────────────────────────────────────────────────────
+  const s1 = makeSection(1, 'API root — available endpoints', '/');
+  setLoading(s1);
+  try {
+    const root = await apiGet('/');
+    setSuccess(s1, root);
+  } catch(e) { setError(s1, e); }
+
+  // ── 2. People list ─────────────────────────────────────────────────────────
+  const s2 = makeSection(2, 'All people — first 10', '/people?limit=10');
+  setLoading(s2);
+  try {
+    const list = await apiGet('/people', { limit: 10 });
+    setSuccess(s2, list);
+  } catch(e) { setError(s2, e); }
+
+  // ── 3. Pagination ──────────────────────────────────────────────────────────
+  const s3 = makeSection(3, 'People — second page (offset 10)', '/people?limit=10&offset=10');
+  setLoading(s3);
+  try {
+    const page2 = await apiGet('/people', { limit: 10, offset: 10 });
+    setSuccess(s3, page2);
+  } catch(e) { setError(s3, e); }
+
+  // ── 4. Search ──────────────────────────────────────────────────────────────
+  const s4 = makeSection(4, 'Search by name — "smith"', '/people?search=smith&limit=5');
+  setLoading(s4);
+  try {
+    const srch = await apiGet('/people', { search: 'smith', limit: 5 });
+    setSuccess(s4, srch);
+  } catch(e) { setError(s4, e); }
+
+  // ── 5. Flag: Clinical-Attending ────────────────────────────────────────────
+  const s5 = makeSection(5, 'Filter by flag — Clinical-Attending', '/people?flag=Clinical-Attending&limit=5');
+  setLoading(s5);
+  try {
+    const att = await apiGet('/people', { flag: 'Clinical-Attending', limit: 5 });
+    setSuccess(s5, att);
+  } catch(e) { setError(s5, e); }
+
+  // ── 6. Flag: Current-Student (protected) ───────────────────────────────────
+  const s6 = makeSection(6, 'Filter by flag — Current-Student (secret unlocks protected records)', '/people?flag=Current-Student&limit=5', true);
+  setLoading(s6);
+  try {
+    const stu = await apiGet('/people', { flag: 'Current-Student', limit: 5 });
+    setSuccess(s6, stu);
+  } catch(e) { setError(s6, e); }
+
+  // ── 7. Flag: Alumni ────────────────────────────────────────────────────────
+  const s7 = makeSection(7, 'Filter by flag — Alumni (secret unlocks protected records)', '/people?flag=Alumni&limit=5', true);
+  setLoading(s7);
+  try {
+    const alum = await apiGet('/people', { flag: 'Alumni', limit: 5 });
+    setSuccess(s7, alum);
+  } catch(e) { setError(s7, e); }
+
+  // ── 8. Filter by org ───────────────────────────────────────────────────────
+  const s8 = makeSection(8, 'Filter by organization — OD Program', '/people?org=OD+Program&limit=5');
+  setLoading(s8);
+  try {
+    const orgf = await apiGet('/people', { org: 'OD Program', limit: 5 });
+    setSuccess(s8, orgf);
+  } catch(e) { setError(s8, e); }
+
+  // ── 9. Grad year filter ────────────────────────────────────────────────────
+  const s9 = makeSection(9, 'Filter Alumni by grad year — 2022', '/people?flag=Alumni&gradyear=2022&limit=5', true);
+  setLoading(s9);
+  try {
+    const gy = await apiGet('/people', { flag: 'Alumni', gradyear: 2022, limit: 5 });
+    setSuccess(s9, gy);
+  } catch(e) { setError(s9, e); }
+
+  // ── 10. Single person — full profile ───────────────────────────────────────
+  const s10 = makeSection(10, `Full profile — person ${id}`, `/people/${id}`);
+  setLoading(s10);
+  try {
+    const person = await apiGet(`/people/${id}`);
+    setSuccess(s10, person);
+  } catch(e) { setError(s10, e); }
+
+  // ── 11-20. Sub-resources ───────────────────────────────────────────────────
+  const subResources = [
+    ['flags',          'Flags',             false],
+    ['organizations',  'Organizations',     false],
+    ['addresses',      'Addresses',         false],
+    ['emails',         'Emails',            false],
+    ['degrees',        'Degrees',           false],
+    ['academic',       'Academic info',     false],
+    ['studentprofile', 'Student profile',   true],
+    ['externalids',    'External IDs',      false],
+    ['images',         'Images',            false],
+    ['awards',         'Awards',            false],
+    ['bio',            'Bio',               false],
+  ];
+  let num = 11;
+  for (const [sub, label, needsSecret] of subResources) {
+    const sid = makeSection(num++, `${label} — person ${id}`, `/people/${id}/${sub}`, needsSecret);
+    setLoading(sid);
+    try {
+      const data = await apiGet(`/people/${id}/${sub}`);
+      setSuccess(sid, data);
+    } catch(e) { setError(sid, e); }
+  }
+
+  // ── 22. Access / permissions ───────────────────────────────────────────────
+  const s22 = makeSection(22, `Access permissions — user ${id}`, `/access?userID=${id}`, true);
+  setLoading(s22);
+  try {
+    const acc = await apiGet('/access', { userID: id });
+    setSuccess(s22, acc);
+  } catch(e) { setError(s22, e); }
+
+  // ── 23. All organizations ──────────────────────────────────────────────────
+  const s23 = makeSection(23, 'All organizations', '/organizations');
+  setLoading(s23);
+  let firstOrgID = null;
+  try {
+    const orgs = await apiGet('/organizations');
+    firstOrgID = orgs.DATA?.[0]?.ORGID ?? null;
+    setSuccess(s23, orgs);
+  } catch(e) { setError(s23, e); }
+
+  // ── 24. Single organization ────────────────────────────────────────────────
+  const s24 = makeSection(24, `Single organization — org ${firstOrgID ?? '?'}`, `/organizations/${firstOrgID ?? '{id}'}`);
+  if (firstOrgID) {
+    setLoading(s24);
+    try {
+      const org = await apiGet(`/organizations/${firstOrgID}`);
+      setSuccess(s24, org);
+    } catch(e) { setError(s24, e); }
+  } else {
+    setSkipped(s24, 'No org ID available — run organizations list first.');
+  }
+
+  // ── 25. Flags catalog ──────────────────────────────────────────────────────
+  const s25 = makeSection(25, 'Flags catalog', '/flags');
+  setLoading(s25);
+  try {
+    const flags = await apiGet('/flags');
+    setSuccess(s25, flags);
+  } catch(e) { setError(s25, e); }
+
+  // ── 26. Quickpull: Attending ───────────────────────────────────────────────
+  const s26 = makeSection(26, 'Quickpull — Clinical-Attending', '/quickpulls/attending');
+  setLoading(s26);
+  try {
+    const qa = await apiGet('/quickpulls/attending');
+    setSuccess(s26, qa);
+  } catch(e) { setError(s26, e); }
+
+  // ── 27. Quickpull: Deans ───────────────────────────────────────────────────
+  const s27 = makeSection(27, 'Quickpull — Deans', '/quickpulls/deans');
+  setLoading(s27);
+  try {
+    const qd = await apiGet('/quickpulls/deans');
+    setSuccess(s27, qd);
+  } catch(e) { setError(s27, e); }
+
+  // ── 28. Quickpull: Grad class ──────────────────────────────────────────────
+  const s28 = makeSection(28, 'Quickpull — Grad class 2022, OD Program', '/quickpulls/gradclass?year=2022&program=OD+Program', true);
+  setLoading(s28);
+  try {
+    const qg = await apiGet('/quickpulls/gradclass', { year: 2022, program: 'OD Program' });
+    setSuccess(s28, qg);
+  } catch(e) { setError(s28, e); }
+
+  // ── 29. Quickpull: Grad class with name filter ─────────────────────────────
+  const s29 = makeSection(29, 'Quickpull — Grad class 2022, All, filter A-C', '/quickpulls/gradclass?year=2022&program=All&filter=A-C', true);
+  setLoading(s29);
+  try {
+    const qgs = await apiGet('/quickpulls/gradclass', { year: 2022, program: 'All', filter: 'A-C' });
+    setSuccess(s29, qgs);
+  } catch(e) { setError(s29, e); }
+
+  // ── 30. Quickpull: Graduate (single) ──────────────────────────────────────
+  const s30 = makeSection(30, `Quickpull — Single graduate (user ${id})`, `/quickpulls/graduate?id=${id}`, true);
+  setLoading(s30);
+  try {
+    const qgr = await apiGet('/quickpulls/graduate', { id });
+    setSuccess(s30, qgr);
+  } catch(e) { setError(s30, e); }
+
+  // ── 31. Quickpull: MyUHCO roster catalog ──────────────────────────────────
+  const s31 = makeSection(31, 'Quickpull — MyUHCO roster catalog (published only)', '/quickpulls/myuhco-rosters?publishedOnly=true', true);
+  setLoading(s31);
+  try {
+    const qr = await apiGet('/quickpulls/myuhco-rosters', { publishedOnly: 'true' });
+    setSuccess(s31, qr);
+  } catch(e) { setError(s31, e); }
+
+  // ── 32. Permission roster ──────────────────────────────────────────────────
+  const s32 = makeSection(32, 'Permission roster — portal.access', '/permission-roster?permission=portal.access');
+  setLoading(s32);
+  try {
+    const pr = await apiGet('/permission-roster', { permission: 'portal.access' });
+    setSuccess(s32, pr);
+  } catch(e) { setError(s32, e); }
+
+  document.getElementById('btnRun').disabled = false;
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

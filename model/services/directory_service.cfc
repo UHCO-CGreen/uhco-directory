@@ -2,19 +2,6 @@ component output="false" singleton {
 
     
     public directory_service function init() {
-        variables.users_service        = createObject("component", "cfc.users_service").init();
-        variables.flags_service        = createObject("component", "cfc.flags_service").init();
-        variables.organizations_service = createObject("component", "cfc.organizations_service").init();
-        variables.addresses_service     = createObject("component", "cfc.addresses_service").init();
-        variables.phone_service         = createObject("component", "cfc.phone_service").init();
-        variables.images_service        = createObject("component", "cfc.images_service").init();
-        variables.academic_service      = createObject("component", "cfc.academic_service").init();
-        variables.externalid_service    = createObject("component", "cfc.externalid_service").init();
-        variables.access_service        = createObject("component", "cfc.access_service").init();
-        variables.emails_service         = createObject("component", "cfc.emails_service").init();
-        variables.degrees_service        = createObject("component", "cfc.degrees_service").init();
-        variables.studentProfile_service = createObject("component", "cfc.studentProfile_service").init();
-        variables.bio_service            = createObject("component", "cfc.bio_service").init();
         return this;
     }
 
@@ -28,22 +15,45 @@ component output="false" singleton {
     public struct function getFullProfile( required numeric userID ) {
 
         var profile = {};
+        var usersService = _getDependency("users_service", "cfc.users_service");
+        var flagsService = _getDependency("flags_service", "cfc.flags_service");
+        var organizationsService = _getDependency("organizations_service", "cfc.organizations_service");
+        var addressesService = _getDependency("addresses_service", "cfc.addresses_service");
+        var phoneService = _getDependency("phone_service", "cfc.phone_service");
+        var imagesService = _getDependency("images_service", "cfc.images_service");
+        var academicService = _getDependency("academic_service", "cfc.academic_service");
+        var externalIDService = _getDependency("externalid_service", "cfc.externalid_service");
+        var accessService = _getDependency("access_service", "cfc.access_service");
+        var emailsService = _getDependency("emails_service", "cfc.emails_service");
+        var degreesService = _getDependency("degrees_service", "cfc.degrees_service");
+        var studentProfileService = _getDependency("studentProfile_service", "cfc.studentProfile_service");
+        var bioService = _getDependency("bio_service", "cfc.bio_service");
+        var publicationsService = _getDependency("publications_service", "cfc.publications_service");
+        var nameResolutionService = _getDependency("nameResolutionService", "cfc.nameResolution_service");
 
-        profile.user        = variables.users_service.getUser( userID ).data;
-        profile.flags       = variables.flags_service.getUserFlags( userID ).data;
-        profile.organizations = variables.organizations_service.getUserOrgs( userID ).data;
-        profile.addresses   = variables.addresses_service.getAddresses( userID ).data;
-        profile.phones      = variables.phone_service.getPhones( userID ).data;
-        profile.images      = variables.images_service.getImages( userID ).data;
-        profile.academic    = variables.academic_service.getAcademicInfo( userID ).data;
-        profile.externalIDs = variables.externalid_service.getExternalIDs( userID ).data;
-        profile.access      = variables.access_service.getAccessForUser( userID ).data;
-        profile.emails      = variables.emails_service.getEmails( userID ).data;
-        profile.degrees     = variables.degrees_service.getDegrees( userID ).data;
-        profile.studentProfile = variables.studentProfile_service.getProfile( userID ).data;
-        profile.residencies = variables.studentProfile_service.getResidencies( userID ).data;
-        profile.awards      = variables.studentProfile_service.getAwards( userID ).data;
-        profile.bio         = variables.bio_service.getBio( userID ).data;
+        profile.user        = usersService.getUser( userID ).data;
+        profile.flags       = flagsService.getUserFlags( userID ).data;
+        profile.organizations = organizationsService.getUserOrgs( userID ).data;
+        profile.addresses   = addressesService.getAddresses( userID ).data;
+        profile.phones      = phoneService.getPhones( userID ).data;
+        profile.images      = imagesService.getImages( userID ).data;
+        profile.academic    = academicService.getAcademicInfo( userID ).data;
+        profile.externalIDs = externalIDService.getExternalIDs( userID ).data;
+        profile.access      = accessService.getAccessForUser( userID ).data;
+        profile.emails      = emailsService.getEmails( userID ).data;
+        profile.degrees     = degreesService.getDegrees( userID ).data;
+        profile.studentProfile = studentProfileService.getProfile( userID ).data;
+        profile.residencies = studentProfileService.getResidencies( userID ).data;
+        profile.awards      = studentProfileService.getAwards( userID ).data;
+        profile.bio         = bioService.getBio( userID ).data;
+        profile.publicationProfiles = publicationsService.getPublicationProfiles( userID ).data;
+        profile.publications = publicationsService.getUserPublications( userID ).data;
+        profile.publicationFetchSummary = publicationsService.getFetchSummary( userID ).data;
+        profile.publicationConfig = publicationsService.getPublicationConfig( userID ).data;
+
+        if ( isStruct(profile.user) AND !structIsEmpty(profile.user) ) {
+            profile.user["NAMES"] = nameResolutionService.getAllActiveAliasNameEnvelopeForUser(userID);
+        }
 
         if ( !isStruct(profile.studentProfile) ) {
             profile.studentProfile = {};
@@ -73,7 +83,11 @@ component output="false" singleton {
 
     
     public array function listUsers() {
-        return variables.users_service.listUsers();
+        return _getDependency("users_service", "cfc.users_service").listUsers();
+    }
+
+    public array function listUsersForAdminIndex() {
+        return _getDependency("users_service", "cfc.users_service").listUsersForAdminIndex();
     }
 
     public struct function searchUsers(
@@ -86,7 +100,7 @@ component output="false" singleton {
         numeric maxRows     = 50,
         numeric startRow    = 1
     ) {
-        return variables.users_service.searchUsers(
+        return _getDependency("users_service", "cfc.users_service").searchUsers(
             searchTerm   = arguments.searchTerm,
             filterFlag   = arguments.filterFlag,
             filterOrg    = arguments.filterOrg,
@@ -96,6 +110,14 @@ component output="false" singleton {
             maxRows      = arguments.maxRows,
             startRow     = arguments.startRow
         );
+    }
+
+    private any function _getDependency( required string key, required string componentPath ) {
+        if ( !structKeyExists(variables, arguments.key) OR !isObject(variables[arguments.key]) ) {
+            variables[arguments.key] = createObject("component", arguments.componentPath).init();
+        }
+
+        return variables[arguments.key];
     }
 
 }

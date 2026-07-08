@@ -206,6 +206,310 @@ component output="false" singleton {
     }
 
     /**
+     * Checks whether the user's primary Dropbox folder exists.
+     * Searches {root}/{FlagFolder}/{lastname}-{firstname}-{peoplesoftid} for each
+     * flag-mapped parent folder.  If not found, also checks two legacy conventions
+     * (case-insensitive via Dropbox API):
+     *   Check 2: {lastname}-{firstname}    (e.g. green-chris)
+     *   Check 3: {firstinitial}-{lastname} (e.g. c-green)
+     *   Check 4: {firstinitial}{lastname}  (e.g. cgreen)
+     *
+     * Returns a struct:
+     *   success, provider, primaryFolder, parentFolder, folderPath,
+     *   exists, publishExists, legacyExists, legacyFolder, legacyFolderPath,
+     *   legacyParentFolder, message, error
+     */
+    public struct function checkUserDropboxFolder(
+        required string firstName,
+        required string lastName,
+        string          middleName  = "",
+        required array  externalIDs,
+        required array  userFlags
+    ) {
+        var result = {
+            success            = true,
+            provider           = _getSourceProvider(),
+            primaryFolder      = "",
+            parentFolder       = "",
+            folderPath         = "",
+            exists             = false,
+            publishExists      = false,
+            legacyExists       = false,
+            legacyFolder       = "",
+            legacyFolderPath   = "",
+            legacyParentFolder = "",
+            message            = "",
+            error              = ""
+        };
+
+        if ( result.provider NEQ "dropbox" ) {
+            result.message = "Dropbox is not the active source provider.";
+            return result;
+        }
+
+        var candidates = _buildFolderCandidates(
+            firstName   = arguments.firstName,
+            lastName    = arguments.lastName,
+            middleName  = arguments.middleName,
+            externalIDs = arguments.externalIDs
+        );
+
+        if ( !arrayLen(candidates) ) {
+            result.message = "Cannot determine primary folder name — PeopleSoft ID may be missing.";
+            return result;
+        }
+
+        result.primaryFolder = candidates[1];
+
+        var allowedFolders = _getAllowedFoldersByFlags( arguments.userFlags );
+        if ( !arrayLen(allowedFolders) ) {
+            result.message = "No flag-mapped parent folder found for this user. Assign a flag (Staff, Faculty, etc.) first.";
+            return result;
+        }
+
+        var rootFolder    = _normalizeSlashPath( variables.AppConfigService.getValue("dropbox.root_folder", "") );
+        var legacyName    = lCase( trim(arguments.lastName) ) & "-" & lCase( trim(arguments.firstName) );
+        result.legacyFolder = legacyName;
+
+        try {
+            // Check 1: primary convention [lastname]-[firstname]-[peoplesoftid]
+            for ( var parentFolder in allowedFolders ) {
+                var checkPath = _normalizeSlashPath( rootFolder & "/" & parentFolder & "/" & result.primaryFolder );
+                if ( variables.DropboxProvider.fileExists(checkPath) ) {
+                    result.exists        = true;
+                    result.parentFolder  = parentFolder;
+                    result.folderPath    = checkPath;
+                    result.publishExists = variables.DropboxProvider.fileExists( checkPath & "/publish" );
+                    result.message       = "Folder found.";
+                    return result;
+                }
+            }
+
+            // Check 2: legacy convention [lastname]-[firstname] (Dropbox lookup is case-insensitive)
+            for ( var parentFolder in allowedFolders ) {
+                var legacyPath = _normalizeSlashPath( rootFolder & "/" & parentFolder & "/" & legacyName );
+                if ( variables.DropboxProvider.fileExists(legacyPath) ) {
+                    result.legacyExists       = true;
+                    result.legacyParentFolder = parentFolder;
+                    result.legacyFolderPath   = legacyPath;
+                    break;
+                }
+            }
+
+            // Check 3: legacy convention [firstinitial]-[lastname] (e.g. c-green)
+            if ( !result.legacyExists AND len(trim(arguments.firstName)) ) {
+                var initialName = lCase( left(trim(arguments.firstName), 1) ) & "-" & lCase( trim(arguments.lastName) );
+                for ( var parentFolder in allowedFolders ) {
+                    var initialPath = _normalizeSlashPath( rootFolder & "/" & parentFolder & "/" & initialName );
+                    if ( variables.DropboxProvider.fileExists(initialPath) ) {
+                        result.legacyExists       = true;
+                        result.legacyFolder       = initialName;
+                        result.legacyParentFolder = parentFolder;
+                        result.legacyFolderPath   = initialPath;
+                        break;
+                    }
+                }
+            }
+
+            // Check 4: legacy convention [firstinitial][lastname] no dash (e.g. cgreen)
+            if ( !result.legacyExists AND len(trim(arguments.firstName)) ) {
+                var initialNoDashName = lCase( left(trim(arguments.firstName), 1) ) & lCase( trim(arguments.lastName) );
+                for ( var parentFolder in allowedFolders ) {
+                    var initialNoDashPath = _normalizeSlashPath( rootFolder & "/" & parentFolder & "/" & initialNoDashName );
+                    if ( variables.DropboxProvider.fileExists(initialNoDashPath) ) {
+                        result.legacyExists       = true;
+                        result.legacyFolder       = initialNoDashName;
+                        result.legacyParentFolder = parentFolder;
+                        result.legacyFolderPath   = initialNoDashPath;
+                        break;
+                    }
+                }
+            }
+
+            // Report the expected primary path using the first allowed folder
+            result.parentFolder = allowedFolders[1];
+            result.folderPath   = _normalizeSlashPath( rootFolder & "/" & result.parentFolder & "/" & result.primaryFolder );
+            result.message      = result.legacyExists ? "Legacy folder found; rename recommended." : "Folder not found.";
+        } catch (any e) {
+            result.success = false;
+            result.error   = e.message ?: "An unexpected error occurred checking the Dropbox folder.";
+        }
+
+        return result;
+    }
+
+    /**
+     * Renames the user's legacy [lastname]-[firstname] Dropbox folder to the primary
+     * [lastname]-[firstname]-[peoplesoftid] convention, then creates a publish subfolder
+     * if one does not already exist.
+     *
+     * Returns a struct:
+     *   success, fromPath, toPath, publishCreated, message, error
+     */
+    public struct function renameUserDropboxFolder(
+        required string firstName,
+        required string lastName,
+        string          middleName  = "",
+        required array  externalIDs,
+        required array  userFlags
+    ) {
+        var result = {
+            success        = true,
+            fromPath       = "",
+            toPath         = "",
+            publishCreated = false,
+            message        = "",
+            error          = ""
+        };
+
+        if ( _getSourceProvider() NEQ "dropbox" ) {
+            result.success = false;
+            result.error   = "Dropbox is not the active source provider.";
+            return result;
+        }
+
+        // Re-run the check to locate the legacy folder
+        var checkResult = checkUserDropboxFolder(
+            firstName   = arguments.firstName,
+            lastName    = arguments.lastName,
+            middleName  = arguments.middleName,
+            externalIDs = arguments.externalIDs,
+            userFlags   = arguments.userFlags
+        );
+
+        if ( !checkResult.success ) {
+            result.success = false;
+            result.error   = checkResult.error;
+            return result;
+        }
+
+        if ( checkResult.exists ) {
+            result.success = false;
+            result.error   = "Primary folder already exists — no rename needed.";
+            return result;
+        }
+
+        if ( !checkResult.legacyExists ) {
+            result.success = false;
+            result.error   = "No legacy folder found to rename.";
+            return result;
+        }
+
+        result.fromPath = checkResult.legacyFolderPath;
+        result.toPath   = checkResult.folderPath;
+
+        try {
+            variables.DropboxProvider.moveFolder( result.fromPath, result.toPath );
+
+            // Ensure publish subfolder exists in the renamed location
+            var publishPath = result.toPath & "/publish";
+            if ( !variables.DropboxProvider.fileExists(publishPath) ) {
+                variables.DropboxProvider.createFolder( publishPath );
+                result.publishCreated = true;
+            }
+
+            result.message = "Folder renamed successfully.";
+        } catch ("DropboxProvider.WriteDisabled" e) {
+            result.success = false;
+            result.error   = "Dropbox write operations are disabled. Set dropbox.write_enabled = true in App Config.";
+        } catch ("DropboxProvider.PathNotAllowed" e) {
+            result.success = false;
+            result.error   = "The folder path is not in the write allowlist. Update dropbox.write_allowed_prefixes in App Config.";
+        } catch (any e) {
+            result.success = false;
+            result.error   = e.message ?: "An unexpected error occurred renaming the Dropbox folder.";
+        }
+
+        return result;
+    }
+
+    /**
+     * Creates the user's primary Dropbox folder and a "publish" subfolder inside it.
+     * Folder path: {writeRoot}/{firstFlagFolder}/{lastname}-{firstname}-{peoplesoftid}/
+     *
+     * Requires dropbox.write_enabled = true and the path to be in write_allowed_prefixes.
+     *
+     * Returns a struct:
+     *   success, provider, primaryFolder, parentFolder, folderPath,
+     *   publishFolderPath, mainCreated, publishCreated, message, error
+     */
+    public struct function createUserDropboxFolder(
+        required string firstName,
+        required string lastName,
+        string          middleName  = "",
+        required array  externalIDs,
+        required array  userFlags
+    ) {
+        var result = {
+            success           = true,
+            provider          = _getSourceProvider(),
+            primaryFolder     = "",
+            parentFolder      = "",
+            folderPath        = "",
+            publishFolderPath = "",
+            mainCreated       = false,
+            publishCreated    = false,
+            message           = "",
+            error             = ""
+        };
+
+        if ( result.provider NEQ "dropbox" ) {
+            result.success = false;
+            result.error   = "Dropbox is not the active source provider.";
+            return result;
+        }
+
+        var candidates = _buildFolderCandidates(
+            firstName   = arguments.firstName,
+            lastName    = arguments.lastName,
+            middleName  = arguments.middleName,
+            externalIDs = arguments.externalIDs
+        );
+
+        if ( !arrayLen(candidates) ) {
+            result.success = false;
+            result.error   = "Cannot determine primary folder name — PeopleSoft ID may be missing.";
+            return result;
+        }
+
+        result.primaryFolder = candidates[1];
+
+        var allowedFolders = _getAllowedFoldersByFlags( arguments.userFlags );
+        if ( !arrayLen(allowedFolders) ) {
+            result.success = false;
+            result.error   = "No flag-mapped parent folder found for this user. Assign a flag (Staff, Faculty, etc.) first.";
+            return result;
+        }
+
+        result.parentFolder = allowedFolders[1];
+
+        // Build the full absolute path using the same read root_folder as checkUserDropboxFolder,
+        // so check and create always target the same location regardless of write_root_folder.
+        var readRoot        = _normalizeSlashPath( variables.AppConfigService.getValue("dropbox.root_folder", "") );
+        var mainFullPath    = _normalizeSlashPath( readRoot & "/" & result.parentFolder & "/" & result.primaryFolder );
+        var publishFullPath = mainFullPath & "/publish";
+
+        try {
+            result.folderPath        = variables.DropboxProvider.createFolder( mainFullPath );
+            result.mainCreated       = true;
+            result.publishFolderPath = variables.DropboxProvider.createFolder( publishFullPath );
+            result.publishCreated    = true;
+            result.message           = "Folder created successfully.";
+        } catch ("DropboxProvider.WriteDisabled" e) {
+            result.success = false;
+            result.error   = "Dropbox write operations are disabled. Set dropbox.write_enabled = true in App Config.";
+        } catch ("DropboxProvider.PathNotAllowed" e) {
+            result.success = false;
+            result.error   = "The folder path is not in the write allowlist. Update dropbox.write_allowed_prefixes in App Config to include this path.";
+        } catch (any e) {
+            result.success = false;
+            result.error   = e.message ?: "An unexpected error occurred creating the Dropbox folder.";
+        }
+
+        return result;
+    }
+
+    /**
      * Returns available source images filtered by:
      *   1. Dropbox subfolders that match the user's assigned flags.
      *   2. Name/token matching within those folders.
@@ -694,6 +998,21 @@ component output="false" singleton {
         nameToken = fi & mi & last;
         nameTokenShort = fi & last;
 
+        // Primary convention: [lastname]-[firstname]-[peoplesoftid]
+        // e.g. johnson-amanda-123456
+        var psID = "";
+        for ( var extID in arguments.externalIDs ) {
+            if ( findNoCase("peoplesoft", extID.SYSTEMNAME ?: "") ) {
+                psID = lCase( trim(extID.EXTERNALVALUE ?: "") );
+                break;
+            }
+        }
+        if ( len(last) AND len(first) AND len(psID) ) {
+            var primaryFolder = last & "-" & first & "-" & psID;
+            arrayAppend( candidates, primaryFolder );
+        }
+
+        // Legacy fallback: bare external ID values (PeopleSoft ID, CougarNet, etc.)
         for ( var extID in arguments.externalIDs ) {
             var extVal = lCase( trim(extID.EXTERNALVALUE ?: "") );
             if ( len(extVal) GTE 2 AND left(extVal, 4) NEQ "http" AND !arrayFindNoCase(candidates, extVal) ) {

@@ -1,4 +1,4 @@
-<cfparam name="form.runImport" default="0">
+﻿<cfparam name="form.runImport" default="0">
 <cfparam name="form.student" default="0">
 <cfparam name="form.staff" default="1">
 <cfparam name="form.faculty" default="0">
@@ -10,9 +10,14 @@
 <cfparam name="url.importedName" default="">
 <cfparam name="url.newUserID" default="">
 
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/users/index.cfm">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
 <cfset datasource = request.datasource>
-<cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
-<cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
+<cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+<cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+<cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
 <cfset selectedStudent = form.student EQ "1">
 <cfset selectedStaff = form.staff EQ "1">
 <cfset selectedFaculty = form.faculty EQ "1">
@@ -24,34 +29,44 @@
 <cfset pageMessage = "">
 <cfset pageMessageClass = "alert-info">
 <cfset reasonApiOnly = "User in API but not in local Users table">
+<cfset pageScripts = "">
+<cfset importToastMessage = "">
+<cfset importToastTone = "success">
 
-<cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-    <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-        <cfset uhApiToken = trim(server.system.environment["UH_API_TOKEN"] )>
-    </cfif>
-    <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-        <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"] )>
-    </cfif>
+<cfif url.msg EQ "imported" AND len(trim(url.importedName))>
+    <cfset importToastMessage = trim(url.importedName) & " imported successfully as User #" & trim(url.newUserID ?: "") & ".">
+<cfelseif len(url.err)>
+    <cfset importToastMessage = "Import failed: " & url.err>
+    <cfset importToastTone = "danger">
 </cfif>
 
-<cfif uhApiToken EQ "">
-    <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
+<cfif len(importToastMessage)>
+    <cfsavecontent variable="pageScripts">
+        <cfoutput>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+(function () {
+    if (!window.AdminUI || typeof window.AdminUI.showToast !== 'function') { return; }
+    window.AdminUI.showToast("#encodeForJavaScript(importToastMessage)#", {
+        tone: "#encodeForJavaScript(importToastTone)#"
+    });
+})();
+</script>
+        </cfoutput>
+    </cfsavecontent>
 </cfif>
-<cfif uhApiSecret EQ "">
-    <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
+
+<cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+    <cfset content = "<h1>UH People Import</h1><div class='alert alert-danger'>UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.</div>">
+    <cfinclude template="/admin/layout.cfm">
+    <cfabort>
 </cfif>
 
 <cfset content = "">
-<cfif url.msg EQ "imported">
-    <cfset content &= "<div class='alert alert-success'><i class='bi bi-check-circle-fill'></i> <strong>#EncodeForHTML(url.importedName)#</strong> imported successfully as <a href='/admin/users/edit.cfm?userID=#EncodeForHTMLAttribute(url.newUserID)#'>User ##&thinsp;#EncodeForHTML(url.newUserID)#</a>.</div>">
-<cfelseif len(url.err)>
-    <cfset content &= "<div class='alert alert-danger'><strong>Import failed:</strong> #EncodeForHTML(url.err)#</div>">
-</cfif>
 <cfset content &= "
 <h1>UH People Import</h1>
 <p class='text-muted'>Pull people from the UH API, compare by first and last name against local users, and stage missing people for review.</p>
 <div class='mb-3'>
-    <a href='/admin/users/uh_people_db_not_in_api.cfm' class='btn btn-outline-dark btn-sm'>Open Reverse Compare</a>
+    <a href='/admin/users/uh_people_db_not_in_api.cfm' class='btn btn-ui-go btn-sm'>Open Reverse Compare</a>
 </div>
 
 <form method='post' class='card card-body mb-4'>
@@ -72,8 +87,8 @@
             </div>
         </div>
         <div class='col-md-4 text-md-end'>
-            <button type='submit' name='runImport' value='1' class='btn btn-primary'>Run Import</button>
-            <button type='submit' name='viewStaging' value='1' class='btn btn-outline-secondary'>View Staging</button>
+            <button type='submit' name='runImport' value='1' class='btn btn-ui-filter'>Run Import</button>
+            <button type='submit' name='viewStaging' value='1' class='btn btn-ui-go'>View Staging</button>
         </div>
     </div>
 </form>
@@ -129,15 +144,15 @@
                         <td>#EncodeForHTML(stagingRecords.reason ?: "")#</td>
                         <td>#dateformat(stagingRecords.createdAt, 'yyyy-mm-dd')# #timeformat(stagingRecords.createdAt, 'HH:mm')#</td>
                         <td class='text-nowrap'>
-                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
+                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#' class='btn btn-sm btn-ui-go'>Review</a>
                             <cfif (stagingRecords.reason ?: "") EQ reasonApiOnly>
                                 <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(stagingRecords.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
-                                   class='btn btn-sm btn-success ms-1'>Quick Import</a>
+                                   class='btn btn-sm btn-ui-save ms-1'>Quick Import</a>
                             </cfif>
                             <form method='post' class='admin-inline-form'>
                                 <input type='hidden' name='deleteFromStaging' value='1'>
                                 <input type='hidden' name='deleteUHApiID' value='#stagingRecords.uhApiId#'>
-                                <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>
+                                <button type='submit' class='btn btn-sm btn-ui-delete ms-1' data-confirm="Remove from staging?">Delete</button>
                             </form>
                         </td>
                     </tr>
@@ -295,16 +310,16 @@
                         <td>#EncodeForHTML(row.action)#</td>
                         <td>#EncodeForHTML(row.reason)#</td>
                         <td class='text-nowrap'>
-                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#' class='btn btn-sm btn-outline-primary'>Review</a>
+                            <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#' class='btn btn-sm btn-ui-go'>Review</a>
             ">
             <cfif row.action EQ "Inserted">
                 <cfset content &= "
                                 <a href='/admin/users/quick_import_person.cfm?uhApiId=#urlEncodedFormat(row.uhApiId)#&returnTo=#urlEncodedFormat(cgi.SCRIPT_NAME)#'
-                                   class='btn btn-sm btn-success ms-1'>Quick Import</a>
+                                   class='btn btn-sm btn-ui-save ms-1'>Quick Import</a>
                                 <form method='post' class='admin-inline-form'>
                                     <input type='hidden' name='deleteFromStaging' value='1'>
                                     <input type='hidden' name='deleteUHApiID' value='#row.uhApiId#'>
-                                    <button type='submit' class='btn btn-sm btn-outline-danger ms-1' onclick='return confirm(&quot;Remove from staging?&quot;);'>Delete</button>
+                                    <button type='submit' class='btn btn-sm btn-ui-delete ms-1' data-confirm="Remove from staging?">Delete</button>
                                 </form>
                 ">
             </cfif>

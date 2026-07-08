@@ -9,6 +9,10 @@ component output="false" singleton {
         return { success=true, data=variables.bioDAO.getBio( userID ) };
     }
 
+    public string function sanitizeForRender( required string bioContent ) {
+        return sanitizeHTML( trim(arguments.bioContent) );
+    }
+
     public void function saveBio( required numeric userID, required string bioContent ) {
         var cleaned = sanitizeHTML( trim(bioContent) );
         variables.bioDAO.saveBio( userID, {

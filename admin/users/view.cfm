@@ -8,13 +8,6 @@
 
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabledValue = trim(appConfigService.getValue("test_mode.enabled", "0"))>
-<cfset testModeEnabled = usersService.isTestModeEnabled() OR (listFindNoCase("1,true,yes,on", testModeEnabledValue) GT 0)>
-<cfset isSuperAdminImpersonation = structKeyExists(request, "isImpersonating") AND request.isImpersonating() AND structKeyExists(request, "isActualSuperAdmin") AND request.isActualSuperAdmin()>
-<cfset showTestUsersForAdmin = canViewTestUsers OR testModeEnabled OR isSuperAdminImpersonation>
-<cfset hideTestUsersForAdmin = NOT showTestUsersForAdmin>
 <cfset profile = directoryService.getFullProfile(url.userID)>
 <cfset freshUserResult = usersService.getUser(val(url.userID))>
 <cfset userActiveRaw = val(profile.user.ACTIVE ?: 0)>
@@ -38,20 +31,24 @@
 <cfset userStatusBadgeHtml = userIsActive
     ? "<span class='badge badge-success users-view-badge'><i class='bi bi-check-circle me-1'></i>Record Active</span>"
     : "<span class='badge badge-danger users-view-badge'><i class='bi bi-x-circle me-1'></i>Record Inactive</span>">
-<cfset isTestUser = false>
-<cfloop from="1" to="#arrayLen(profile.flags ?: [])#" index="flagIndex">
-    <cfif compareNoCase(trim(profile.flags[flagIndex].FLAGNAME ?: ""), "TEST_USER") EQ 0>
-        <cfset isTestUser = true>
-        <cfbreak>
-    </cfif>
-</cfloop>
-<cfif hideTestUsersForAdmin AND isTestUser>
+<cfif NOT request.canAccessUserProfile(profile)>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
+<cfset _viewIsAlumni = false>
+<cfset _viewIsFaculty = false>
+<cfloop from="1" to="#arrayLen(profile.flags)#" index="_vf">
+    <cfif compareNoCase(trim(profile.flags[_vf].FLAGNAME ?: ""), "Alumni") EQ 0>
+        <cfset _viewIsAlumni = true>
+    </cfif>
+    <cfif listFindNoCase("Faculty-Fulltime,Faculty-Adjunct", trim(profile.flags[_vf].FLAGNAME ?: ""))>
+        <cfset _viewIsFaculty = true>
+    </cfif>
+</cfloop>
+<cfif _viewIsAlumni AND NOT (application.authService.hasRole("ALUMNI_ADMIN") OR (_viewIsFaculty AND application.authService.hasAnyRole(["USER_ADMIN", "CLINICAL_FACULTY_ADMIN", "RESEARCH_FACULTY_ADMIN"])))>
+    <cflocation url="#request.webRoot#/admin/dashboard.cfm" addtoken="false">
+    <cfabort>
+</cfif>
 <cfset returnTo = structKeyExists(url, "returnTo") AND len(trim(url.returnTo)) ? trim(url.returnTo) : (len(trim(cgi.HTTP_REFERER)) ? trim(cgi.HTTP_REFERER) : "/admin/users/index.cfm")>
-<cfparam name="form.quickApiMatch" default="0">
-<cfparam name="form.saveMatchedApiId" default="0">
-<cfparam name="form.matchedApiId" default="">
 <cfset contentWrapperClass = "">
 <cfset toolbarListType = "all">
 <cfset toolbarSearchTerm = structKeyExists(url, "search") ? trim(url.search) : "">
@@ -87,45 +84,26 @@
     <cfset impersonationState = application.authService.getImpersonationState()>
 </cfif>
 
-<cfswitch expression="#toolbarListType#">
-    <cfcase value="problems"><cfset toolbarListLabel = "Problem Records"></cfcase>
-    <cfcase value="faculty"><cfset toolbarListLabel = "Faculty"></cfcase>
-    <cfcase value="staff"><cfset toolbarListLabel = "Staff"></cfcase>
-    <cfcase value="current-students"><cfset toolbarListLabel = "Current Students"></cfcase>
-    <cfcase value="alumni"><cfset toolbarListLabel = "Alumni"></cfcase>
-    <cfcase value="inactive"><cfset toolbarListLabel = "Inactive Records"></cfcase>
-    <cfdefaultcase><cfset toolbarListLabel = "All Records"></cfdefaultcase>
-</cfswitch>
-
-<cfset usersListMenuHTML = "
-            <div class='dropdown users-list-view-selector'>
-                <button class='btn btn-link navbar-brand text-white users-list-toolbar-brand users-list-view-selector-toggle dropdown-toggle' type='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                    <i class='bi bi-people-fill me-2'></i>Users: #toolbarListLabel#
-                </button>
-                <ul class='dropdown-menu dropdown-menu-end'>
-                    <li><a class='dropdown-item#(toolbarListType EQ "problems" ? " active" : "")#' href='/admin/users/index.cfm?list=problems'><i class='bi bi-exclamation-triangle me-2'></i>Problem Records</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "faculty" ? " active" : "")#' href='/admin/users/index.cfm?list=faculty'><i class='bi bi-people-fill me-2'></i>Faculty</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "staff" ? " active" : "")#' href='/admin/users/index.cfm?list=staff'><i class='bi bi-people-fill me-2'></i>Staff</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "current-students" ? " active" : "")#' href='/admin/users/index.cfm?list=current-students'><i class='bi bi-people-fill me-2'></i>Current Students</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "alumni" ? " active" : "")#' href='/admin/users/index.cfm?list=alumni'><i class='bi bi-mortarboard me-2'></i>Alumni</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "inactive" ? " active" : "")#' href='/admin/users/index.cfm?list=inactive'><i class='bi bi-person-dash me-2'></i>Inactive Records</a></li>
-                    <li><a class='dropdown-item#(toolbarListType EQ "all" ? " active" : "")#' href='/admin/users/index.cfm?list=all'><i class='bi bi-list me-2'></i>All Records</a></li>
-                </ul>
-            </div>
-">
-
 <cfset usersTopToolBar = "
-    <nav class='navbar sticky-top bg-slate text-white users-list-toolbar'>
+    <nav class='navbar sticky-top users-list-toolbar'>
         <div class='container-fluid users-list-toolbar-shell'>
             <div class='users-list-toolbar-primary'>
-                #usersListMenuHTML#
+                <button class='btn btn-sm btn-ui-cancel me-2 admin-sidebar-toggle' id='sidebarToggle' type='button' title='Toggle Sidebar' aria-label='Toggle Sidebar'>
+                    <i class='bi bi-list'></i>
+                </button>
+                <div class='navbar-brand users-list-toolbar-brand mb-0 fs-5 d-flex align-items-center gap-2'>
+                    <span>UHCO_Identity</span>
+                    <span class='users-list-toolbar-brand-divider'>|</span>
+                    <i class='bi bi-people-fill'></i>
+                    <span class='users-list-toolbar-brand-label'>Users</span>
+                </div>
                 <div class='users-list-toolbar-controls'>
                     <form method='get' action='/admin/users/index.cfm' class='users-list-toolbar-search-form'>
                         <input type='hidden' name='list' value='#toolbarListType#'>
                         <input type='hidden' name='page' value='1'>
                         <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
                             <input type='text' name='search' class='form-control' placeholder='Search name/email or use field:value (e.g. lastname:Doe &amp;&amp; firstname:Jane)' value='#encodeForHTMLAttribute(toolbarSearchTerm)#'>
-                            <button class='btn btn-secondary' type='submit'><i class='bi bi-search me-1'></i>Search</button>
+                            <button class='btn btn-ui-filter' type='submit'><i class='bi bi-search me-1'></i>Search</button>
                         </div>
                     </form>
                 </div>
@@ -133,9 +111,9 @@
         
             <ul class='navbar-nav d-flex flex-row align-items-center gap-2 ms-auto users-list-toolbar-nav'>
                 <li class='nav-item dropdown ms-3 users-list-toolbar-account'>
-                    <a class='nav-link dropdown-toggle d-flex align-items-center text-white' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false'>
-                        <i class='bi bi-person-circle me-2'></i>
-                        #currentUserDisplayName#
+                    <a class='nav-link dropdown-toggle p-0 d-flex align-items-center gap-2 text-dark' href='##' role='button' data-bs-toggle='dropdown' aria-expanded='false' aria-label='User menu'>
+                        <img src='#encodeForHTMLAttribute(currentUserImageSrc)#' alt='Profile image for #encodeForHTMLAttribute(trim(currentAdminUser.displayName ?: "Admin User"))#' class='rounded-circle users-list-toolbar-avatar admin-toolbar-avatar'>
+                        <span class='d-none d-lg-inline small'>#currentUserDisplayName#</span>
                     </a>
                     <div class='dropdown-menu dropdown-menu-end p-3 users-list-toolbar-dropdown' style='min-width: 320px;'>
                         <div class='d-flex align-items-center gap-3 mb-3 users-list-toolbar-account-header'>
@@ -147,9 +125,9 @@
                             </div>
                         </div>
                         #(len(currentUserRoleLabel) ? "<div class='bg-light p-2 rounded mb-3'><small class='d-block text-uppercase fw-bold text-muted users-list-toolbar-label'>Role</small><span class='badge badge-dark'>" & currentUserRoleLabel & "</span></div>" : "")#
-                        #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-outline-dark w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
+                        #(structCount(impersonationState) ? "<div class='users-list-toolbar-impersonation alert alert-warning mb-3 py-2 px-3'><div class='small fw-semibold text-uppercase mb-1'>Impersonation Active</div><div class='small mb-2'>You are currently using <strong>" & encodeForHTML(impersonationState.label ?: "") & "</strong>.</div><form method='post' action='" & request.webRoot & "/admin/settings/admin-users/save.cfm' class='mb-0'><input type='hidden' name='action' value='clearImpersonation'><input type='hidden' name='returnURL' value='" & encodeForHTMLAttribute(currentRequestUrl) & "'><button type='submit' class='btn btn-sm btn-ui-warning w-100'><i class='bi bi-x-octagon me-1'></i>Stop Impersonating</button></form></div>" : "")#
                         <div class='d-grid'>
-                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-outline-primary btn-sm'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
+                            <a href='#request.webRoot#/admin/logout.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-box-arrow-right me-1'></i>Logout</a>
                         </div>
                     </div>
                 </li>
@@ -247,7 +225,6 @@
 <cfset uhApiId     = trim(profile.user.UH_API_ID ?: "")>
 <cfset showAcademicInfo   = false>
 <cfset showStudentProfile = false>
-<cfset quickMatchAttempted = (cgi.request_method EQ "POST" AND form.quickApiMatch EQ "1")>
 <cfset hasAddress =
     len(room) ||
     len(building) ||
@@ -259,13 +236,6 @@
     len(officeMailAddr) ||
     len(mailcode)
 >
-
-<cfset quickMatchFound = false>
-<cfset quickMatchApiId = "">
-<cfset quickMatchApiFirstName = "">
-<cfset quickMatchApiLastName = "">
-<cfset quickMatchMessage = "">
-<cfset quickMatchMessageClass = "alert-info">
 
 <cfif arrayLen(profile.flags) gt 0>
     <cfloop from="1" to="#arrayLen(profile.flags)#" index="f">
@@ -294,113 +264,6 @@
     <cfset spCommAge       = "">
 </cfif>
 
-<cfif quickMatchAttempted>
-    <cfset uhApiToken = structKeyExists(application, "uhApiToken") ? trim(application.uhApiToken ?: "") : "">
-    <cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-
-    <cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-        <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")>
-            <cfset uhApiToken = trim(server.system.environment["UH_API_TOKEN"] )>
-        </cfif>
-        <cfif structKeyExists(server.system.environment, "UH_API_SECRET")>
-            <cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"] )>
-        </cfif>
-    </cfif>
-
-    <cfif uhApiToken EQ "">
-        <cfset uhApiToken = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6">
-    </cfif>
-    <cfif uhApiSecret EQ "">
-        <cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR">
-    </cfif>
-
-    <cfsilent>
-        <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
-        <cfset peopleResponse = uhApi.getPeople(student=true, staff=true, faculty=true)>
-    </cfsilent>
-
-    <cfset statusCode = peopleResponse.statusCode ?: "Unknown">
-    <cfset responseData = peopleResponse.data ?: {}>
-    <cfset peopleArray = []>
-
-    <cfif left(statusCode, 3) EQ "200">
-        <cfif isStruct(responseData) AND structKeyExists(responseData, "data") AND isArray(responseData.data)>
-            <cfset peopleArray = responseData.data>
-        <cfelseif isArray(responseData)>
-            <cfset peopleArray = responseData>
-        </cfif>
-
-        <cfset localFirstName = lCase(trim(resolvedFirstName ?: ""))>
-        <cfset localLastName = lCase(trim(resolvedLastName ?: ""))>
-
-        <cfloop from="1" to="#arrayLen(peopleArray)#" index="i">
-            <cfset person = peopleArray[i]>
-            <cfif NOT isStruct(person)>
-                <cfcontinue>
-            </cfif>
-
-            <cfset apiFirstName = lCase(trim(person.first_name ?: person.firstName ?: ""))>
-            <cfset apiLastName = lCase(trim(person.last_name ?: person.lastName ?: ""))>
-            <cfset apiId = trim(person.id ?: "")>
-
-            <cfif apiId NEQ "" AND apiFirstName EQ localFirstName AND apiLastName EQ localLastName>
-                <cfset quickMatchFound = true>
-                <cfset quickMatchApiId = apiId>
-                <cfset quickMatchApiFirstName = trim(person.first_name ?: person.firstName ?: "")>
-                <cfset quickMatchApiLastName = trim(person.last_name ?: person.lastName ?: "")>
-                <cfbreak>
-            </cfif>
-        </cfloop>
-
-        <cfif quickMatchFound>
-            <cfset quickMatchMessage = "API match found by first/last name.">
-            <cfset quickMatchMessageClass = "alert-success">
-        <cfelse>
-            <cfset quickMatchMessage = "No API match found by first/last name.">
-            <cfset quickMatchMessageClass = "alert-warning">
-        </cfif>
-    <cfelse>
-        <cfset quickMatchMessage = "Quick match failed: UH API returned status #EncodeForHTML(statusCode)#.">
-        <cfset quickMatchMessageClass = "alert-danger">
-    </cfif>
-</cfif>
-
-<cfif cgi.request_method EQ "POST" AND form.saveMatchedApiId EQ "1">
-    <cfset saveApiId = trim(form.matchedApiId ?: "")>
-    <cfif saveApiId EQ "">
-        <cfset quickMatchMessage = "Save failed: matched API ID is missing.">
-        <cfset quickMatchMessageClass = "alert-danger">
-    <cfelse>
-        <cfset usersService = createObject("component", "cfc.users_service").init()>
-        <cfset userData = {
-            FirstName = profile.user.FIRSTNAME ?: "",
-            MiddleName = profile.user.MIDDLENAME ?: "",
-            LastName = profile.user.LASTNAME ?: "",
-            Pronouns = profile.user.PRONOUNS ?: "",
-            EmailPrimary = profile.user.EMAILPRIMARY ?: "",
-            Phone = profile.user.PHONE ?: "",
-            Room = profile.user.ROOM ?: "",
-            Building = profile.user.BUILDING ?: "",
-            CougarNetID = profile.user.COUGARNETID ?: "",
-            Title1 = profile.user.TITLE1 ?: "",
-            Title2 = profile.user.TITLE2 ?: "",
-            Title3 = profile.user.TITLE3 ?: "",
-            UH_API_ID = saveApiId
-        }>
-
-        <cfset saveResult = usersService.updateUser(val(url.userID), userData)>
-        <cfif structKeyExists(saveResult, "success") AND saveResult.success>
-            <cfset profile.user.UH_API_ID = saveApiId>
-            <cfset uhApiId = saveApiId>
-            <cfset quickMatchMessage = "Saved UH API ID to user record.">
-            <cfset quickMatchMessageClass = "alert-success">
-        <cfelse>
-            <cfset quickMatchMessage = "Save failed: " & (saveResult.message ?: "Unknown error")>
-            <cfset quickMatchMessageClass = "alert-danger">
-        </cfif>
-    </cfif>
-</cfif>
-
 <cfset userAliasesHtml = "">
 <cfif arrayLen(userAliases)>
     <cfset userAliasesHtml = "<div class='mb-3'><strong>Aliases:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>First</th><th>Middle</th><th>Last</th><th>Type / System</th><th>Alias Status</th></tr></thead><tbody>">
@@ -424,38 +287,6 @@
     </cfloop>
     <cfset userAliasesHtml &= "</tbody></table></div></div>">
 </cfif>
-
-<!---
-<cfset quickMatchHtml = "
-<div class='card card-body mb-3 mt-4 users-view-quickmatch'>
-    <h5 class='mb-2'>Quick API Match</h5>
-    <p class='text-muted mb-2'>Compare this user by primary alias first/last name against UH API.</p>
-    <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline'>
-        <input type='hidden' name='quickApiMatch' value='1'>
-        <button type='submit' class='btn btn-sm btn-outline-primary'>Run Quick API Match</button>
-    </form>
-">
-
-<cfif quickMatchAttempted>
-    <cfset quickMatchHtml &= "<div class='alert #quickMatchMessageClass# mt-3 mb-2'>#EncodeForHTML(quickMatchMessage)#</div>">
-
-    <cfif quickMatchFound>
-        <cfset quickMatchHtml &= "
-        <p class='mb-2'><strong>Matched API ID:</strong> #EncodeForHTML(quickMatchApiId)#</p>
-        <p class='mb-2'><strong>Matched API Name:</strong> #EncodeForHTML(quickMatchApiFirstName)# #EncodeForHTML(quickMatchApiLastName)#</p>
-        <form method='post' action='/admin/users/view.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='d-inline me-2'>
-            <input type='hidden' name='quickApiMatch' value='1'>
-            <input type='hidden' name='saveMatchedApiId' value='1'>
-            <input type='hidden' name='matchedApiId' value='#EncodeForHTMLAttribute(quickMatchApiId)#'>
-            <button type='submit' class='btn btn-sm btn-outline-success'>Save API ID to User</button>
-        </form>
-        <a href='/admin/users/uh_person.cfm?uhApiId=#urlEncodedFormat(quickMatchApiId)#&sourceUserID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-success'>Sync from API</a>
-        ">
-    </cfif>
-</cfif>
-
-<cfset quickMatchHtml &= "</div>">
---->
 
 <cfset profileThumbnail = "/assets/images/uh.png">
 
@@ -507,13 +338,6 @@
 </cfif>
 
 <!---#quickMatchHtml#--->
-
-<cfif len(trim(profile.user.UH_API_ID ?: ""))>
-        <cfset uhSyncUrl = "/admin/users/uh_sync.cfm?userID=" & urlEncodedFormat(profile.user.USERID) & "&uhApiId=" & urlEncodedFormat(profile.user.UH_API_ID)>
-        <cfset uhSyncButtonHtml = "<a href='" & uhSyncUrl & "' class='btn btn-sm btn-ui-neutral'><i class='bi bi-cloud-download me-1'></i>UH Sync</a>">
-    <cfelse>
-        <cfset uhSyncButtonHtml = "<button type='button' class='btn btn-sm btn-ui-neutral disabled' disabled><i class='bi bi-cloud-download me-1'></i>UH Sync</button>">
-    </cfif>
 
 <cfset generalInfoHtml = "">
 <cfset contactInfoHtml = "">
@@ -761,27 +585,27 @@
 <cfset content = "
 #usersTopToolBar#
 <div class='py-4 px-4 pt-2'>
-<div class='d-flex flex-wrap align-items-center gap-2 mb-4'>
-    <a href='/admin/users/edit.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-ui-neutral'>
-        <i class='bi bi-pencil me-1'></i>Edit This User
-    </a>
-    #uhSyncButtonHtml#
-    <a href='/admin/users/search_UH_API.cfm' class='btn btn-sm btn-ui-neutral'>
-        <i class='bi bi-search me-1'></i>Search The UH API
-    </a>
-    <a href='/admin/users/search_UH_LDAP.cfm' class='btn btn-sm btn-ui-neutral'>
-        <i class='bi bi-person-vcard me-1'></i>Search The UH LDAP
-    </a>
+<div class='users-page-secondary-toolbar users-view-secondary-toolbar mb-4'>
+    <div class='users-page-secondary-toolbar-heading users-view-header'>
+        <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded admin-object-cover users-view-profile-thumb'>
+        <div class='users-view-header-body'>
+            <h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')#<cfif len(trim(degrees))><span class='users-view-degrees'>, #EncodeForHTML(degrees)#</span></cfif></h1>
+            <div class='users-view-subtitle'>#SubTitle#</div>
+            <div class='mb-2'>#userStatusBadgeHtml#</div>
+        </div>
+    </div>
+    <div class='users-page-secondary-toolbar-actions'>
+        <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-sm btn-ui-cancel'>
+            <i class='bi bi-people-fill me-1'></i>Back to User List
+        </a>
+        <a href='/admin/users/edit.cfm?userID=#urlEncodedFormat(profile.user.USERID)#' class='btn btn-sm btn-ui-edit'>
+            <i class='bi bi-pencil me-1'></i>Edit This User
+        </a>
+    </div>
 </div>
 
 <div class='users-view-page'>
-    <div class='users-view-header clearfix'>
-        <img src='#profileThumbnail#' alt='Profile Thumbnail' class='rounded float-start me-3 mb-2 admin-object-cover users-view-profile-thumb'>
-        <h1 class='users-view-title'>#(len(prefix) ? prefix & ' ' : '')##resolvedFirstName# #resolvedLastName##(len(suffix) ? ', ' & suffix : '')##(len(trim(degrees)) ? ', ' & EncodeForHTML(degrees) : '')#</h1>
-        <div class='users-view-subtitle'>#SubTitle#</div>
-        <div class='mb-2'>#userStatusBadgeHtml#</div>
-        #flagsRowHtml#
-    </div>
+    #flagsRowHtml#
 
     <div class='users-view-masonry'>
         <div class='users-view-masonry-item#generalSectionClass#'>
@@ -877,8 +701,8 @@
     </div>
 
     <div class='mt-4'>
-        <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#&returnTo=#urlEncodedFormat(returnTo)#' class='btn btn-ui-uh'>Edit</a>
-        <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-ui-neutral'>Back to Users</a>
+        <a href='/admin/users/edit.cfm?userID=#profile.user.USERID#&returnTo=#urlEncodedFormat(returnTo)#' class='btn btn-ui-edit'>Edit</a>
+        <a href='#EncodeForHTMLAttribute(returnTo)#' class='btn btn-ui-cancel'>Back to Users</a>
     </div>
 </div>
 </div>

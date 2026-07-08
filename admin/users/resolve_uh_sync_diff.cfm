@@ -19,6 +19,17 @@
         newID      — UHSyncNew.NewID
         resolution — 'imported' | 'ignored'
         returnTo   — redirect target (validated)
+
+    Sync all user fields + flags:
+        syncAll           — '1'
+        applySourceUserID — local UserID
+        returnTo          — redirect target (validated)
+
+    Sync single flag from live UH API data:
+        applyFlagName     — local flag name
+        applyFlagApiValue — API boolean-like value
+        applySourceUserID — local UserID
+        returnTo          — redirect target (validated)
 --->
 
 <cfparam name="form.diffID"     default="0">
@@ -27,6 +38,10 @@
 <cfparam name="form.resolution" default="">
 <cfparam name="form.returnTo"   default="">
 <cfparam name="form.userID"     default="0">
+<cfparam name="form.applyFlagName" default="">
+<cfparam name="form.applyFlagApiValue" default="">
+<cfparam name="form.applySourceUserID" default="0">
+<cfparam name="form.syncAll" default="0">
 
 <cfif NOT request.hasPermission("users.edit")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
@@ -34,30 +49,6 @@
 </cfif>
 
 <cfset usersService = createObject("component", "cfc.users_service").init()>
-<cfset canViewTestUsers = application.authService.hasRole("SUPER_ADMIN")>
-<cfset testModeEnabled = usersService.isTestModeEnabled()>
-<cfset hideTestUsersForAdmin = (NOT canViewTestUsers) AND (NOT testModeEnabled)>
-
-<cffunction name="isBlockedTestUserForAdmin" access="private" returntype="boolean" output="false">
-    <cfargument name="targetUserID" type="numeric" required="true">
-    <cfset var localFlagsService = "">
-    <cfset var targetUserFlags = []>
-    <cfset var targetFlag = {}>
-
-    <cfif NOT hideTestUsersForAdmin>
-        <cfreturn false>
-    </cfif>
-
-    <cfset localFlagsService = createObject("component", "cfc.flags_service").init()>
-    <cfset targetUserFlags = localFlagsService.getUserFlags(arguments.targetUserID).data>
-    <cfloop array="#targetUserFlags#" index="targetFlag">
-        <cfif compareNoCase(trim(targetFlag.FLAGNAME ?: ""), "TEST_USER") EQ 0>
-            <cfreturn true>
-        </cfif>
-    </cfloop>
-
-    <cfreturn false>
-</cffunction>
 
 <!--- Only allow POST --->
 <cfif cgi.REQUEST_METHOD NEQ "POST">
@@ -79,9 +70,401 @@
 <cfset uhSyncDAO  = createObject("component", "dao.uhSync_DAO").init()>
 
 <!--- ══════════════════════════════════════════════════════════════════ --->
+<!--- ── SYNC ALL USER DATA ─────────────────────────────────────────── --->
+<!--- ══════════════════════════════════════════════════════════════════ --->
+<cfif form.syncAll EQ "1" AND isNumeric(form.applySourceUserID) AND val(form.applySourceUserID) GT 0>
+
+    <cfset applyUserID = val(form.applySourceUserID)>
+
+    <cfif NOT request.canAccessUserByID(applyUserID)>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset profileService = createObject("component", "cfc.directory_service").init()>
+    <cfset syncProfile = profileService.getFullProfile(applyUserID)>
+
+    <cfif NOT (structKeyExists(syncProfile, "user") AND structCount(syncProfile.user))>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed: user profile could not be loaded.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset syncUser = syncProfile.user>
+    <cfset syncApiId = trim(syncUser.UH_API_ID ?: "")>
+
+    <cfif NOT len(syncApiId)>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed: this user does not have a UH API ID.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+    <cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+    <cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
+
+    <cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed: UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfsilent>
+        <cfset syncUhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
+        <cfset syncPersonResponse = syncUhApi.getPerson(
+            syncApiId,
+            trim(syncUser.DEPARTMENT ?: ""),
+            trim(syncUser.DIVISION ?: ""),
+            trim(syncUser.CAMPUS ?: "")
+        )>
+    </cfsilent>
+
+    <cfset syncStatusCode = syncPersonResponse.statusCode ?: "Unknown">
+    <cfset syncResponseData = syncPersonResponse.data ?: {}>
+    <cfset syncApiPerson = {}>
+
+    <cfif left(syncStatusCode, 3) EQ "200">
+        <cfif isStruct(syncResponseData)>
+            <cfif structKeyExists(syncResponseData, "data") AND isStruct(syncResponseData.data)>
+                <cfif structKeyExists(syncResponseData.data, "person") AND isStruct(syncResponseData.data.person)>
+                    <cfset syncApiPerson = syncResponseData.data.person>
+                <cfelse>
+                    <cfset syncApiPerson = syncResponseData.data>
+                </cfif>
+            <cfelseif structKeyExists(syncResponseData, "person") AND isStruct(syncResponseData.person)>
+                <cfset syncApiPerson = syncResponseData.person>
+            <cfelse>
+                <cfset syncApiPerson = syncResponseData>
+            </cfif>
+        </cfif>
+    <cfelse>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed: UH API request returned status ' & syncStatusCode & '.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset currentUserResult = usersService.getUser(applyUserID)>
+    <cfif NOT (structKeyExists(currentUserResult, "success") AND currentUserResult.success)>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed: unable to load local user for update.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset currentUser = currentUserResult.data>
+    <cfset userData = {
+        FirstName              = currentUser.FIRSTNAME ?: "",
+        MiddleName             = currentUser.MIDDLENAME ?: "",
+        LastName               = currentUser.LASTNAME ?: "",
+        Pronouns               = currentUser.PRONOUNS ?: "",
+        EmailPrimary           = currentUser.EMAILPRIMARY ?: "",
+        Phone                  = currentUser.PHONE ?: "",
+        Room                   = currentUser.ROOM ?: "",
+        Building               = currentUser.BUILDING ?: "",
+        CougarNetID            = currentUser.COUGARNETID ?: "",
+        Title1                 = currentUser.TITLE1 ?: "",
+        Title2                 = currentUser.TITLE2 ?: "",
+        Title3                 = currentUser.TITLE3 ?: "",
+        Division               = currentUser.DIVISION ?: "",
+        DivisionName           = currentUser.DIVISIONNAME ?: "",
+        Campus                 = currentUser.CAMPUS ?: "",
+        Department             = currentUser.DEPARTMENT ?: "",
+        DepartmentName         = currentUser.DEPARTMENTNAME ?: "",
+        Office_Mailing_Address = currentUser.OFFICE_MAILING_ADDRESS ?: "",
+        Mailcode               = currentUser.MAILCODE ?: "",
+        UH_API_ID              = currentUser.UH_API_ID ?: "",
+        Degrees                = currentUser.DEGREES ?: "",
+        Prefix                 = currentUser.PREFIX ?: "",
+        Suffix                 = currentUser.SUFFIX ?: ""
+    }>
+
+    <cfscript>
+        function resolveSyncAllFindValueByKeyDeep(any node="", required string keyName) {
+            var keys = [];
+            var currentKey = "";
+            var found = "";
+            var index = 1;
+
+            if (isNull(arguments.node)) { return ""; }
+
+            if (isStruct(arguments.node)) {
+                keys = structKeyArray(arguments.node);
+                for (index = 1; index <= arrayLen(keys); index++) {
+                    currentKey = keys[index];
+                    if (compareNoCase(currentKey, arguments.keyName) EQ 0) {
+                        if (isSimpleValue(arguments.node[currentKey])) { return toString(arguments.node[currentKey] ?: ""); }
+                        if (isBoolean(arguments.node[currentKey])) { return arguments.node[currentKey] ? "true" : "false"; }
+                    }
+                }
+                for (index = 1; index <= arrayLen(keys); index++) {
+                    found = resolveSyncAllFindValueByKeyDeep(node=arguments.node[keys[index]], keyName=arguments.keyName);
+                    if (len(trim(toString(found)))) { return found; }
+                }
+            } else if (isArray(arguments.node)) {
+                for (index = 1; index <= arrayLen(arguments.node); index++) {
+                    found = resolveSyncAllFindValueByKeyDeep(node=arguments.node[index], keyName=arguments.keyName);
+                    if (len(trim(toString(found)))) { return found; }
+                }
+            }
+
+            return "";
+        }
+
+        function resolveSyncAllGetApiValue(required any source, required string keyListCsv) {
+            var names = listToArray(arguments.keyListCsv);
+            var index = 1;
+            var foundValue = "";
+
+            for (index = 1; index <= arrayLen(names); index++) {
+                foundValue = resolveSyncAllFindValueByKeyDeep(node=arguments.source, keyName=trim(names[index]));
+                if (len(trim(toString(foundValue)))) { return toString(foundValue); }
+            }
+
+            return "";
+        }
+    </cfscript>
+
+    <cfset apiFirstName      = trim(resolveSyncAllGetApiValue(syncApiPerson, "first_name,firstName"))>
+    <cfset apiMiddleName     = trim(resolveSyncAllGetApiValue(syncApiPerson, "middle_name,middleName"))>
+    <cfset apiLastName       = trim(resolveSyncAllGetApiValue(syncApiPerson, "last_name,lastName"))>
+    <cfset apiEmail          = trim(resolveSyncAllGetApiValue(syncApiPerson, "email,emailAddress"))>
+    <cfset apiPhone          = trim(resolveSyncAllGetApiValue(syncApiPerson, "phone,phoneNumber"))>
+    <cfset apiRoom           = trim(resolveSyncAllGetApiValue(syncApiPerson, "room"))>
+    <cfset apiBuilding       = trim(resolveSyncAllGetApiValue(syncApiPerson, "building"))>
+    <cfset apiTitle          = trim(resolveSyncAllGetApiValue(syncApiPerson, "title"))>
+    <cfset apiDivision       = trim(resolveSyncAllGetApiValue(syncApiPerson, "division"))>
+    <cfset apiDivisionName   = trim(resolveSyncAllGetApiValue(syncApiPerson, "division_name,divisionName"))>
+    <cfset apiCampus         = trim(resolveSyncAllGetApiValue(syncApiPerson, "campus"))>
+    <cfset apiDepartment     = trim(resolveSyncAllGetApiValue(syncApiPerson, "department"))>
+    <cfset apiDepartmentName = trim(resolveSyncAllGetApiValue(syncApiPerson, "department_name,departmentName"))>
+    <cfset apiOfficeAddr     = trim(resolveSyncAllGetApiValue(syncApiPerson, "office_mailing_address,officeMailingAddress,mailing_address"))>
+    <cfset apiMailcode       = trim(resolveSyncAllGetApiValue(syncApiPerson, "mailcode,mail_code"))>
+
+    <cfif len(apiFirstName)><cfset userData.FirstName = apiFirstName></cfif>
+    <cfif len(apiMiddleName)><cfset userData.MiddleName = apiMiddleName></cfif>
+    <cfif len(apiLastName)><cfset userData.LastName = apiLastName></cfif>
+    <cfif len(apiEmail)><cfset userData.EmailPrimary = lCase(apiEmail)></cfif>
+    <cfif len(apiPhone)><cfset userData.Phone = apiPhone></cfif>
+    <cfif len(apiRoom)><cfset userData.Room = apiRoom></cfif>
+    <cfif len(apiBuilding)><cfset userData.Building = apiBuilding></cfif>
+    <cfif len(apiTitle)><cfset userData.Title1 = apiTitle></cfif>
+    <cfif len(apiDivision)><cfset userData.Division = apiDivision></cfif>
+    <cfif len(apiDivisionName)><cfset userData.DivisionName = apiDivisionName></cfif>
+    <cfif len(apiCampus)><cfset userData.Campus = apiCampus></cfif>
+    <cfif len(apiDepartment)><cfset userData.Department = apiDepartment></cfif>
+    <cfif len(apiDepartmentName)><cfset userData.DepartmentName = apiDepartmentName></cfif>
+    <cfif len(apiOfficeAddr)><cfset userData.Office_Mailing_Address = apiOfficeAddr></cfif>
+    <cfif len(apiMailcode)><cfset userData.Mailcode = apiMailcode></cfif>
+
+    <cfset updateResult = usersService.updateUser(applyUserID, userData)>
+    <cfif NOT (structKeyExists(updateResult, "success") AND updateResult.success)>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Sync All failed while updating user fields: ' & (updateResult.message ?: 'Unknown error'))#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfif len(apiFirstName) OR len(apiLastName)>
+        <cfset aliasService = createObject("component", "cfc.aliases_service").init()>
+        <cfset existingAliases = aliasService.getAliases(applyUserID).data ?: []>
+        <cfset primaryAliasIndex = 0>
+        <cfset firstActiveAliasIndex = 0>
+
+        <cfloop from="1" to="#arrayLen(existingAliases)#" index="aliasIndex">
+            <cfif val(existingAliases[aliasIndex].ISPRIMARY ?: 0) EQ 1>
+                <cfset primaryAliasIndex = aliasIndex>
+                <cfbreak>
+            </cfif>
+            <cfif firstActiveAliasIndex EQ 0 AND val(existingAliases[aliasIndex].ISACTIVE ?: 0) EQ 1>
+                <cfset firstActiveAliasIndex = aliasIndex>
+            </cfif>
+        </cfloop>
+
+        <cfif primaryAliasIndex EQ 0><cfset primaryAliasIndex = firstActiveAliasIndex></cfif>
+
+        <cfset aliasesToSave = []>
+        <cfif primaryAliasIndex GT 0>
+            <cfloop from="1" to="#arrayLen(existingAliases)#" index="aliasIndex">
+                <cfset currentAlias = existingAliases[aliasIndex]>
+                <cfset aliasRow = {
+                    firstName    = trim(currentAlias.FIRSTNAME ?: ""),
+                    middleName   = trim(currentAlias.MIDDLENAME ?: ""),
+                    lastName     = trim(currentAlias.LASTNAME ?: ""),
+                    aliasType    = trim(currentAlias.ALIASTYPE ?: ""),
+                    sourceSystem = trim(currentAlias.SOURCESYSTEM ?: ""),
+                    isActive     = val(currentAlias.ISACTIVE ?: 0),
+                    isPrimary    = val(currentAlias.ISPRIMARY ?: 0)
+                }>
+                <cfif aliasIndex EQ primaryAliasIndex>
+                    <cfif len(apiFirstName)><cfset aliasRow.firstName = apiFirstName></cfif>
+                    <cfif len(apiMiddleName)><cfset aliasRow.middleName = apiMiddleName></cfif>
+                    <cfif len(apiLastName)><cfset aliasRow.lastName = apiLastName></cfif>
+                    <cfif NOT len(aliasRow.aliasType)><cfset aliasRow.aliasType = "SOURCE_VARIANT"></cfif>
+                    <cfif NOT len(aliasRow.sourceSystem)><cfset aliasRow.sourceSystem = "UH API"></cfif>
+                    <cfset aliasRow.isPrimary = 1>
+                </cfif>
+                <cfset arrayAppend(aliasesToSave, aliasRow)>
+            </cfloop>
+        <cfelse>
+            <cfset arrayAppend(aliasesToSave, {
+                firstName    = apiFirstName,
+                middleName   = apiMiddleName,
+                lastName     = apiLastName,
+                aliasType    = "SOURCE_VARIANT",
+                sourceSystem = "UH API",
+                isActive     = 1,
+                isPrimary    = 1
+            })>
+        </cfif>
+
+        <cfset aliasService.replaceAliases(applyUserID, aliasesToSave)>
+    </cfif>
+
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset allFlagsResult = flagsService.getAllFlags()>
+    <cfset syncFlagsUpdated = 0>
+
+    <cfif structKeyExists(allFlagsResult, "success") AND allFlagsResult.success>
+        <cfset currentFlagsResult = flagsService.getUserFlags(applyUserID)>
+        <cfset userHasCurrentStudent = false>
+        <cfset userHasStaff = false>
+        <cfset userHasFaculty = false>
+        <cfset currentStudentFlagID = 0>
+        <cfset staffFlagID = 0>
+        <cfset facultyFlagID = 0>
+
+        <cfloop from="1" to="#arrayLen(allFlagsResult.data)#" index="flagIndex">
+            <cfif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Current-Student") EQ 0>
+                <cfset currentStudentFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
+            <cfelseif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Staff") EQ 0>
+                <cfset staffFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
+            <cfelseif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Faculty-Fulltime") EQ 0>
+                <cfset facultyFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
+            </cfif>
+        </cfloop>
+
+        <cfif structKeyExists(currentFlagsResult, "success") AND currentFlagsResult.success>
+            <cfloop from="1" to="#arrayLen(currentFlagsResult.data)#" index="userFlagIndex">
+                <cfset thisFlagID = val(currentFlagsResult.data[userFlagIndex].FLAGID ?: 0)>
+                <cfif thisFlagID EQ currentStudentFlagID><cfset userHasCurrentStudent = true></cfif>
+                <cfif thisFlagID EQ staffFlagID><cfset userHasStaff = true></cfif>
+                <cfif thisFlagID EQ facultyFlagID><cfset userHasFaculty = true></cfif>
+            </cfloop>
+        </cfif>
+
+        <cfset apiStudent = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "student,is_student,isStudent")))>
+        <cfset apiStaff = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "staff,is_staff,isStaff")))>
+        <cfset apiFaculty = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "faculty,is_faculty,isFaculty")))>
+
+        <cfif currentStudentFlagID GT 0>
+            <cfif listFindNoCase("yes,true,1,y", apiStudent) AND NOT userHasCurrentStudent>
+                <cfset flagsService.addFlag(applyUserID, currentStudentFlagID)>
+                <cfset syncFlagsUpdated++>
+            <cfelseif listFindNoCase("no,false,0,n", apiStudent) AND userHasCurrentStudent>
+                <cfset flagsService.removeFlag(applyUserID, currentStudentFlagID)>
+                <cfset syncFlagsUpdated++>
+            </cfif>
+        </cfif>
+
+        <cfif staffFlagID GT 0>
+            <cfif listFindNoCase("yes,true,1,y", apiStaff) AND NOT userHasStaff>
+                <cfset flagsService.addFlag(applyUserID, staffFlagID)>
+                <cfset syncFlagsUpdated++>
+            <cfelseif listFindNoCase("no,false,0,n", apiStaff) AND userHasStaff>
+                <cfset flagsService.removeFlag(applyUserID, staffFlagID)>
+                <cfset syncFlagsUpdated++>
+            </cfif>
+        </cfif>
+
+        <cfif facultyFlagID GT 0>
+            <cfif listFindNoCase("yes,true,1,y", apiFaculty) AND NOT userHasFaculty>
+                <cfset flagsService.addFlag(applyUserID, facultyFlagID)>
+                <cfset syncFlagsUpdated++>
+            <cfelseif listFindNoCase("no,false,0,n", apiFaculty) AND userHasFaculty>
+                <cfset flagsService.removeFlag(applyUserID, facultyFlagID)>
+                <cfset syncFlagsUpdated++>
+            </cfif>
+        </cfif>
+    </cfif>
+
+    <cfset pendingDiffsForUser = uhSyncDAO.getUnresolvedDiffsForUser(applyUserID)>
+    <cfif arrayLen(pendingDiffsForUser) GT 0>
+        <cfset uhSyncDAO.resolveAllDiffsForUser(applyUserID, val(pendingDiffsForUser[1].RUNID ?: 0), "synced")>
+    </cfif>
+
+    <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat('Sync All complete. Updated profile fields and ' & syncFlagsUpdated & ' flag change(s).')#" addtoken="false">
+    <cfabort>
+
+<!--- ══════════════════════════════════════════════════════════════════ --->
+<!--- ── SYNC SINGLE FLAG ──────────────────────────────────────────── --->
+<!--- ══════════════════════════════════════════════════════════════════ --->
+<cfelseif len(trim(form.applyFlagName)) AND isNumeric(form.applySourceUserID) AND val(form.applySourceUserID) GT 0>
+
+    <cfset applyUserID = val(form.applySourceUserID)>
+
+    <cfif NOT request.canAccessUserByID(applyUserID)>
+        <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset flagsService = createObject("component", "cfc.flags_service").init()>
+    <cfset requestedFlagName = trim(form.applyFlagName)>
+    <cfset requestedApiValue = lCase(trim(form.applyFlagApiValue ?: ""))>
+    <cfset targetHasFlag = "">
+    <cfset flagID = 0>
+
+    <cfif listFindNoCase("yes,true,1,y", requestedApiValue)>
+        <cfset targetHasFlag = true>
+    <cfelseif listFindNoCase("no,false,0,n", requestedApiValue)>
+        <cfset targetHasFlag = false>
+    <cfelse>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Unable to sync flag: API value is not a supported boolean.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset allFlagsResult = flagsService.getAllFlags()>
+    <cfif structKeyExists(allFlagsResult, "success") AND allFlagsResult.success>
+        <cfloop from="1" to="#arrayLen(allFlagsResult.data)#" index="flagIndex">
+            <cfif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), requestedFlagName) EQ 0>
+                <cfset flagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+    </cfif>
+
+    <cfif flagID LTE 0>
+        <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Unable to sync flag: ' & requestedFlagName & ' was not found.')#" addtoken="false">
+        <cfabort>
+    </cfif>
+
+    <cfset currentFlagsResult = flagsService.getUserFlags(applyUserID)>
+    <cfset userHasFlag = false>
+    <cfif structKeyExists(currentFlagsResult, "success") AND currentFlagsResult.success>
+        <cfloop from="1" to="#arrayLen(currentFlagsResult.data)#" index="flagIndex">
+            <cfif val(currentFlagsResult.data[flagIndex].FLAGID ?: 0) EQ flagID>
+                <cfset userHasFlag = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+    </cfif>
+
+    <cfif targetHasFlag AND NOT userHasFlag>
+        <cfset actionResult = flagsService.addFlag(applyUserID, flagID)>
+        <cfif NOT (structKeyExists(actionResult, "success") AND actionResult.success)>
+            <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Failed to add flag: ' & (actionResult.message ?: 'Unknown error'))#" addtoken="false">
+            <cfabort>
+        </cfif>
+        <cfset flagMessage = "Added flag '" & requestedFlagName & "'.">
+    <cfelseif NOT targetHasFlag AND userHasFlag>
+        <cfset actionResult = flagsService.removeFlag(applyUserID, flagID)>
+        <cfif NOT (structKeyExists(actionResult, "success") AND actionResult.success)>
+            <cflocation url="#returnTo##sep#err=#urlEncodedFormat('Failed to remove flag: ' & (actionResult.message ?: 'Unknown error'))#" addtoken="false">
+            <cfabort>
+        </cfif>
+        <cfset flagMessage = "Removed flag '" & requestedFlagName & "'.">
+    <cfelse>
+        <cfset flagMessage = "No change needed for flag '" & requestedFlagName & "'.">
+    </cfif>
+
+    <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat(flagMessage)#" addtoken="false">
+    <cfabort>
+
+<!--- ══════════════════════════════════════════════════════════════════ --->
 <!--- ── FIELD DIFF ─────────────────────────────────────────────────── --->
 <!--- ══════════════════════════════════════════════════════════════════ --->
-<cfif isNumeric(form.diffID) AND val(form.diffID) GT 0>
+<cfelseif isNumeric(form.diffID) AND val(form.diffID) GT 0>
 
     <cfset diffID     = val(form.diffID)>
     <cfset allowedRes = ["synced", "discarded"]>
@@ -105,7 +488,7 @@
 
     <cfif resolution EQ "synced">
         <!--- Apply the API value to the local user field --->
-        <cfif isBlockedTestUserForAdmin(val(diffRow.USERID))>
+        <cfif NOT request.canAccessUserByID(val(diffRow.USERID))>
             <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
             <cfabort>
         </cfif>
@@ -185,7 +568,7 @@
     <cfset fieldLabel = trim(diffRow.FIELDNAME)>
     <cfset msgLabels  = { "synced"="Synced", "discarded"="Discarded" }>
     <cfset msgTxt     = (msgLabels[resolution] ?: resolution) & " " & fieldLabel & " for user " & diffRow.USERID & ".">
-    <cflocation url="#returnTo##sep#msg=resolved&err=#urlEncodedFormat(msgTxt)#" addtoken="false">
+    <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat(msgTxt)#" addtoken="false">
     <cfabort>
 
 <!--- ══════════════════════════════════════════════════════════════════ --->
@@ -220,7 +603,7 @@
         <!--- Delete user from local DB using userID from form (double-check matches gone record) --->
         <cfset targetUserID = isNumeric(form.userID) ? val(form.userID) : val(goneRow.USERID)>
         <cfif targetUserID GT 0>
-            <cfif isBlockedTestUserForAdmin(targetUserID)>
+            <cfif NOT request.canAccessUserByID(targetUserID)>
                 <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
                 <cfabort>
             </cfif>
@@ -242,7 +625,7 @@
     </cftry>
 
     <cfset msgTxt = resolution EQ "deleted" ? "User deleted successfully." : "User marked as kept (no action taken).">
-    <cflocation url="#returnTo##sep#msg=resolved&err=#urlEncodedFormat(msgTxt)#" addtoken="false">
+    <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat(msgTxt)#" addtoken="false">
     <cfabort>
 
 <!--- ══════════════════════════════════════════════════════════════════ --->
@@ -269,6 +652,10 @@
     </cfif>
 
     <cfif resolution EQ "imported">
+        <cfif NOT request.canCreateUsers()>
+            <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+            <cfabort>
+        </cfif>
 
         <cfset uhApiId = trim(newRow.UHApiID ?: "")>
         <!--- Prefer actual UHApiID column name - handles different CF case sensitivity --->
@@ -293,19 +680,19 @@
         <cfif existingCheck.recordCount GT 0>
             <!--- Already exists — just mark resolved and continue --->
             <cfset uhSyncDAO.resolveNew(newID, "imported")>
-            <cflocation url="#returnTo##sep#msg=resolved&err=#urlEncodedFormat('User already exists locally (UserID ' & existingCheck.UserID & '); marked as imported.')#" addtoken="false">
+            <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat('User already exists locally (UserID ' & existingCheck.UserID & '); marked as imported.')#" addtoken="false">
             <cfabort>
         </cfif>
 
         <!--- ── Re-fetch fresh person data from UH API ── --->
-        <cfset uhApiToken  = structKeyExists(application, "uhApiToken")  ? trim(application.uhApiToken  ?: "") : "">
-        <cfset uhApiSecret = structKeyExists(application, "uhApiSecret") ? trim(application.uhApiSecret ?: "") : "">
-        <cfif (uhApiToken EQ "" OR uhApiSecret EQ "") AND structKeyExists(server, "system") AND structKeyExists(server.system, "environment")>
-            <cfif structKeyExists(server.system.environment, "UH_API_TOKEN")><cfset uhApiToken  = trim(server.system.environment["UH_API_TOKEN"])></cfif>
-            <cfif structKeyExists(server.system.environment, "UH_API_SECRET")><cfset uhApiSecret = trim(server.system.environment["UH_API_SECRET"])></cfif>
+        <cfset uhApiCredentials = request.runtimeSecretPolicy.getUHApiCredentials()>
+        <cfset uhApiToken = trim(uhApiCredentials.token ?: "")>
+        <cfset uhApiSecret = trim(uhApiCredentials.secret ?: "")>
+
+        <cfif uhApiToken EQ "" OR uhApiSecret EQ "">
+            <cflocation url="#returnTo##sep#err=#urlEncodedFormat('UH API credentials are not configured. Set UH_API_TOKEN and UH_API_SECRET environment variables.')#" addtoken="false">
+            <cfabort>
         </cfif>
-        <cfif uhApiToken  EQ ""><cfset uhApiToken  = "my5Tu[{[VH%,dT{wR3SEigeWc%2w,ZyFT6=5!2Rv$f0g,_z!UpDduLxhgjSm$P6"></cfif>
-        <cfif uhApiSecret EQ ""><cfset uhApiSecret = "degxqhYPX2Vk@LFevunxX}:kTkX3fBXR"></cfif>
 
         <cfset uhApi = createObject("component", "cfc.uh_api").init(apiToken=uhApiToken, apiSecret=uhApiSecret)>
         <cfsilent>
@@ -471,7 +858,7 @@
     <cfset msgTxt = resolution EQ "imported"
         ? "User imported successfully (UserID " & (newUserID ?: "?") & ")."
         : "New API user ignored.">
-    <cflocation url="#returnTo##sep#msg=resolved&err=#urlEncodedFormat(msgTxt)#" addtoken="false">
+    <cflocation url="#returnTo##sep#msg=resolved&info=#urlEncodedFormat(msgTxt)#" addtoken="false">
     <cfabort>
 
 <cfelse>

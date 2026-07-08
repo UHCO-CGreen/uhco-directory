@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     uh_sync_report.cfm
     Displays UH API vs local-DB diff results.
     Use "Run Now" to trigger a fresh comparison, or schedule
@@ -26,9 +26,65 @@
 <!--- ── URL params ── --->
 <cfset msgParam     = structKeyExists(url, "msg")    ? url.msg           : "">
 <cfset errParam     = structKeyExists(url, "err")    ? url.err           : "">
+<cfset infoParam    = structKeyExists(url, "info")   ? url.info          : "">
 <cfset viewRunID    = structKeyExists(url, "runID") AND isNumeric(url.runID) ? val(url.runID) : 0>
 <cfset filterField  = structKeyExists(url, "filter") ? trim(url.filter)  : "">
 <cfset activeTab    = structKeyExists(url, "tab")    ? trim(url.tab)     : "diffs">
+<cfset diffPageSize = 50>
+<cfset requestedDiffPage = structKeyExists(url, "diffPage") AND isNumeric(url.diffPage) ? val(url.diffPage) : 1>
+<cfset currentDiffPage = requestedDiffPage GT 0 ? requestedDiffPage : 1>
+<cfset totalDiffPages = 1>
+<cfset totalDiffRows = 0>
+<cfset pagedDiffRows = []>
+<cfset pageScripts = "">
+<cfset reportToastMessage = "">
+<cfset reportToastTone = "success">
+
+<cfif msgParam EQ "ran">
+    <cfset reportToastMessage = "Sync report run complete. Results shown below.">
+<cfelseif msgParam EQ "error" AND len(errParam)>
+    <cfset reportToastMessage = "Run failed: " & errParam>
+    <cfset reportToastTone = "danger">
+<cfelseif msgParam EQ "resolved">
+    <cfif len(infoParam)>
+        <cfset reportToastMessage = infoParam>
+    <cfelseif len(errParam)>
+        <cfset reportToastMessage = errParam>
+    </cfif>
+</cfif>
+
+<cfif len(reportToastMessage)>
+    <cfsavecontent variable="pageScripts">
+        <cfoutput>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
+(function () {
+    if (!window.AdminUI || typeof window.AdminUI.showToast !== 'function') { return; }
+    window.AdminUI.showToast("#encodeForJavaScript(reportToastMessage)#", {
+        tone: "#encodeForJavaScript(reportToastTone)#"
+    });
+})();
+</script>
+        </cfoutput>
+    </cfsavecontent>
+</cfif>
+<cfscript>
+function formatRunDuration(required numeric durationMs) {
+    var totalMs = max(0, int(val(arguments.durationMs ?: 0)));
+    var minutes = int(totalMs / 60000);
+    var seconds = int((totalMs mod 60000) / 1000);
+    var milliseconds = totalMs mod 1000;
+
+    if (minutes GT 0) {
+        return minutes & "m " & seconds & "s";
+    }
+
+    if (seconds GT 0) {
+        return seconds & "." & right("000" & milliseconds, 3) & "s";
+    }
+
+    return totalMs & " ms";
+}
+</cfscript>
 
 <!--- ── Load data ── --->
 <cfset uhSyncDAO  = createObject("component", "dao.uhSync_DAO").init()>
@@ -62,6 +118,19 @@
 </cfcatch>
 </cftry>
 
+<cfset totalDiffRows = arrayLen(diffRows)>
+<cfif totalDiffRows GT 0>
+    <cfset totalDiffPages = ceiling(totalDiffRows / diffPageSize)>
+    <cfif currentDiffPage GT totalDiffPages>
+        <cfset currentDiffPage = totalDiffPages>
+    </cfif>
+    <cfset diffStartIndex = ((currentDiffPage - 1) * diffPageSize) + 1>
+    <cfset diffEndIndex = min(diffStartIndex + diffPageSize - 1, totalDiffRows)>
+    <cfloop from="#diffStartIndex#" to="#diffEndIndex#" index="diffRowIndex">
+        <cfset arrayAppend(pagedDiffRows, diffRows[diffRowIndex])>
+    </cfloop>
+</cfif>
+
 <!--- ── Build diff summary lookup: FieldName → count ── --->
 <cfset diffSummaryMap = {}>
 <cfloop from="1" to="#arrayLen(diffSummary)#" index="i">
@@ -69,31 +138,40 @@
 </cfloop>
 
 <!--- ── Scheduler URL ── --->
+<cfset appConfigService = createObject("component", "cfc.appConfig_service").init()>
+<cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
 <cfset schedulerUrl = request.siteBaseUrl & "/admin/reporting/run_uh_sync_report.cfm?triggeredBy=scheduled&format=json">
 
 <!--- ── Schedule form handler ── --->
 <cfset scheduleMsg      = "">
 <cfset scheduleMsgClass = "">
 <cfif structKeyExists(form, "scheduleAction") AND form.scheduleAction EQ "enable">
-    <cftry>
-        <cfschedule
-            action         = "update"
-            task           = "UHCO_UHSyncReport"
-            operation      = "HTTPRequest"
-            url            = "#schedulerUrl#"
-            startDate      = "#dateFormat(now(), 'MM/DD/YYYY')#"
-            startTime      = "03:00 AM"
-            interval       = "daily"
-            requesttimeout = "600"
-            resolveurl     = "false"
-            publish        = "false">
-        <cfset scheduleMsg      = "Daily schedule enabled — report will run at 3:00 AM each day.">
-        <cfset scheduleMsgClass = "alert-success">
-    <cfcatch>
-        <cfset scheduleMsg      = "Could not register schedule: " & cfcatch.message>
+    <cfif NOT len(scheduleTaskToken)>
+        <cfset scheduleMsg = "Could not register schedule: scheduled_tasks.shared_secret is not configured.">
         <cfset scheduleMsgClass = "alert-danger">
-    </cfcatch>
-    </cftry>
+    <cfelse>
+        <cftry>
+            <cfschedule
+                action         = "update"
+                task           = "UHCO_UHSyncReport"
+                operation      = "HTTPRequest"
+                url            = "#schedulerUrl#"
+                username       = "scheduler"
+                password       = "#scheduleTaskToken#"
+                startDate      = "#dateFormat(now(), 'mm/dd/yyyy')#"
+                startTime      = "03:00 AM"
+                interval       = "daily"
+                requesttimeout = "600"
+                resolveurl     = "false"
+                publish        = "false">
+            <cfset scheduleMsg      = "Daily schedule enabled — report will run at 3:00 AM each day.">
+            <cfset scheduleMsgClass = "alert-success">
+        <cfcatch>
+            <cfset scheduleMsg      = "Could not register schedule: " & cfcatch.message>
+            <cfset scheduleMsgClass = "alert-danger">
+        </cfcatch>
+        </cftry>
+    </cfif>
 </cfif>
 
 <!--- ══════════════════════════════════════════════════════════════ --->
@@ -103,13 +181,6 @@
 <cfset content = "<h1 class='mb-1'>UH API Sync Report</h1>">
 
 <!--- Status messages --->
-<cfif msgParam EQ "ran">
-    <cfset content &= "<div class='alert alert-success mt-3'><i class='bi bi-check-circle-fill'></i> Sync report run complete. Results shown below.</div>">
-<cfelseif msgParam EQ "error">
-    <cfset content &= "<div class='alert alert-danger mt-3'><strong>Run failed:</strong> #EncodeForHTML(errParam)#</div>">
-<cfelseif msgParam EQ "resolved">
-    <cfset content &= "<div class='alert alert-success mt-3'><i class='bi bi-check-circle-fill'></i> #EncodeForHTML(errParam)#</div>">
-</cfif>
 <cfif len(scheduleMsg)>
     <cfset content &= "<div class='alert #scheduleMsgClass# mt-2'>#EncodeForHTML(scheduleMsg)#</div>">
 </cfif>
@@ -120,14 +191,14 @@
 <!--- ── Action bar ── --->
 <cfset content &= "
 <div class='d-flex flex-wrap align-items-center gap-2 mb-4 mt-2'>
-    <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-primary'>
+    <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-ui-filter'>
         <i class='bi bi-play-fill'></i> Run Now
     </a>
-    <button class='btn btn-outline-secondary btn-sm' type='button'
+    <button class='btn btn-ui-cancel btn-sm' type='button'
             data-bs-toggle='collapse' data-bs-target='##schedulePanel'>
         <i class='bi bi-clock'></i> Schedule
     </button>
-    <button class='btn btn-outline-secondary btn-sm' type='button'
+    <button class='btn btn-ui-cancel btn-sm' type='button'
             data-bs-toggle='collapse' data-bs-target='##historyPanel'>
         <i class='bi bi-clock-history'></i> Run History
     </button>
@@ -146,14 +217,14 @@
         <div class='input-group mb-3 report-scheduler-input'>
             <input type='text' class='form-control form-control-sm font-monospace'
                    value='#EncodeForHTMLAttribute(schedulerUrl)#' readonly id='schedUrlInput'>
-            <button class='btn btn-sm btn-outline-secondary'
-                    onclick=""navigator.clipboard.writeText(document.getElementById('schedUrlInput').value)"">
+            <button class='btn btn-sm btn-ui-go'
+                    data-clipboard-source='schedUrlInput'>
                 <i class='bi bi-clipboard'></i>
             </button>
         </div>
         <form method='post'>
             <input type='hidden' name='scheduleAction' value='enable'>
-            <button type='submit' class='btn btn-sm btn-success'>
+            <button type='submit' class='btn btn-sm btn-ui-save'>
                 <i class='bi bi-check-circle'></i> Enable Daily Schedule via ColdFusion
             </button>
         </form>
@@ -169,7 +240,7 @@
 <cfelse>
     <cfset content &= "<table class='table table-sm table-bordered mb-0'><thead class='table-dark'><tr>
         <th>Run ID</th><th>Date/Time (UTC)</th><th>Triggered By</th>
-        <th>Compared</th><th>Diffs</th><th>Gone</th><th>New</th><th></th>
+        <th>Compared</th><th>Diffs</th><th>Gone</th><th>New</th><th>Duration</th><th></th>
     </tr></thead><tbody>">
     <cfloop from="1" to="#arrayLen(recentRuns)#" index="i">
         <cfset r = recentRuns[i]>
@@ -177,6 +248,7 @@
         <cfset diffBadge  = r.TOTALDIFFS GT 0 ? "bg-warning text-dark" : "bg-success">
         <cfset goneBadge  = r.TOTALGONE  GT 0 ? "bg-danger"            : "bg-success">
         <cfset newBadge   = r.TOTALNEW   GT 0 ? "bg-info text-dark"    : "bg-success">
+        <cfset durationLabel = val(r.DURATIONMS ?: 0) GT 0 ? formatRunDuration(val(r.DURATIONMS)) : "-">
         <cfset content &= "<tr#activeCls#>
             <td>#r.RUNID#</td>
             <td>#dateTimeFormat(r.RUNAT, 'mmm d, yyyy HH:nn')#</td>
@@ -185,7 +257,8 @@
             <td><span class='badge #diffBadge#'>#r.TOTALDIFFS#</span></td>
             <td><span class='badge #goneBadge#'>#r.TOTALGONE#</span></td>
             <td><span class='badge #newBadge#'>#r.TOTALNEW#</span></td>
-            <td><a href='?runID=#r.RUNID#' class='btn btn-xs btn-sm btn-outline-secondary py-0 px-1'>View</a></td>
+            <td>#durationLabel#</td>
+            <td><a href='?runID=#r.RUNID#' class='btn btn-xs btn-sm btn-ui-go py-0 px-1'>View</a></td>
         </tr>">
     </cfloop>
     <cfset content &= "</tbody></table>">
@@ -209,6 +282,7 @@
 <!--- ── Run header ── --->
 <cfset totalPending = arrayLen(diffRows) + arrayLen(goneRows) + arrayLen(newRows)>
 <cfset runBadgeCls  = (currentRun.TOTALDIFFS GT 0 OR currentRun.TOTALGONE GT 0 OR currentRun.TOTALNEW GT 0) ? "bg-warning text-dark" : "bg-success">
+<cfset currentRunDurationLabel = val(currentRun.DURATIONMS ?: 0) GT 0 ? formatRunDuration(val(currentRun.DURATIONMS)) : "not recorded">
 <cfset content &= "
 <div class='d-flex flex-wrap align-items-center gap-3 mb-3'>
     <span class='text-muted small'>
@@ -216,6 +290,7 @@
         &mdash; #dateTimeFormat(currentRun.RUNAT, 'mmmm d, yyyy HH:nn')# UTC
         &mdash; triggered by <em>#EncodeForHTML(currentRun.TRIGGEREDBY)#</em>
         &mdash; #currentRun.TOTALCOMPARED# users compared
+        &mdash; duration #currentRunDurationLabel#
     </span>
     <span class='badge bg-warning text-dark fs-6'>#currentRun.TOTALDIFFS# diff(s)</span>
     <span class='badge bg-danger fs-6'>#currentRun.TOTALGONE# gone</span>
@@ -239,7 +314,7 @@
                 #EncodeForHTML(lbl)# (#ds.DIFFCOUNT#)</a>">
     </cfloop>
     <cfif len(filterField)>
-        <cfset content &= "<a href='?runID=#currentRun.RUNID#&tab=diffs' class='btn btn-sm btn-outline-secondary py-0'>
+        <cfset content &= "<a href='?runID=#currentRun.RUNID#&tab=diffs' class='btn btn-sm btn-ui-clear py-0'>
             <i class='bi bi-x'></i> Clear filter</a>">
     </cfif>
     <cfset content &= "</div></div>">
@@ -288,10 +363,14 @@
 <!--- ══════════════════════════════════════════════════════════════ --->
 <cfset content &= "<div class='tab-pane fade#tabDiffActive#' id='tab-diffs' role='tabpanel'>">
 
-<cfif arrayLen(diffRows) EQ 0>
+<cfif totalDiffRows EQ 0>
     <cfset content &= "<div class='alert alert-success'><i class='bi bi-check-circle-fill'></i>
         No field differences found#(len(filterField) ? ' for the selected filter' : '')#.</div>">
 <cfelse>
+    <cfset diffBaseUrl = "?runID=#currentRun.RUNID#&tab=diffs#(len(filterField) ? '&filter=' & urlEncodedFormat(filterField) : '')#">
+    <cfset diffRangeStart = ((currentDiffPage - 1) * diffPageSize) + 1>
+    <cfset diffRangeEnd = min(currentDiffPage * diffPageSize, totalDiffRows)>
+    <cfset content &= "<div class='d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2'><div class='small text-muted'>Showing #diffRangeStart#-#diffRangeEnd# of #totalDiffRows# changed field record(s).</div></div>">
     <cfset content &= "
     <div class='table-responsive'>
     <table class='table table-sm table-striped table-hover align-middle'>
@@ -306,10 +385,9 @@
         </thead>
         <tbody>
     ">
-    <cfloop from="1" to="#arrayLen(diffRows)#" index="i">
-        <cfset dr      = diffRows[i]>
+    <cfloop from="1" to="#arrayLen(pagedDiffRows)#" index="i">
+        <cfset dr      = pagedDiffRows[i]>
         <cfset fldLbl  = structKeyExists(fieldLabels, dr.FIELDNAME) ? fieldLabels[dr.FIELDNAME] : dr.FIELDNAME>
-        <cfset returnTo = "/admin/reporting/uh_sync_report.cfm?runID=#currentRun.RUNID#&tab=diffs#(len(filterField) ? '&filter=' & urlEncodedFormat(filterField) : '')#">
 
         <cfset content &= "
         <tr>
@@ -323,27 +401,24 @@
             <td><span class='text-muted'>#(len(dr.LOCALVALUE) ? EncodeForHTML(dr.LOCALVALUE) : '<em class=""text-muted"">empty</em>')#</span></td>
             <td><strong>#EncodeForHTML(dr.APIVALUE)#</strong></td>
             <td class='text-end text-nowrap'>
-                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'>
-                    <input type='hidden' name='diffID'     value='#dr.DIFFID#'>
-                    <input type='hidden' name='resolution' value='synced'>
-                    <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(returnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-success py-0'>
-                        <i class='bi bi-cloud-download'></i> Sync
-                    </button>
-                </form>
-                <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline ms-1'>
-                    <input type='hidden' name='diffID'     value='#dr.DIFFID#'>
-                    <input type='hidden' name='resolution' value='discarded'>
-                    <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(returnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-outline-secondary py-0'>
-                        <i class='bi bi-x'></i> Discard
-                    </button>
-                </form>
+                <a href='/admin/users/edit.cfm?userID=#dr.USERID#' class='btn btn-sm btn-ui-go py-0'>
+                    <i class='bi bi-eye me-1'></i>View
+                </a>
             </td>
         </tr>
         ">
     </cfloop>
     <cfset content &= "</tbody></table></div>">
+
+    <cfif totalDiffPages GT 1>
+        <cfset content &= "<nav class='mt-3' aria-label='Changed field pages'><ul class='pagination pagination-sm flex-wrap mb-0'>">
+        <cfset content &= "<li class='page-item#(currentDiffPage EQ 1 ? ' disabled' : '')#'><a class='page-link' href='#diffBaseUrl#&diffPage=#currentDiffPage - 1#'>Previous</a></li>">
+        <cfloop from="1" to="#totalDiffPages#" index="diffPageNum">
+            <cfset content &= "<li class='page-item#(diffPageNum EQ currentDiffPage ? ' active' : '')#'><a class='page-link' href='#diffBaseUrl#&diffPage=#diffPageNum#'>#diffPageNum#</a></li>">
+        </cfloop>
+        <cfset content &= "<li class='page-item#(currentDiffPage EQ totalDiffPages ? ' disabled' : '')#'><a class='page-link' href='#diffBaseUrl#&diffPage=#currentDiffPage + 1#'>Next</a></li>">
+        <cfset content &= "</ul></nav>">
+    </cfif>
 </cfif>
 
 <cfset content &= "</div>"> <!--- end tab-diffs --->
@@ -389,12 +464,12 @@
             <td><code class='small'>#EncodeForHTML(gr.UH_API_ID)#</code></td>
             <td class='text-end text-nowrap'>
                 <form method='post' action='/admin/users/resolve_uh_sync_diff.cfm' class='d-inline'
-                      onsubmit=""return confirm('Delete #EncodeForJavascript(gr.FIRSTNAME & ' ' & gr.LASTNAME)#? This cannot be undone.')"">
+                      data-confirm='Delete #encodeForHTMLAttribute(trim(gr.FIRSTNAME & ' ' & gr.LASTNAME))#? This cannot be undone.'
                     <input type='hidden' name='goneID'     value='#gr.GONEID#'>
                     <input type='hidden' name='resolution' value='deleted'>
                     <input type='hidden' name='userID'     value='#gr.USERID#'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(goneReturnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-danger py-0'>
+                    <button type='submit' class='btn btn-sm btn-ui-delete py-0'>
                         <i class='bi bi-trash'></i> Delete User
                     </button>
                 </form>
@@ -402,11 +477,11 @@
                     <input type='hidden' name='goneID'     value='#gr.GONEID#'>
                     <input type='hidden' name='resolution' value='kept'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(goneReturnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-outline-secondary py-0'>
+                    <button type='submit' class='btn btn-sm btn-ui-cancel py-0'>
                         <i class='bi bi-person-check'></i> Keep
                     </button>
                 </form>
-                <a href='/admin/users/view.cfm?userID=#gr.USERID#' class='btn btn-sm btn-outline-primary py-0 ms-1'>
+                <a href='/admin/users/view.cfm?userID=#gr.USERID#' class='btn btn-sm btn-ui-go py-0 ms-1'>
                     <i class='bi bi-eye'></i> View
                 </a>
             </td>
@@ -461,7 +536,7 @@
                     <input type='hidden' name='newID'      value='#nr.NEWID#'>
                     <input type='hidden' name='resolution' value='imported'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(newReturnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-success py-0'>
+                    <button type='submit' class='btn btn-sm btn-ui-save py-0'>
                         <i class='bi bi-person-plus'></i> Import
                     </button>
                 </form>
@@ -469,7 +544,7 @@
                     <input type='hidden' name='newID'      value='#nr.NEWID#'>
                     <input type='hidden' name='resolution' value='ignored'>
                     <input type='hidden' name='returnTo'   value='#EncodeForHTMLAttribute(newReturnTo)#'>
-                    <button type='submit' class='btn btn-sm btn-outline-secondary py-0'>
+                    <button type='submit' class='btn btn-sm btn-ui-cancel py-0'>
                         <i class='bi bi-x'></i> Ignore
                     </button>
                 </form>
@@ -486,7 +561,7 @@
 
 <!--- ── JS to persist active tab in sessionStorage ── --->
 <cfset content &= "
-<script>
+<cfoutput><script nonce='#encodeForHTMLAttribute(request.cspNonce ?: '')#'></cfoutput>
 (function () {
     var tabs = document.querySelectorAll('##syncTabs button[data-bs-toggle=""tab""]');
     if (!tabs.length) return;

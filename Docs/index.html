@@ -12,7 +12,7 @@
       <div class="hero-card">
         <div class="eyebrow">System Documentation</div>
         <h1>UHCO Identity</h1>
-        <p>UHCO Identity is the internal people-directory platform for the University of Houston College of Optometry. This docs site replaces the old root Word document with a browsable HTML reference covering architecture, data model, admin tools, API behavior, deployment, and operational notes.</p>
+        <p>UHCO Identity is the internal people-directory platform for the University of Houston College of Optometry. This docs site covers architecture, data model, admin tools, API behavior, deployment, and operational notes.</p>
         <div class="hero-meta">
           <span>Adobe ColdFusion</span>
           <span>Microsoft SQL Server</span>
@@ -29,35 +29,45 @@
       <ul class="toc">
         <li><a href="#overview">1. Overview</a></li>
         <li><a href="#data-model">2. Core Data Model</a></li>
-        <li><a href="#user-management">3. User Management</a></li>
-        <li><a href="#user-review">4. UserReview Workflow</a></li>
-        <li><a href="#organizations">5. Organizations</a></li>
-        <li><a href="#flags">6. Flags</a></li>
-        <li><a href="#api">7. REST API</a></li>
-        <li><a href="#tokens-secrets">8. Tokens and Secrets</a></li>
-        <li><a href="#sync">9. UH Directory Sync</a></li>
-        <li><a href="#dq">10. Data Quality</a></li>
-        <li><a href="#tools">11. Bulk Tools</a></li>
-        <li><a href="#admin-ui">12. Admin Interface</a></li>
-        <li><a href="#architecture">13. Architecture</a></li>
-        <li><a href="#deployment">14. Deployment</a></li>
+        <li><a href="#admin-auth">3. Admin Authentication &amp; RBAC</a></li>
+        <li><a href="#user-management">4. User Management</a></li>
+        <li><a href="#aliases">5. User Names &amp; Aliases</a></li>
+        <li><a href="#user-review">6. UserReview Workflow</a></li>
+        <li><a href="#user-media">7. User Media &amp; Photos</a></li>
+        <li><a href="#bio">8. User Bio</a></li>
+        <li><a href="#publications">9. User Publications</a></li>
+        <li><a href="#organizations">10. Organizations</a></li>
+        <li><a href="#flags">11. Flags</a></li>
+        <li><a href="#api">12. REST API</a></li>
+        <li><a href="#quickpull">13. QuickPull Endpoints</a></li>
+        <li><a href="#tokens-secrets">14. Tokens and Secrets</a></li>
+        <li><a href="#app-config">15. App Config</a></li>
+        <li><a href="#sync">16. UH Directory Sync</a></li>
+        <li><a href="#dq">17. Data Quality</a></li>
+        <li><a href="#tools">18. Bulk Tools and Reporting</a></li>
+        <li><a href="#admin-ui">19. Admin Interface &amp; Settings</a></li>
+        <li><a href="#architecture">20. Architecture</a></li>
+        <li><a href="#deployment">21. Deployment</a></li>
         <li><a href="#appendix">Appendix</a></li>
       </ul>
     </aside>
 
     <div class="content">
+
+      <!-- ═══════════════════════════════════════════ 1. Overview -->
       <section class="card" id="overview">
         <h2>1. Overview</h2>
-        <p>UHCO Ident is the authoritative directory application for UHCO faculty, staff, current students, and alumni. It centralizes roster management, syncs with the university-wide UH Directory API, and exposes its own secured REST API for downstream systems such as Modern Campus.</p>
+        <p>UHCO Ident is the authoritative directory application for UHCO faculty, staff, current students, and alumni. It centralizes roster management, syncs with the university-wide UH Directory API, and exposes its own secured REST API for downstream systems such as Modern Campus and the MyUHCO portal.</p>
         <div class="grid two">
           <div>
             <h3>Technology Stack</h3>
             <ul>
               <li>Back end: Adobe ColdFusion, developed on CF2025 and deployed on CF2021</li>
-              <li>Database: Microsoft SQL Server via datasource <code>UHCO_Directory</code></li>
-              <li>Front end: Bootstrap 5 and Bootstrap Icons in the admin interface</li>
+              <li>Database: Microsoft SQL Server via datasource <code>UHCO_Identity_Admin</code></li>
+              <li>Front end: Bootstrap 5 and Bootstrap Icons in the admin; SCSS compiled to <code>/assets/css/</code></li>
               <li>Web server: IIS with URL Rewrite for API routing</li>
-              <li>External integration: UH Directory API with Bearer token and HMAC secret</li>
+              <li>External integration: UH Directory API (Bearer + HMAC) and CougarNet LDAP for authentication</li>
+              <li>Dropbox integration for user photo management</li>
               <li>Self-service workflow: UserReview staged profile updates with admin approval</li>
             </ul>
           </div>
@@ -67,24 +77,26 @@
               <li><code>/admin/</code> administrative back-office</li>
               <li><code>/UserReview/</code> end-user self-service review experience</li>
               <li><code>/api/v1/</code> REST API endpoints</li>
-              <li><code>/cfc/</code> service components</li>
-              <li><code>/dao/</code> DAO components</li>
-              <li><code>/includes/</code> shared helper partials</li>
+              <li><code>/assets/</code> compiled CSS and JS (SCSS source in <code>/assets/scss/</code>)</li>
+              <li><code>/model/services/</code> service-layer CFCs (mapped as <code>/cfc</code>)</li>
+              <li><code>/model/dao/</code> DAO-layer CFCs (mapped as <code>/dao</code>)</li>
+              <li><code>/model/includes/</code> shared helper partials (mapped as <code>/includes</code>)</li>
               <li><code>/sql/</code> schema and migration scripts</li>
-              <li><code>/xml/</code> XML data used by the UH API integration</li>
+              <li><code>/_published_images/</code> photo publishing target directory</li>
+              <li><code>/_temp_variants/</code> image variant working directory</li>
             </ul>
           </div>
         </div>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 2. Data Model -->
       <section class="card" id="data-model">
         <h2>2. Core Data Model</h2>
-        <p>All data is stored in SQL Server and hangs off the central <code>Users</code> table. The model is effectively a star pattern with user identity at the center and related records branching by concern.</p>
+        <p>All data is stored in SQL Server and hangs off the central <code>Users</code> table. The model is a star pattern with user identity at the center and related records branching by concern.</p>
         <h3>Primary User Fields</h3>
         <div class="badge-list">
           <span class="badge">UserID</span>
           <span class="badge">UH_API_ID</span>
-          <span class="badge">FirstName / LastName</span>
           <span class="badge">PreferredName</span>
           <span class="badge">Degrees</span>
           <span class="badge">Pronouns</span>
@@ -94,6 +106,10 @@
           <span class="badge">Division / Department</span>
           <span class="badge">Title1 / Title2 / Title3</span>
           <span class="badge">Active</span>
+          <span class="badge">IsTestUser</span>
+        </div>
+        <div class="note">
+          <strong>Name fields:</strong> <code>FirstName</code>, <code>LastName</code>, and related name parts are no longer stored directly on <code>Users</code>. All names are stored in <code>UserAliases</code> and resolved at query time by <code>nameResolution_service.cfc</code>. See <a href="#aliases">Section 5</a> for details.
         </div>
         <h3>Supporting Tables</h3>
         <div class="table-wrap">
@@ -105,48 +121,154 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td><code>UserFlags</code>, <code>UserFlagAssignments</code></td><td>Categorical user labels such as Faculty, Staff, Current-Student, Alumni, and No UH.</td></tr>
-              <tr><td><code>Organizations</code>, <code>UserOrganizations</code></td><td>Hierarchical org structure and user memberships.</td></tr>
-              <tr><td><code>UserAcademicInfo</code></td><td>Graduation year, program, and degree metadata for students and alumni.</td></tr>
+              <tr><td><code>UserAliases</code>, <code>AliasTypes</code></td><td>All name variants per user (primary alias carries the canonical display name). Replaces the old direct name fields on <code>Users</code>.</td></tr>
+              <tr><td><code>UserFlags</code>, <code>UserFlagAssignments</code></td><td>Categorical user labels such as Faculty-Fulltime, Faculty-Adjunct, Staff, Current-Student, Alumni, and No UH.</td></tr>
+              <tr><td><code>Organizations</code>, <code>UserOrganizations</code></td><td>Hierarchical org structure and user memberships with start/end dates.</td></tr>
+              <tr><td><code>UserAcademicInfo</code></td><td>Graduation year, program, degree metadata, hometown city and state for students and alumni.</td></tr>
               <tr><td><code>UserAddresses</code></td><td>Mailing and home addresses beyond the primary office fields.</td></tr>
+              <tr><td><code>UserEmails</code></td><td>Secondary email addresses per user (primary email remains on <code>Users</code>).</td></tr>
+              <tr><td><code>UserPhones</code></td><td>Secondary phone numbers per user.</td></tr>
               <tr><td><code>UserImages</code></td><td>Published image URLs and sort order.</td></tr>
+              <tr><td><code>UserImageSources</code>, <code>UserImageVariants</code>, <code>VariantTypes</code></td><td>Image variant pipeline: source images (Dropbox or upload), variant type definitions, and generated output records.</td></tr>
+              <tr><td><code>UserBios</code></td><td>Rich-text bio content per user (HTML, sanitized to safe tags).</td></tr>
               <tr><td><code>UserExternalIDs</code>, <code>ExternalSystems</code></td><td>Mappings to CougarNet, PeopleSoft, legacy systems, and other external IDs.</td></tr>
               <tr><td><code>Tokens</code>, <code>Secrets</code></td><td>Hashed API credentials and protected-data access controls.</td></tr>
               <tr><td><code>UserStudentProfile</code>, <code>UserAwards</code></td><td>Expanded student profile content and award records.</td></tr>
+              <tr><td><code>UserDegrees</code></td><td>Per-user degree records separate from the free-text <code>Degrees</code> field.</td></tr>
+              <tr><td><code>Publications</code>, <code>PublicationProfiles</code>, <code>PublicationSourceRecords</code>, <code>PublicationFetchRuns</code></td><td>Academic publications pulled from ORCID and PubMed, with fetch history and showcase flags.</td></tr>
               <tr><td><code>UserReviewSubmissions</code>, <code>UserReviewSubmissionFields</code></td><td>Staged self-service profile changes, admin resolutions, notes, and review history.</td></tr>
               <tr><td><code>DataQualityRuns</code>, <code>DataQualityIssues</code></td><td>Data-quality batch history and per-user issue tracking.</td></tr>
-              <tr><td><code>UHSyncRuns</code>, <code>UHSyncDiffs</code>, <code>UHSyncGone</code>, <code>UHSyncNew</code></td><td>UH API sync run history and field-level comparisons.</td></tr>
               <tr><td><code>DataQualityExclusions</code></td><td>Per-user exclusions for known acceptable data-quality issues.</td></tr>
+              <tr><td><code>UHSyncRuns</code>, <code>UHSyncDiffs</code>, <code>UHSyncGone</code>, <code>UHSyncNew</code></td><td>UH API sync run history and field-level comparisons.</td></tr>
+              <tr><td><code>DuplicateUserPairs</code></td><td>Candidate duplicate user pairs found by the duplicate-user scan.</td></tr>
+              <tr><td><code>AppConfig</code></td><td>Database-backed key/value configuration store. Sensitive keys are encrypted at rest.</td></tr>
+              <tr><td><code>AdminUsers</code>, <code>AdminRoles</code>, <code>AdminPermissions</code>, <code>AdminRolePermissions</code>, <code>AdminUserRoles</code></td><td>Admin authentication and role-based access control records.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 3. Admin Auth & RBAC -->
+      <section class="card" id="admin-auth">
+        <h2>3. Admin Authentication &amp; RBAC</h2>
+        <p>Admin authentication is handled by <code>admin/AuthService.cfc</code> (the in-memory session object) backed by <code>ldapAuthGateway_service.cfc</code> for credential validation and <code>adminAuth_DAO.cfc</code> for role/permission persistence.</p>
+        <div class="grid two">
+          <div>
+            <h3>Login Methods</h3>
+            <ul>
+              <li><strong>CougarNet (LDAP):</strong> username and password validated against the CougarNet Active Directory. This is the primary login method.</li>
+              <li><strong>Windows SSO:</strong> implemented in <code>auth_windows_start.cfm</code> / <code>auth_windows_callback.cfm</code> but disabled by <code>application.flags.windowsSSOEnabled = false</code> until the production server has IIS Windows Authentication installed.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Session &amp; Authorization Helpers</h3>
+            <p>On every admin request, <code>onRequestStart</code> in <code>Application.cfc</code> attaches these helper closures to <code>request</code>:</p>
+            <ul>
+              <li><code>request.hasRole(roleName)</code></li>
+              <li><code>request.hasPermission(permissionKey)</code></li>
+              <li><code>request.hasAnyPermission([])</code></li>
+              <li><code>request.isImpersonating()</code></li>
+              <li><code>request.canManageTestUsers()</code></li>
+              <li><code>request.canAccessUser(flags, orgs)</code></li>
+            </ul>
+          </div>
+        </div>
+        <h3>Role-Based Access Control</h3>
+        <p>Roles are stored in <code>AdminRoles</code> and assigned to <code>AdminUsers</code>. Permissions are string keys attached to roles. The <code>adminAuthorizationPolicy_service.cfc</code> enforces scoped user-record visibility per role.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Built-in Role</th><th>Scope</th></tr></thead>
+            <tbody>
+              <tr><td><code>SUPER_ADMIN</code></td><td>Unrestricted access; can manage test users and see duplicate report.</td></tr>
+              <tr><td><code>USER_ADMIN</code></td><td>Unrestricted user access; cannot manage test users.</td></tr>
+              <tr><td><code>OD_STUDENT_ADMIN</code></td><td>Current-Student users in OD Program only.</td></tr>
+              <tr><td><code>PHD_MS_STUDENT_ADMIN</code></td><td>Current-Student users in PhD or MS Program only.</td></tr>
+              <tr><td><code>ALUMNI_ADMIN</code></td><td>Alumni users only.</td></tr>
+              <tr><td><code>CLINICAL_FACULTY_ADMIN</code></td><td>Faculty in Clinical Sciences only.</td></tr>
+              <tr><td><code>CLINICAL_STAFF_ADMIN</code></td><td>Staff in Optometry Clinic only.</td></tr>
+              <tr><td><code>COLLEGE_STAFF_ADMIN</code></td><td>All Staff users.</td></tr>
+              <tr><td><code>RESEARCH_FACULTY_ADMIN</code></td><td>Faculty in Vision Science only.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Key Permission Strings</h3>
+        <div class="badge-list">
+          <span class="badge">settings.user_review.manage</span>
+          <span class="badge">users.approve_user_review</span>
+          <span class="badge">media.view</span>
+          <span class="badge">media.edit</span>
+          <span class="badge">settings.app_config.manage</span>
+          <span class="badge">settings.migrations.manage</span>
+          <span class="badge">settings.admin_roles.manage</span>
+          <span class="badge">settings.admin_users.manage</span>
+          <span class="badge">settings.admin_permissions.manage</span>
+        </div>
+        <h3>Admin User Management</h3>
+        <p>Admin users are created and managed at <code>admin/settings/admin-users/</code>. Roles are managed at <code>admin/settings/admin-roles/</code>. Permissions are attached to roles at <code>admin/settings/admin-permissions/</code>. Per-user permission overrides (grants or denials outside a role) are managed at <code>admin/settings/user-permissions/</code>.</p>
+        <h3>Impersonation &amp; Test Mode</h3>
+        <p><code>SUPER_ADMIN</code> can impersonate any admin user for testing. Test Mode (toggled in App Config settings) enables a set of synthetic test-user records that are invisible to all non-SUPER_ADMIN roles. Test users can be generated, reset, or deleted from <code>admin/settings/app-config/</code>.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 4. User Management -->
       <section class="card" id="user-management">
-        <h2>3. User Management</h2>
-        <p>The <code>admin/users/</code> area is the core administrative workspace for managing directory records. The app treats five user groupings as first-class admin views: Faculty, Staff, Current Students, Alumni, and Inactive.</p>
+        <h2>4. User Management</h2>
+        <p>The <code>admin/users/</code> area is the core administrative workspace. The app treats five user groupings as first-class admin views: Faculty, Staff, Current Students, Alumni, and Inactive.</p>
         <h3>User List</h3>
         <ul>
           <li>Paginated, sortable table with filters driven by tabs and query-string state.</li>
-          <li>Dedicated “Needs Attention” view for records carrying flags like <code>Admin - Check</code> or <code>No UH</code>.</li>
-          <li>Bulk flag and organization lookups are loaded up front to avoid N+1 queries.</li>
-          <li>Sort links are generated by helpers and the active sort column is highlighted.</li>
+          <li>Dedicated "Needs Attention" view for records carrying flags such as <code>Admin - Check</code> or <code>No UH</code>.</li>
+          <li>Scoped admin roles see only the users their role permits (enforced by <code>adminAuthorizationPolicy_service.cfc</code>).</li>
+          <li>Test users are filtered out for all roles except <code>SUPER_ADMIN</code>.</li>
         </ul>
         <h3>User Profile View</h3>
-        <p>The profile view uses <code>directory_service.getFullProfile(userID)</code> and renders identity, contact info, titles, photo gallery, organizations, flags, external IDs, addresses, academic info, sync history, and data-quality exclusions.</p>
+        <p>The profile view uses <code>directory_service.getFullProfile(userID)</code> and renders identity, resolved aliases, contact info, titles, photo gallery, organizations, flags, external IDs, addresses, academic info, bio, publications, degrees, sync history, and data-quality exclusions.</p>
         <h3>Create, Edit, Delete</h3>
         <ul>
-          <li><code>new.cfm</code> creates a blank user record.</li>
-          <li><code>edit.cfm</code> loads the same save flow with existing data.</li>
-          <li><code>saveUser.cfm</code> validates required fields and email format before writing via <code>users_service.saveUser()</code>.</li>
-          <li>Delete flows hard-delete the user and rely on related table cleanup to remove dependent rows.</li>
+          <li><code>new.cfm</code> creates a minimal user record (limited required fields).</li>
+          <li><code>edit.cfm</code> uses the same save flow with existing data; name parts are written to <code>UserAliases</code>, not directly to <code>Users</code>.</li>
+          <li><code>saveUser.cfm</code> delegates to <code>userEditSave_service.cfc</code> which orchestrates alias, contact, org, and flag writes in a single transaction-aware flow.</li>
+          <li>Delete uses <code>userDeletion_service.cfc</code>, which hard-deletes the user and cleans dependent rows.</li>
+          <li><code>merge.cfm</code> merges two duplicate user records; candidate pairs are surfaced by the duplicate report.</li>
         </ul>
         <h3>Per-User UH API Sync</h3>
-        <p>Admins can sync a single user from the UH Directory API and resolve field-by-field differences, or use a lightweight AJAX endpoint to refresh a single field directly from the upstream source.</p>
+        <p>Admins can sync a single user from the UH Directory API via <code>resolve_uh_sync_diff.cfm</code> and resolve field-by-field differences. A lightweight AJAX endpoint at <code>quick_sync_field.cfm</code> refreshes a single field from the upstream source without leaving the profile view.</p>
+        <h3>Publications Fetch</h3>
+        <p>An AJAX endpoint at <code>fetchPublications.cfm</code> triggers an on-demand pull of ORCID or PubMed publications for a user. See <a href="#publications">Section 9</a>.</p>
+        <h3>LDAP Lookup</h3>
+        <p><code>search_UH_LDAP.cfm</code> provides a direct CougarNet LDAP search tool for looking up people by samAccountName, display name, or email. Useful for finding external IDs and verifying account state before importing.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 5. Aliases -->
+      <section class="card" id="aliases">
+        <h2>5. User Names &amp; Aliases</h2>
+        <p>Names are no longer stored as direct columns on <code>Users</code>. Every user has one or more rows in <code>UserAliases</code>, each with an <code>AliasType</code> (e.g., <em>Primary</em>, <em>Preferred</em>, <em>LDAP</em>, <em>UH API</em>). The primary alias is the canonical display name used throughout the admin and API.</p>
+        <div class="grid two">
+          <div>
+            <h3>Alias Record Structure</h3>
+            <ul>
+              <li><code>AliasID</code></li>
+              <li><code>UserID</code></li>
+              <li><code>AliasTypeID</code> (references <code>AliasTypes</code>)</li>
+              <li><code>FirstName</code>, <code>MiddleName</code>, <code>LastName</code></li>
+              <li><code>IsPrimary</code> — exactly one per user</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Resolution Services</h3>
+            <ul>
+              <li><code>aliases_service.cfc</code> — CRUD for alias records.</li>
+              <li><code>nameResolution_service.cfc</code> — bulk resolves name data for arrays of user rows returned by any DAO, attaching <code>FIRSTNAME</code>, <code>LASTNAME</code>, <code>FULLNAME</code>, etc. All list pages and API responses go through this service.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note">
+          <strong>Why aliases:</strong> the system now integrates with both LDAP (where names come from AD attributes) and the UH API (which may supply a different display name). Aliases allow all name sources to coexist per user without overwriting the canonical record.
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 6. UserReview -->
       <section class="card" id="user-review">
-        <h2>4. UserReview Workflow</h2>
+        <h2>6. UserReview Workflow</h2>
         <p>UserReview is a separate self-service flow that allows eligible users to stage profile changes without writing directly to the live <code>Users</code> record. Changes remain pending until an authorized admin approves or rejects them.</p>
         <div class="grid two">
           <div>
@@ -154,7 +276,7 @@
             <ul>
               <li>Public entry point lives under <code>/UserReview/</code> with its own login and session namespace.</li>
               <li>Eligibility is based on feature settings plus user flags such as Faculty and Staff, not the admin-role system.</li>
-              <li><code>Title1</code> and <code>EmailPrimary</code> are shown read-only for reference and cannot be edited.</li>
+              <li><code>Title1</code> and <code>EmailPrimary</code> are shown read-only and cannot be edited.</li>
               <li>Existing secondary emails, phones, and addresses are preloaded to prevent duplicate entry.</li>
               <li>Plain <code>@uh.edu</code> addresses are excluded from editable secondary email rows; <code>@central.uh.edu</code> and <code>@cougarnet.uh.edu</code> are allowed.</li>
             </ul>
@@ -163,29 +285,120 @@
             <h3>Submission Lifecycle</h3>
             <ol>
               <li>User loads the form model from live profile data plus any unresolved pending changes.</li>
-              <li>Only actual diffs are stored; unchanged contact collections are ignored by canonical structural comparison.</li>
+              <li>Only actual diffs are stored; unchanged contact collections are ignored.</li>
               <li>Submission data is written to <code>UserReviewSubmissions</code> and <code>UserReviewSubmissionFields</code>.</li>
               <li>Admins may approve or discard an entire submission or resolve individual fields.</li>
-              <li>Approved fields update live data immediately; discarded fields retain the current value.</li>
-              <li>Submission status becomes <code>approved</code>, <code>rejected</code>, or <code>partially_approved</code> after all fields are resolved.</li>
+              <li>Approved fields update live data immediately.</li>
+              <li>Status becomes <code>approved</code>, <code>rejected</code>, or <code>partially_approved</code> after all fields are resolved.</li>
             </ol>
           </div>
         </div>
+        <h3>Authentication</h3>
+        <p><code>UserReviewAuthService.cfc</code> authenticates users against the CougarNet LDAP (same gateway as the admin login). It also supports an external token flow (<code>externalAuthToken</code> + <code>cougarnetID</code> + <code>launchContextToken</code>) for integrations such as the MyUHCO portal that need to launch UserReview on behalf of an already-authenticated user without re-prompting for credentials.</p>
         <h3>Review Notes</h3>
-        <p>Discard actions require a reason. Notes are appended to <code>UserReviewSubmissions.ReviewNote</code>, shown on the admin review page, and surfaced back to the user when the most recent reviewed outcome is <code>rejected</code> or <code>partially_approved</code>. If the user creates a new pending submission, the prior review-update alert is suppressed until the new submission is reviewed.</p>
+        <p>Discard actions require a reason. Notes are appended to <code>UserReviewSubmissions.ReviewNote</code>, shown on the admin review page, and surfaced back to the user when the most recent reviewed outcome is <code>rejected</code> or <code>partially_approved</code>. A new pending submission suppresses the prior review-update alert until the new submission is reviewed.</p>
         <h3>Key Files</h3>
         <ul>
           <li><code>UserReview/index.cfm</code>, <code>login.cfm</code>, <code>authenticate.cfm</code>, <code>save.cfm</code>, <code>layout.cfm</code></li>
-          <li><code>model/services/UserReviewAuthService.cfc</code> for end-user authentication and session state</li>
-          <li><code>model/services/userReview_service.cfc</code> for form modeling, diffing, and approval logic</li>
-          <li><code>model/dao/UserReview_DAO.cfc</code> for submission persistence and review-state queries</li>
-          <li><code>sql/create_user_review.sql</code> for schema and default app settings</li>
+          <li><code>model/services/UserReviewAuthService.cfc</code> — end-user authentication, LDAP credential validation, external token flow</li>
+          <li><code>model/services/userReview_service.cfc</code> — form modeling, diffing, and approval logic</li>
+          <li><code>model/dao/UserReview_DAO.cfc</code> — submission persistence and review-state queries</li>
+          <li><code>admin/settings/user-review/</code> — admin configuration, submission queue, review UI, and approval endpoints</li>
         </ul>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 7. User Media -->
+      <section class="card" id="user-media">
+        <h2>7. User Media &amp; Photos</h2>
+        <p>The <code>admin/user-media/</code> section manages user profile photos through a three-stage pipeline: source images are pulled from Dropbox (or uploaded directly), processed into typed variants, and then published to <code>/_published_images/</code>.</p>
+        <div class="grid two">
+          <div>
+            <h3>Image Pipeline Stages</h3>
+            <ol>
+              <li><strong>Source assignment</strong> — each user is linked to a source image via <code>UserImageSources</code>. Sources can be a Dropbox path, a local upload, or a URL.</li>
+              <li><strong>Variant generation</strong> — admins trigger explicit generation per variant type. <code>UserImageVariantService.cfc</code> and <code>ImageProcessor.cfc</code> produce the output file in <code>/_temp_variants/</code>.</li>
+              <li><strong>Publishing</strong> — <code>PublishingService.cfc</code> moves the approved variant files to <code>/_published_images/</code> and updates <code>UserImages</code> with the public URLs. The published base URL is configurable via App Config (<code>media.published_site_base_url</code>).</li>
+            </ol>
+          </div>
+          <div>
+            <h3>Variant Types &amp; Modes</h3>
+            <p>Variant types define the target dimensions and processing mode. Three modes are supported:</p>
+            <ul>
+              <li><strong>Resize</strong> — scales to target width/height</li>
+              <li><strong>Resize and Crop</strong> — scales then center-crops to exact dimensions</li>
+              <li><strong>Pass-through</strong> — copies the source file as-is (JPG, PNG, or WebP)</li>
+            </ul>
+            <p>Variant types are managed at <code>admin/settings/media-config/variant-types.cfm</code>. Filename patterns for published images are configured at <code>admin/settings/media-config/filename-patterns.cfm</code>.</p>
+          </div>
+        </div>
+        <h3>Dropbox Integration</h3>
+        <p><code>DropboxProvider.cfc</code> obtains a short-lived Dropbox access token using the OAuth2 refresh-token flow. Credentials (<code>dropbox.app_key</code>, <code>dropbox.app_secret</code>, <code>dropbox.refresh_token</code>) are stored in App Config. Tokens are cached in server scope and refreshed automatically on expiry.</p>
+        <h3>Variant Lifecycle States</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>missing</code></td><td>Variant type exists but no record yet — source must be assigned first.</td></tr>
+              <tr><td><code>stale</code></td><td>Record exists but source changed or was just assigned — generation available, not automatic.</td></tr>
+              <tr><td><code>current</code></td><td>Generated successfully; source unchanged. No action required.</td></tr>
+              <tr><td><code>error</code></td><td>Last generation failed — error message stored; re-generation allowed.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Bulk Operations</h3>
+        <p><code>admin/user-media/bulk-transfer.cfm</code> uses <code>BulkImageTransferService.cfc</code> to transfer source images in batch from Dropbox to local storage. A health endpoint at <code>admin/user-media/health.cfm</code> shows overall publishing status counts.</p>
+        <h3>Permissions</h3>
+        <ul>
+          <li><code>media.view</code> — view published images and variant status across users</li>
+          <li><code>media.edit</code> — assign sources, trigger generation, and publish variants</li>
+        </ul>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 8. Bio -->
+      <section class="card" id="bio">
+        <h2>8. Bio</h2>
+        <p>Each user can have a rich-text biographical profile stored in <code>UserBios</code>. Bio content is authored in the admin profile editor using a Quill-based rich text control and sanitized server-side before storage.</p>
+        <h3>Sanitization Rules</h3>
+        <p><code>bio_service.sanitizeHTML()</code> applies a whitelist policy: only <code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>, <code>&lt;a&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;ol&gt;</code>, <code>&lt;li&gt;</code>, and <code>&lt;br&gt;</code> are kept. All attributes are stripped except <code>href</code> and <code>target</code> on anchors. <code>javascript:</code> and <code>data:</code> URIs in <code>href</code> are blocked.</p>
+        <h3>API Access</h3>
+        <p>Bio content is available at <code>GET /api/v1/people/{id}/bio</code>. The response includes raw HTML and a plain-text excerpt.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 9. Publications -->
+      <section class="card" id="publications">
+        <h2>9. Publications</h2>
+        <p>Faculty members can have academic publications pulled from ORCID and PubMed and displayed in the directory. A subset of publications can be marked as <em>showcased</em> and exposed via the API.</p>
+        <div class="grid two">
+          <div>
+            <h3>Data Sources</h3>
+            <ul>
+              <li><strong>ORCID</strong> — <code>publicationProvider_orcid.cfc</code> fetches works using the researcher's ORCID iD (stored in <code>UserExternalIDs</code>).</li>
+              <li><strong>PubMed</strong> — <code>publicationProvider_pubmed.cfc</code> searches by author name or NLM ID.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Fetch &amp; Merge Flow</h3>
+            <ol>
+              <li>Admin triggers fetch via <code>admin/users/fetchPublications.cfm</code> (AJAX, returns JSON).</li>
+              <li><code>publicationFetch_service.cfc</code> calls the configured providers and collects raw records.</li>
+              <li><code>publicationMerge_service.cfc</code> de-duplicates across sources and inserts or updates <code>Publications</code> and <code>PublicationSourceRecords</code>.</li>
+              <li>A <code>PublicationFetchRuns</code> record is written with counts and timestamp.</li>
+            </ol>
+          </div>
+        </div>
+        <h3>Configuration Keys (App Config)</h3>
+        <ul>
+          <li><code>publications.max_showcased_per_user</code> — maximum showcased publications per user (default 10).</li>
+          <li><code>publications.faculty_flags</code> — comma-separated flag names for publication-eligible users (default: <em>Faculty-Adjunct, Faculty-Fulltime, Professor-Emeritus, Joint Faculty Appointment</em>).</li>
+        </ul>
+        <h3>Tables</h3>
+        <p><code>Publications</code> (merged deduplicated records), <code>PublicationProfiles</code> (per-user provider settings including ORCID iD), <code>PublicationSourceRecords</code> (raw per-source hits), <code>PublicationFetchRuns</code> (fetch audit log).</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 10. Organizations -->
       <section class="card" id="organizations">
-        <h2>5. Organizations</h2>
-        <p>Organizations provide the hierarchy used for browsing, filtering, and representing the college’s internal structure.</p>
+        <h2>10. Organizations</h2>
+        <p>Organizations provide the hierarchy used for browsing, filtering, and representing the college's internal structure.</p>
         <div class="grid two">
           <div>
             <h3>Structure</h3>
@@ -199,14 +412,15 @@
           </div>
           <div>
             <h3>User Assignments</h3>
-            <p><code>UserOrganizations</code> allows multiple org memberships per user with start and end dates. Admin pages support add/remove membership management directly from the user profile.</p>
+            <p><code>UserOrganizations</code> allows multiple org memberships per user with start and end dates. Admin pages support add/remove membership management directly from the user profile. The <code>OD Program</code>, <code>PhD Program</code>, <code>MS Program</code>, <code>Clinical Sciences</code>, <code>Optometry Clinic</code>, and <code>Vision Science</code> org names are referenced by the scoped-role system.</p>
           </div>
         </div>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 11. Flags -->
       <section class="card" id="flags">
-        <h2>6. Flags</h2>
-        <p>Flags are used for filtering, admin workflows, and API data protection.</p>
+        <h2>11. Flags</h2>
+        <p>Flags are used for filtering, admin workflows, scoped-role access control, and API data protection.</p>
         <h3>Definition Model</h3>
         <ul>
           <li><code>FlagID</code>, <code>FlagName</code>, <code>FlagDescription</code></li>
@@ -214,15 +428,16 @@
           <li><code>SortOrder</code> and <code>Active</code> control display and retirement behavior</li>
         </ul>
         <div class="note">
-          <strong>Protected data behavior:</strong> flags such as Current-Student and Alumni are filtered from API responses unless the caller presents a valid secret that unlocks those protected flags.
+          <strong>Protected data behavior:</strong> flags such as Current-Student and Alumni are filtered from API responses unless the caller presents a valid secret that unlocks those protected flags. The scoped-role system also uses flag names directly (e.g., <code>Faculty-Adjunct</code>, <code>Staff</code>, <code>Current-Student</code>) to determine which users a given admin role may access.
         </div>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 12. REST API -->
       <section class="card" id="api">
-        <h2>7. REST API</h2>
+        <h2>12. REST API</h2>
         <p>The API is rooted at <code>/api/v1/</code> and is read-only. All requests require a valid Bearer token, and some protected data additionally requires a secret.</p>
         <p>For full endpoint reference, authentication examples, quickpull behavior, and response samples, see the dedicated API documentation at <a href="/api/docs.html" target="_blank" rel="noopener">/api/docs.html</a>.</p>
-        <h3>Key Endpoints</h3>
+        <h3>Core Endpoints</h3>
         <pre><code>GET /api/v1/people
 GET /api/v1/people/{id}
 GET /api/v1/people/{id}/flags
@@ -230,9 +445,18 @@ GET /api/v1/people/{id}/organizations
 GET /api/v1/people/{id}/academic
 GET /api/v1/people/{id}/addresses
 GET /api/v1/people/{id}/externalids
+GET /api/v1/people/{id}/images
+GET /api/v1/people/{id}/emails
+GET /api/v1/people/{id}/degrees
+GET /api/v1/people/{id}/studentprofile
+GET /api/v1/people/{id}/awards
+GET /api/v1/people/{id}/bio
 GET /api/v1/organizations
 GET /api/v1/organizations/{id}
-GET /api/v1/flags</code></pre>
+GET /api/v1/flags
+GET /api/v1/access?userID={id}
+GET /api/v1/permission-roster?permission={key}</code></pre>
+        <p>QuickPull endpoints are described in <a href="#quickpull">Section 13</a>.</p>
         <h3>People Query Parameters</h3>
         <ul>
           <li><code>search</code> full-text search across identity and email fields</li>
@@ -255,10 +479,69 @@ GET /api/v1/flags</code></pre>
         </ol>
         <h3>Error Format</h3>
         <pre><code>{ "error": "message", "status": 401 }</code></pre>
+        <h3>CORS</h3>
+        <p>CORS headers are set in the API sub-application's <code>Application.cfc</code>. The allowed origin is configurable to support browser-side integrations (e.g., MyUHCO portal).</p>
+        <h3>Utility Endpoints</h3>
+        <ul>
+          <li><code>GET /api/v1/access?userID={id}</code> — returns the effective permissions for a given admin user ID.</li>
+          <li><code>GET /api/v1/permission-roster?permission={key}</code> — returns the list of admin users who hold a given permission key.</li>
+        </ul>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 13. QuickPull -->
+      <section class="card" id="quickpull">
+        <h2>13. QuickPull Endpoints</h2>
+        <p>QuickPull endpoints are opinionated, purpose-built projections of directory data used by specific downstream displays (kiosks, ceremony wallboards, MyUHCO). They assemble flat denormalized response objects in a single call rather than requiring the caller to join multiple standard endpoints.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Endpoint</th>
+                <th>Purpose</th>
+                <th>Key Fields</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/attending</code></td>
+                <td>Clinical attending list</td>
+                <td>USERID, FIRSTNAME, MIDDLENAME, LASTNAME, DEGREES, FULLNAME</td>
+              </tr>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/gradclass?year={year}</code></td>
+                <td>Graduation class for a given year, with awards and hometowns</td>
+                <td>FULLNAME, PROGRAM, KIOSKROSTERIMAGE, KIOSKPROFILEIMAGE, HOMETOWNFULL, DEGREES, AWARDNAME1, FIRSTEXTERNSHIP, SECONDEXTERNSHIP</td>
+              </tr>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/graduate?id={userID}</code></td>
+                <td>Single graduate profile for ceremony display</td>
+                <td>FULLNAME, DEGREES, AWARDS, INTERACTIVEUSERIMAGE, KIOSKROSTERIMAGE, KIOSKPROFILEIMAGE</td>
+              </tr>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/deans</code></td>
+                <td>Dean roster for kiosk display</td>
+                <td>USERID, FULLNAME, TITLE1, KIOSKNONGRIDIMAGE</td>
+              </tr>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/myuhco?id={externalID}</code></td>
+                <td>Single user profile lookup by external ID (UH_API_ID, CougarNet, or PeopleSoft) for MyUHCO portal</td>
+                <td>FULLNAME, FLAGS, ORGANIZATIONS, CURRENTGRADYEAR, WEBPROFILEIMAGE, WEBTHUMBIMAGE</td>
+              </tr>
+              <tr>
+                <td><code>GET /api/v1/quickpulls/myuhco-rosters?publishedOnly={true|false}</code></td>
+                <td>Bulk roster data for MyUHCO portal population</td>
+                <td>Returns sets of users keyed by roster type</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>QuickPull definitions, field lists, and endpoint keys are centralized in <code>quickpull_service.cfc</code>. Variant image field names (e.g., <code>KIOSKROSTERIMAGE</code>) resolve to published image URLs from <code>UserImageVariants</code> via <code>UserImageVariantDAO</code>.</p>
+        <p>The <code>HOMETOWNFULL</code> field is a combined computed value of <code>HometownCity</code> and <code>HometownState</code> from <code>UserAcademicInfo</code>.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 14. Tokens & Secrets -->
       <section class="card" id="tokens-secrets">
-        <h2>8. Tokens and Secrets</h2>
+        <h2>14. Tokens and Secrets</h2>
         <p>API tokens and secrets are managed separately because they solve different security problems.</p>
         <div class="grid two">
           <div>
@@ -268,31 +551,61 @@ GET /api/v1/flags</code></pre>
               <li>Store only SHA-256 hashes, never the raw token</li>
               <li>Track scope, allowlist, expiration, revocation, and last used time</li>
               <li>Can be revoked or permanently deleted</li>
+              <li>Managed at <code>admin/settings/uhco-api/tokens/</code></li>
             </ul>
           </div>
           <div>
             <h3>Secrets</h3>
             <ul>
-              <li>Unlock protected flag and organization data</li>
+              <li>Unlock protected flag and organization data in API responses</li>
               <li>Also store only SHA-256 hashes</li>
               <li>Define which protected flags a client may see</li>
               <li>Use the same one-time reveal lifecycle as tokens</li>
+              <li>Managed at <code>admin/settings/uhco-api/secrets/</code></li>
             </ul>
           </div>
         </div>
+        <h3>Quick Test Credential Generator</h3>
+        <p>A built-in tool in the API settings area generates short-lived test tokens and secrets for development and integration testing without creating permanent credentials.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 15. App Config -->
+      <section class="card" id="app-config">
+        <h2>15. App Config</h2>
+        <p><code>appConfig_service.cfc</code> provides a database-backed key/value store accessed throughout the application for runtime configuration. Values are stored in the <code>AppConfig</code> table and retrieved by key. Sensitive keys (LDAP credentials, Dropbox secrets, etc.) are encrypted at rest using AES with a key derived from the <code>UHCO_IDENT_APPCONFIG_ENC_KEY</code> OS environment variable.</p>
+        <h3>Encryption Policy</h3>
+        <p><code>runtimeSecretPolicy_service.cfc</code> enforces that encryption is active in non-local environments. On every request, <code>Application.cfc</code> checks the health status; if encryption is required but the key is absent, a warning is logged and the app continues in a degraded-security state rather than crashing.</p>
+        <h3>Notable Config Keys</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Key</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>auth.ldap.server</code></td><td>CougarNet LDAP server (default: cougarnet.uh.edu)</td></tr>
+              <tr><td><code>auth.admin.allowed_group_dns</code></td><td>AD group DNs permitted to log in as admins</td></tr>
+              <tr><td><code>ldap.cougarnet.bind_username</code></td><td>Service account bind username (sensitive)</td></tr>
+              <tr><td><code>ldap.cougarnet.bind_password</code></td><td>Service account bind password (sensitive, encrypted)</td></tr>
+              <tr><td><code>dropbox.app_key</code>, <code>dropbox.app_secret</code>, <code>dropbox.refresh_token</code></td><td>Dropbox OAuth2 credentials (sensitive, encrypted)</td></tr>
+              <tr><td><code>media.published_site_base_url</code></td><td>Base URL prepended to published image file names</td></tr>
+              <tr><td><code>publications.max_showcased_per_user</code></td><td>Max showcased publications per user</td></tr>
+              <tr><td><code>publications.faculty_flags</code></td><td>Comma-separated flags for publication-eligible users</td></tr>
+              <tr><td><code>dashboard.list_page_size</code></td><td>Dashboard list page size</td></tr>
+              <tr><td><code>dashboard.stale_months</code></td><td>Month threshold before a user record is flagged as stale</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Test Mode</h3>
+        <p>App Config settings also expose Test Mode controls: enable/disable the test-user set, generate fresh test users, reset them to a clean state, or delete them entirely. Only <code>SUPER_ADMIN</code> can manage test users. Test users carry <code>IsTestUser = 1</code> on the <code>Users</code> record and are excluded from all standard list views and API responses.</p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════ 16. UH Directory Sync -->
       <section class="card" id="sync">
-        <h2>9. UH Directory Sync</h2>
+        <h2>16. UH Directory Sync</h2>
         <p>UHCO Ident maintains its own copy of staff and faculty data and periodically compares it against the upstream UH Directory API.</p>
         <h3>Credentials and Configuration</h3>
         <ul>
-          <li><code>UH_API_TOKEN</code> Bearer token</li>
-          <li><code>UH_API_SECRET</code> HMAC signing secret</li>
+          <li><code>UH_API_TOKEN</code> Bearer token — OS environment variable, loaded into application scope at startup via <code>runtimeSecretPolicy_service.cfc</code>.</li>
+          <li><code>UH_API_SECRET</code> HMAC signing secret — same source.</li>
         </ul>
-        <div class="note">
-          <strong>Important:</strong> the source documentation notes hardcoded fallback credentials in <code>admin/reporting/run_uh_sync_report.cfm</code>. Those should be removed and replaced with environment-only configuration.
-        </div>
         <h3>Bulk Sync Flow</h3>
         <ol>
           <li>Load all local users with a non-null <code>UH_API_ID</code>.</li>
@@ -304,10 +617,13 @@ GET /api/v1/flags</code></pre>
           <li>Track upstream-only people in <code>UHSyncNew</code>.</li>
           <li>Create a <code>UHSyncRun</code> record with counts and metadata.</li>
         </ol>
+        <h3>Reporting</h3>
+        <p>Sync results are reviewed at <code>admin/reporting/uh_sync_report.cfm</code>. The <code>admin/users/uh_people_db_not_in_api.cfm</code> report finds local records whose <code>UH_API_ID</code> no longer appears upstream. The dashboard shows a pending-changes badge driven by the most recent <code>UHSyncRun</code>.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 17. Data Quality -->
       <section class="card" id="dq">
-        <h2>10. Data Quality</h2>
+        <h2>17. Data Quality</h2>
         <p>The data-quality system audits the local database for missing or inconsistent information and stores findings for review.</p>
         <h3>Typical Issue Codes</h3>
         <div class="badge-list">
@@ -329,99 +645,148 @@ GET /api/v1/flags</code></pre>
           <span class="badge">NO_GRAD_YEAR</span>
           <span class="badge">MISSING_PREFERRED</span>
         </div>
-        <p>Excluded issues can be suppressed per user via <code>DataQualityExclusions</code> when a known exception is acceptable.</p>
+        <p>Excluded issues can be suppressed per user via <code>DataQualityExclusions</code> when a known exception is acceptable. Exclusions are managed from the user profile view at <code>admin/users/saveDQExclusions.cfm</code>.</p>
+        <h3>Duplicate Users Report</h3>
+        <p>A separate report at <code>admin/reporting/duplicate_users_report.cfm</code> scans for candidate duplicate user records (same name, email, or external ID). Results are stored in <code>DuplicateUserPairs</code>. The dashboard shows a pending-pair count badge visible only to <code>SUPER_ADMIN</code>. Confirmed duplicates can be merged via <code>admin/users/merge.cfm</code>.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 18. Bulk Tools -->
       <section class="card" id="tools">
-        <h2>11. Bulk Tools and Reporting</h2>
-        <p>The admin reporting area contains recurring import, audit, and migration utilities beyond sync and DQ.</p>
+        <h2>18. Bulk Tools and Reporting</h2>
+        <p>The admin area contains recurring import, audit, and migration utilities beyond sync and data quality.</p>
+        <h3>Import Tools (<code>admin/settings/import/</code>)</h3>
         <ul>
-          <li><strong>CS Bulk Import:</strong> mass-creates new College of Science users with initial org and flag assignments.</li>
-          <li><strong>CS Alumni Bulk Import:</strong> creates alumni records with graduation metadata.</li>
-          <li><strong>CS Migration Tool:</strong> one-time legacy data migration utility.</li>
-          <li><strong>OD Student Audit:</strong> compares the student roster against enrollment-related data.</li>
-          <li><strong>UH People Import:</strong> interactive import from the UH API.</li>
-          <li><strong>UH People — DB Not In API:</strong> finds local records whose <code>UH_API_ID</code> no longer appears upstream.</li>
+          <li><strong>CSV Bulk Import:</strong> mass-creates new users with initial org and flag assignments from an uploaded spreadsheet.</li>
+          <li><strong>Alumni Bulk Import:</strong> creates alumni records with graduation metadata.</li>
+          <li><strong>UH People Import</strong> (<code>admin/users/uh_people_import.cfm</code>): interactive import of people found in the UH Directory API but not yet in the local database.</li>
         </ul>
+        <h3>Roster Tools (<code>admin/settings/rosters/</code>)</h3>
+        <p>Upload and compare enrollment rosters (e.g., OD cohort lists) against the current directory to identify additions and departures.</p>
+        <h3>Grad Migration (<code>admin/settings/migrations/</code>)</h3>
+        <p><code>gradMigration_service.cfc</code> runs a configurable graduated-student migration that transitions current students to alumni status, applies graduation-year flags, and can optionally deactivate departed records. The migration runs inside a ColdFusion transaction for atomicity. Auto-execute mode and a scheduled trigger are supported. Requires the <code>settings.migrations.manage</code> permission.</p>
+        <h3>Query Builder (<code>admin/settings/query-builder/</code>)</h3>
+        <p>An admin-only ad hoc query tool backed by <code>queryBuilder_service.cfc</code>. Provides a safe parameterized interface for running pre-approved queries against the directory database for data analysis.</p>
+        <h3>Bulk Image Transfer (<code>admin/user-media/bulk-transfer.cfm</code>)</h3>
+        <p>Scans Dropbox for source images matching user records and transfers them in batch to local storage. Filters by user type to avoid overwriting unrelated source images.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 19. Admin Interface -->
       <section class="card" id="admin-ui">
-        <h2>12. Admin Interface</h2>
-        <p>The admin side is a server-rendered Bootstrap application with shared layout, dashboard, reporting pages, and operational utilities.</p>
-        <h3>Highlights</h3>
+        <h2>19. Admin Interface &amp; Settings</h2>
+        <p>The admin side is a server-rendered Bootstrap application with shared layout, dashboard, reporting pages, and operational utilities. All CSS is compiled from SCSS in <code>assets/scss/admin.scss</code> and served from <code>assets/css/admin.css</code>.</p>
+        <h3>Dashboard</h3>
+        <p><code>admin/dashboard.cfm</code> shows status badges for Data Quality, UH Sync, and (for SUPER_ADMIN) Duplicate Users. Each badge links to the relevant report. Stale-month and list-page-size thresholds are configurable through App Config.</p>
+        <h3>Settings Architecture</h3>
+        <p>All settings pages live under <code>admin/settings/</code> and are protected by granular permission checks. The <code>section-status-config.cfm</code> helper tracks enabled/disabled state per section. <code>feature-gates.cfm</code> is an internal request-scoped helper that signals whether a particular settings feature is available given the current environment and config state.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Settings Section</th><th>Purpose</th><th>Permission</th></tr></thead>
+            <tbody>
+              <tr><td><code>admin-roles/</code></td><td>Create, rename, and delete admin roles</td><td><code>settings.admin_roles.manage</code></td></tr>
+              <tr><td><code>admin-users/</code></td><td>Create admin user accounts and assign roles</td><td><code>settings.admin_users.manage</code></td></tr>
+              <tr><td><code>admin-permissions/</code></td><td>Attach or detach permissions from roles</td><td><code>settings.admin_permissions.manage</code></td></tr>
+              <tr><td><code>user-permissions/</code></td><td>Per-user permission grants and denials outside role membership</td><td><code>settings.admin_permissions.manage</code></td></tr>
+              <tr><td><code>app-config/</code></td><td>Database-backed application configuration and test-mode controls</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>media-config/</code></td><td>Variant type definitions and filename patterns for published images</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>uhco-api/tokens/</code></td><td>API token lifecycle management</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>uhco-api/secrets/</code></td><td>API secret lifecycle management</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>user-review/</code></td><td>UserReview feature configuration and submission queue</td><td><code>settings.user_review.manage</code> or <code>users.approve_user_review</code></td></tr>
+              <tr><td><code>migrations/</code></td><td>Graduation migration configuration and execution</td><td><code>settings.migrations.manage</code></td></tr>
+              <tr><td><code>import/</code></td><td>Bulk CSV import tools</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>rosters/</code></td><td>Enrollment roster comparison tools</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>query-builder/</code></td><td>Ad hoc parameterized query tool</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>scheduled-tasks/</code></td><td>View and trigger scheduled task status</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>uh-sync/</code></td><td>UH Sync run history and field-change audit</td><td><code>settings.app_config.manage</code></td></tr>
+              <tr><td><code>bulk-exclusions/</code></td><td>Bulk data-quality exclusion management</td><td><code>settings.app_config.manage</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Scheduled Tasks</h3>
+        <p>Scheduled tasks are defined in <code>admin/settings/scheduled-tasks/tasks/</code>. Each task file includes <code>_scheduled_task_auth.cfm</code> which validates a shared secret before executing, preventing unauthorized direct HTTP calls to the task endpoint.</p>
+        <h3>Operational Pages</h3>
         <ul>
-          <li><code>dashboard.cfm</code> shows DQ and sync status badges plus quick navigation.</li>
-          <li><code>layout.cfm</code> provides the shell, sidebar, current user display, and navigation.</li>
-          <li><code>diagnostic.cfm</code> surfaces runtime environment and connectivity information.</li>
-          <li><code>clear_cache.cfm</code> and <code>resetapp.cfm</code> are operational maintenance pages.</li>
-          <li><code>admin/access/</code> manages named access areas.</li>
-          <li><code>admin/external/</code> manages external system definitions.</li>
-          <li><code>admin/settings/user-review/</code> combines UserReview configuration and submission processing.</li>
-        </ul>
-        <h3>Permission Model</h3>
-        <ul>
-          <li><code>settings.user_review.manage</code> controls UserReview feature configuration.</li>
-          <li><code>users.approve_user_review</code> controls submission review, approval, and rejection.</li>
-          <li>The UserReview admin landing page can show configuration, submissions, or both depending on the caller's granted permissions.</li>
-          <li>Review actions refresh the admin authorization context before writing approval metadata so stale sessions do not resolve fields with <code>AdminUserID = 0</code>.</li>
+          <li><code>admin/diagnostic.cfm</code> — surfaces runtime environment, datasource connectivity, and credential health.</li>
+          <li><code>admin/clear_cache.cfm</code> and <code>admin/resetapp.cfm</code> — maintenance pages for cache and application-scope reset.</li>
+          <li><code>admin/access/</code> — manages named access areas used for fine-grained feature gating.</li>
+          <li><code>admin/external/</code> — manages external system definitions referenced by <code>UserExternalIDs</code>.</li>
         </ul>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 20. Architecture -->
       <section class="card" id="architecture">
-        <h2>13. Architecture and Code Structure</h2>
-        <p>UHCO Ident uses a simple three-layer design with request-time object creation and no dependency injection framework.</p>
+        <h2>20. Architecture and Code Structure</h2>
+        <p>UHCO Ident uses a three-layer design with request-time object creation and no dependency injection framework.</p>
         <div class="grid two">
           <div>
             <h3>Layer Overview</h3>
             <ul>
-              <li>Presentation layer: <code>.cfm</code> pages in <code>admin/</code> and <code>api/v1/</code></li>
-              <li>Service layer: CFCs in <code>cfc/</code></li>
-              <li>Data access layer: CFCs in <code>dao/</code>, all extending <code>BaseDAO.cfc</code></li>
+              <li>Presentation: <code>.cfm</code> pages in <code>admin/</code> and <code>api/v1/</code></li>
+              <li>Service: CFCs in <code>model/services/</code> (mapped as <code>/cfc</code>)</li>
+              <li>Data access: CFCs in <code>model/dao/</code> (mapped as <code>/dao</code>), all extending <code>BaseDAO.cfc</code></li>
             </ul>
           </div>
           <div>
             <h3>Instantiation Pattern</h3>
-            <pre><code>&lt;cfset svc = createObject("component", "cfc.users_service").init()&gt;</code></pre>
-            <p>Objects are constructed per request. Existing <code>singleton</code> metadata in components is only descriptive and has no runtime effect in ColdFusion.</p>
+            <pre><code>&lt;cfset svc = createObject("component",
+    "cfc.users_service").init()&gt;</code></pre>
+            <p>The <code>/cfc</code> and <code>/dao</code> mappings in <code>Application.cfc</code> resolve to <code>model/services/</code> and <code>model/dao/</code> respectively, so all existing instantiation calls continue to work without path changes.</p>
           </div>
         </div>
         <h3>BaseDAO Utilities</h3>
         <ul>
-          <li><code>executeQueryWithRetry(sql, params, options)</code> retries transient connection errors with backoff.</li>
-          <li><code>queryToArray(query)</code> normalizes ColdFusion query results into uppercase-key structs.</li>
+          <li><code>executeQueryWithRetry(sql, params, options)</code> — retries transient connection errors with backoff.</li>
+          <li><code>queryToArray(query)</code> — normalizes ColdFusion query results into uppercase-key structs.</li>
         </ul>
         <h3>Application Scope</h3>
-        <p><code>Application.cfc</code> loads API credentials into application scope on startup. The API sub-application in <code>api/v1/Application.cfc</code> disables sessions and converts unhandled failures into JSON 500 responses. The root application also initializes a separate UserReview auth service and routes <code>/UserReview/</code> requests through a distinct request context.</p>
+        <p><code>Application.cfc</code> initializes several singletons on startup:</p>
+        <ul>
+          <li><code>application.authService</code> — <code>admin/AuthService.cfc</code>, the in-memory session-aware admin auth object.</li>
+          <li><code>application.userReviewAuthService</code> — <code>UserReviewAuthService.cfc</code>, end-user session for the UserReview flow.</li>
+          <li><code>application.adminAuthorizationPolicyService</code> — <code>adminAuthorizationPolicy_service.cfc</code>, scoped user-record access enforcement.</li>
+          <li><code>application.runtimeSecretPolicyService</code> — <code>runtimeSecretPolicy_service.cfc</code>, centralizes retrieval of OS env secrets and encrypted AppConfig values.</li>
+          <li><code>application.uhApiToken</code> / <code>application.uhApiSecret</code> — loaded via <code>runtimeSecretPolicyService</code> from OS environment variables.</li>
+        </ul>
+        <h3>Request Context Routing</h3>
+        <p><code>onRequestStart</code> sets <code>request.context</code> to <code>"userreview"</code> for any path beginning with <code>/userreview/</code> and to <code>"admin"</code> otherwise. The UserReview context uses the separate user-auth session; the admin context attaches role/permission helpers and enforces admin login.</p>
+        <h3>API Sub-Application</h3>
+        <p>The API lives in <code>api/v1/Application.cfc</code> as a child application. Sessions are disabled. Unhandled errors are caught and returned as JSON 500 responses. CORS headers are applied per request. The IIS rewrite rule routes all <code>/api/v1/*</code> requests to <code>/api/v1/index.cfm</code> as a <code>_path</code> query parameter.</p>
+        <h3>Assets / SCSS Build</h3>
+        <p>Styling is managed in <code>assets/scss/</code> with three entry points: <code>admin.scss</code>, <code>userreview.scss</code>, and <code>api-docs.scss</code>. Compiled output goes to <code>assets/css/</code>. Bootstrap 5 and Bootstrap Icons are vendored in <code>assets/vendor/</code>. The <code>assets/js/</code> folder holds per-section JavaScript, including <code>api-docs-quick-auth.js</code> for the interactive auth helper on the API docs page.</p>
       </section>
 
+      <!-- ═══════════════════════════════════════════ 21. Deployment -->
       <section class="card" id="deployment">
-        <h2>14. Deployment and Security</h2>
+        <h2>21. Deployment and Security</h2>
         <h3>Required Configuration</h3>
         <ul>
           <li>Set OS-level environment variables <code>UH_API_TOKEN</code> and <code>UH_API_SECRET</code>.</li>
-          <li>Configure the ColdFusion datasource <code>UHCO_Directory</code>.</li>
+          <li>Set <code>UHCO_IDENT_APPCONFIG_ENC_KEY</code> in non-local environments (required for AppConfig encryption of sensitive keys).</li>
+          <li>Configure the ColdFusion datasource <code>UHCO_Identity_Admin</code>.</li>
           <li>Install the IIS rewrite rule that routes <code>/api/v1/*</code> to <code>/api/v1/index.cfm</code>.</li>
-          <li>Schedule UH Sync and Data Quality tasks through the ColdFusion Scheduler.</li>
-          <li>Run the UserReview schema and permission seed scripts, including <code>sql/create_user_review.sql</code> and <code>sql/add_user_review_permissions.sql</code>.</li>
-          <li>Grant <code>settings.user_review.manage</code> and/or <code>users.approve_user_review</code> to the appropriate admin roles or direct admin users.</li>
+          <li>Schedule UH Sync, Data Quality, and Grad Migration tasks through the ColdFusion Scheduler, pointing to task files in <code>admin/settings/scheduled-tasks/tasks/</code>.</li>
+          <li>Run schema scripts in <code>sql/</code> including UserReview, alias, bio, publications, image variant, app config, and admin auth tables.</li>
+          <li>Seed admin roles and grant <code>SUPER_ADMIN</code> to the initial admin account via <code>admin/settings/admin-roles/</code> and <code>admin/settings/admin-users/</code>.</li>
+          <li>Configure <code>auth.ldap.server</code> and LDAP bind credentials in App Config.</li>
+          <li>Configure Dropbox OAuth2 credentials in App Config if using the photo pipeline.</li>
         </ul>
         <h3>Compatibility Notes</h3>
         <ul>
           <li>Developed on ColdFusion 2025 and compatible with ColdFusion 2021.</li>
-          <li><code>queryExecute</code> return type support is available in CF2021.</li>
-          <li>Undocumented <code>fetchSize</code> options are ignored safely in CF2021.</li>
-          <li><code>arraySort()</code> closure callbacks and <code>qry.getRow(1)</code> are supported on the deployed version line.</li>
+          <li><code>queryExecute</code> return type support, <code>arraySort()</code> closure callbacks, and <code>qry.getRow(1)</code> are all supported on the deployed version line.</li>
+          <li>Windows SSO requires IIS Windows Authentication to be installed on the production server. It is currently disabled via <code>application.flags.windowsSSOEnabled = false</code>.</li>
         </ul>
-        <h3>Security Follow-Ups</h3>
+        <h3>Security Checklist</h3>
         <ul>
-          <li>Remove hardcoded fallback API credentials.</li>
-          <li>Restrict <code>admin/</code> with proper authentication controls.</li>
-          <li>Lock down <code>admin/diagnostic.cfm</code> to admins only.</li>
+          <li>Ensure <code>UHCO_IDENT_APPCONFIG_ENC_KEY</code> is set in production before storing any sensitive AppConfig values.</li>
+          <li>Restrict <code>admin/</code> at the IIS or network level; the application-layer auth is the last line, not the only one.</li>
+          <li>Lock down <code>admin/diagnostic.cfm</code> to admins only (it exposes runtime and credential health).</li>
           <li>Enforce HTTPS for all admin and API traffic.</li>
-          <li>Review token IP allowlists and rotate UH API credentials periodically.</li>
+          <li>Review API token IP allowlists and rotate UH API credentials periodically.</li>
+          <li>Rotate Dropbox OAuth2 credentials if the refresh token is compromised.</li>
         </ul>
       </section>
 
+      <!-- ═══════════════════════════════════════════ Appendix -->
       <section class="card" id="appendix">
         <h2>Appendix: File and Folder Reference</h2>
         <div class="table-wrap">
@@ -433,31 +798,50 @@ GET /api/v1/flags</code></pre>
               </tr>
             </thead>
             <tbody>
-              <tr><td><code>Application.cfc</code></td><td>Root application configuration and environment bootstrap.</td></tr>
+              <tr><td><code>Application.cfc</code></td><td>Root application configuration, CFC mappings, singleton initialization, request routing.</td></tr>
               <tr><td><code>admin/</code></td><td>Administrative interface pages and operational tools.</td></tr>
-              <tr><td><code>admin/layout.cfm</code></td><td>Shared admin layout and navigation shell.</td></tr>
-              <tr><td><code>admin/users/</code></td><td>User CRUD, sync, import, and profile management.</td></tr>
-              <tr><td><code>admin/reporting/</code></td><td>UH Sync, data-quality, audit, and reporting tools.</td></tr>
+              <tr><td><code>admin/AuthService.cfc</code></td><td>In-memory session-aware admin authentication object (LDAP-backed).</td></tr>
+              <tr><td><code>admin/layout.cfm</code></td><td>Shared admin layout, sidebar navigation, and current-user display.</td></tr>
+              <tr><td><code>admin/users/</code></td><td>User CRUD, sync, import, LDAP lookup, publications fetch, and profile management.</td></tr>
+              <tr><td><code>admin/user-media/</code></td><td>Photo source management, variant generation, and image publishing pipeline.</td></tr>
+              <tr><td><code>admin/reporting/</code></td><td>UH Sync, data quality, duplicate users, and other audit reports.</td></tr>
               <tr><td><code>admin/settings/user-review/</code></td><td>UserReview settings, submission queue, review UI, and approval endpoints.</td></tr>
+              <tr><td><code>admin/settings/admin-roles/</code></td><td>Admin role CRUD.</td></tr>
+              <tr><td><code>admin/settings/admin-users/</code></td><td>Admin user account management and role assignment.</td></tr>
+              <tr><td><code>admin/settings/admin-permissions/</code></td><td>Permission-to-role assignment.</td></tr>
+              <tr><td><code>admin/settings/app-config/</code></td><td>Database-backed application config and test-mode controls.</td></tr>
+              <tr><td><code>admin/settings/media-config/</code></td><td>Image variant type and filename pattern configuration.</td></tr>
+              <tr><td><code>admin/settings/migrations/</code></td><td>Graduation migration settings and execution.</td></tr>
+              <tr><td><code>admin/settings/uhco-api/</code></td><td>API token and secret lifecycle management.</td></tr>
               <tr><td><code>admin/flags/</code></td><td>Flag definition CRUD.</td></tr>
               <tr><td><code>admin/orgs/</code></td><td>Organization CRUD.</td></tr>
-              <tr><td><code>admin/external/</code></td><td>External system CRUD.</td></tr>
-              <tr><td><code>UserReview/</code></td><td>End-user self-service profile review flow with separate authentication.</td></tr>
+              <tr><td><code>admin/external/</code></td><td>External system definition CRUD.</td></tr>
+              <tr><td><code>admin/access/</code></td><td>Named access-area management.</td></tr>
+              <tr><td><code>UserReview/</code></td><td>End-user self-service profile review flow with LDAP authentication.</td></tr>
               <tr><td><code>api/v1/</code></td><td>REST API sub-application and route dispatcher.</td></tr>
+              <tr><td><code>api/v1/handlers/</code></td><td>Individual endpoint handler files included by the dispatcher.</td></tr>
               <tr><td><code>api/docs.html</code></td><td>Dedicated API reference with authentication guidance, endpoint details, and quickpull examples.</td></tr>
-              <tr><td><code>cfc/</code></td><td>Service layer components.</td></tr>
-              <tr><td><code>dao/</code></td><td>DAO layer including <code>BaseDAO.cfc</code>.</td></tr>
+              <tr><td><code>model/services/</code></td><td>Service-layer CFCs (accessible as <code>cfc.*</code>).</td></tr>
+              <tr><td><code>model/dao/</code></td><td>DAO-layer CFCs including <code>BaseDAO.cfc</code> (accessible as <code>dao.*</code>).</td></tr>
+              <tr><td><code>model/includes/</code></td><td>Shared helper partials included by service and presentation layers.</td></tr>
+              <tr><td><code>assets/scss/</code></td><td>SCSS source files for admin, UserReview, and API docs styling.</td></tr>
+              <tr><td><code>assets/css/</code></td><td>Compiled CSS served to the browser.</td></tr>
+              <tr><td><code>assets/js/</code></td><td>JavaScript for admin sections and API docs interactive auth helper.</td></tr>
+              <tr><td><code>_published_images/</code></td><td>Published user photo files served publicly.</td></tr>
+              <tr><td><code>_temp_variants/</code></td><td>Working directory for image variant generation before publishing.</td></tr>
               <tr><td><code>sql/</code></td><td>Schema creation, migration, and utility scripts.</td></tr>
+              <tr><td><code>dev/</code></td><td>Internal planning documents, runbooks, and scratch files. Not deployed.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
+
     </div>
   </main>
 
   <footer class="footer">
     <div class="container">
-      <p>Generated from the legacy UHCO Ident root documentation and converted to HTML for easier maintenance.</p>
+      <p>Last updated June 2026. Reflects the current codebase including aliases, admin RBAC, user media, bio, publications, QuickPull API, and App Config features.</p>
     </div>
   </footer>
 </body>

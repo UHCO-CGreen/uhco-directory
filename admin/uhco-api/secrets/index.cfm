@@ -1,10 +1,14 @@
+﻿<cfif NOT request.hasPermission("settings.api.manage")>
+    <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
+</cfif>
+
 <cfset secretService = createObject("component", "cfc.secret_service").init()>
 <cfset secrets = secretService.getAllSecrets()>
 
 <cfset content = "
 <div class='d-flex justify-content-between align-items-center mb-4'>
     <h1 class='h3 mb-0'>API Secrets</h1>
-    <a href='/admin/secrets/create.cfm' class='btn btn-ui-add'>
+    <a href='/admin/settings/uhco-api/secrets/create.cfm' class='btn btn-ui-add'>
         <i class='bi bi-plus-lg me-1'></i> New Secret
     </a>
 </div>
@@ -16,7 +20,7 @@
 ">
 
 <cfif arrayLen(secrets) EQ 0>
-    <cfset content &= "<p class='text-muted'>No secrets yet. <a href='/admin/secrets/create.cfm'>Create one</a>.</p>">
+    <cfset content &= "<p class='text-muted'>No secrets yet. <a href='/admin/settings/uhco-api/secrets/create.cfm'>Create one</a>.</p>">
 <cfelse>
     <cfset content &= "
     <div class='table-responsive'>
@@ -53,14 +57,14 @@
             <td>#lastUsedDisplay#</td>
             <td class='text-end'>
                 <cfif s.ISACTIVE>
-                <form method='post' action='/admin/secrets/revokeSecret.cfm' class='d-inline' onsubmit=""return confirm('Revoke this secret?')"">
+                <form method='post' action='/admin/settings/uhco-api/secrets/revokeSecret.cfm' class='d-inline' data-confirm='Revoke this secret?'>
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-warning'>Revoke</button>
+                    <button class='btn btn-sm btn-ui-warning'>Revoke</button>
                 </form>
                 </cfif>
-                <form method='post' action='/admin/secrets/deleteSecret.cfm' class='d-inline ms-1' onsubmit=""return confirm('Permanently delete this secret?')"">
+                <form method='post' action='/admin/settings/uhco-api/secrets/deleteSecret.cfm' class='d-inline ms-1' data-confirm='Permanently delete this secret?'>
                     <input type='hidden' name='secretID' value='#s.SECRETID#'>
-                    <button class='btn btn-sm btn-danger'>Delete</button>
+                    <button class='btn btn-sm btn-ui-delete'>Delete</button>
                 </form>
             </td>
         </tr>

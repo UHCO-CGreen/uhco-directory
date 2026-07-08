@@ -79,6 +79,14 @@
         <cfinclude template="handlers/quickpulls.cfm">
     </cfcase>
 
+    <cfcase value="access">
+        <cfinclude template="handlers/access.cfm">
+    </cfcase>
+
+    <cfcase value="permission-roster">
+        <cfinclude template="handlers/permission_roster.cfm">
+    </cfcase>
+
     <cfcase value="">
         <cfset auth.sendJSON({
             api     : "UHCO Directory API",
@@ -106,7 +114,9 @@
                 "GET /api/v1/quickpulls/graduate?id={userID}",
                 "GET /api/v1/quickpulls/deans",
                 "GET /api/v1/quickpulls/myuhco?id={externalID}",
-                "GET /api/v1/quickpulls/myuhco-rosters?publishedOnly={true|false}"
+                "GET /api/v1/quickpulls/myuhco-rosters?publishedOnly={true|false}",
+                "GET /api/v1/access?userID={userID}",
+                "GET /api/v1/permission-roster?permission={name}"
             ]
         })>
         <cfabort>

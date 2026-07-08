@@ -61,6 +61,51 @@ component output="false" singleton {
         return { success=true, data=images };
     }
 
+    public struct function getPublishedVariantList() {
+        var rows = variables.ImagesDAO.getPublishedVariantList();
+        var variants = [];
+
+        for ( var row in rows ) {
+            if ( len(trim(row.IMAGEVARIANT ?: "")) ) {
+                arrayAppend(variants, trim(row.IMAGEVARIANT));
+            }
+        }
+
+        return { success=true, data=variants };
+    }
+
+    public struct function getPublishedUserSummaryCount( string searchTerm = "", string variantFilter = "" ) {
+        return {
+            success = true,
+            data = variables.ImagesDAO.getPublishedUserSummaryCount(
+                searchTerm = arguments.searchTerm,
+                variantFilter = arguments.variantFilter
+            )
+        };
+    }
+
+    public struct function getPublishedUserSummaryPage(
+        numeric pageSize = 25,
+        numeric pageNumber = 1,
+        string searchTerm = "",
+        string variantFilter = ""
+    ) {
+        var rows = variables.ImagesDAO.getPublishedUserSummaryPage(
+            pageSize = arguments.pageSize,
+            pageNumber = arguments.pageNumber,
+            searchTerm = arguments.searchTerm,
+            variantFilter = arguments.variantFilter
+        );
+
+        for ( var i = 1; i LTE arrayLen(rows); i++ ) {
+            rows[i].WEBTHUMBURL = variables.MediaConfigService.normalizePublishedUrl( rows[i].WEBTHUMBURL ?: "" );
+            rows[i].WEBPROFILEURL = variables.MediaConfigService.normalizePublishedUrl( rows[i].WEBPROFILEURL ?: "" );
+            rows[i].LEGACYALUMNIURL = variables.MediaConfigService.normalizePublishedUrl( rows[i].LEGACYALUMNIURL ?: "" );
+        }
+
+        return { success=true, data=rows };
+    }
+
     public struct function getPublishedImageCountMapByUser() {
         var rows = variables.ImagesDAO.getPublishedImageCountsByUser();
         var result = {};
@@ -70,6 +115,27 @@ component output="false" singleton {
         }
 
         return { success=true, data=result };
+    }
+
+    public struct function getPublishedImageTotalCount() {
+        return {
+            success = true,
+            data = variables.ImagesDAO.getPublishedImageTotalCount()
+        };
+    }
+
+    public struct function getNeedsPublishingUserCount() {
+        return {
+            success = true,
+            data = variables.ImagesDAO.getNeedsPublishingUserCount()
+        };
+    }
+
+    public struct function getNeedsPublishingQueue() {
+        return {
+            success = true,
+            data = variables.ImagesDAO.getNeedsPublishingQueue()
+        };
     }
 
 }

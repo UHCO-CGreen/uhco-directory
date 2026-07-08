@@ -5,10 +5,14 @@ component output="false" singleton {
         variables.usersService = createObject("component", "cfc.users_service").init();
         variables.directoryService = createObject("component", "cfc.directory_service").init();
         variables.flagsService = createObject("component", "cfc.flags_service").init();
+        variables.aliasesService = createObject("component", "cfc.aliases_service").init();
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
         variables.emailsService = createObject("component", "cfc.emails_service").init();
         variables.phoneService = createObject("component", "cfc.phone_service").init();
         variables.addressesService = createObject("component", "cfc.addresses_service").init();
+        variables.publicationsService = createObject("component", "cfc.publications_service").init();
+        variables.publicationAdminService = createObject("component", "cfc.publicationAdmin_service").init();
+        variables.publicationFetchService = createObject("component", "cfc.publicationFetch_service").init();
         return this;
     }
 
@@ -134,14 +138,13 @@ component output="false" singleton {
         var profile = getReviewProfile(arguments.userID);
         var pending = getOpenSubmissionForUser(arguments.userID);
         var latestReviewedSubmission = getLatestReviewedSubmissionForUser(arguments.userID);
+        var nameAliases = _extractNameAliases(arguments.userID);
         var model = {
             general = {
                 Prefix = trim(profile.user.PREFIX ?: ""),
                 Suffix = trim(profile.user.SUFFIX ?: ""),
                 Pronouns = trim(profile.user.PRONOUNS ?: ""),
-                FirstName = trim(profile.user.FIRSTNAME ?: ""),
-                MiddleName = trim(profile.user.MIDDLENAME ?: ""),
-                LastName = trim(profile.user.LASTNAME ?: ""),
+                NameAliases = nameAliases,
                 Title1 = trim(profile.user.TITLE1 ?: ""),
                 Title2 = trim(profile.user.TITLE2 ?: ""),
                 Title3 = trim(profile.user.TITLE3 ?: "")
@@ -166,7 +169,11 @@ component output="false" singleton {
                     continue;
                 }
                 if (fieldRow.SECTIONKEY EQ "general" OR fieldRow.SECTIONKEY EQ "bioinfo") {
-                    model[fieldRow.SECTIONKEY][fieldRow.FIELDNAME] = fieldRow.PROPOSEDVALUE ?: "";
+                    if (fieldRow.SECTIONKEY EQ "general" AND fieldRow.FIELDNAME EQ "NameAliases") {
+                        model.general.NameAliases = _deserializeJsonArray(fieldRow.PROPOSEDVALUE);
+                    } else {
+                        model[fieldRow.SECTIONKEY][fieldRow.FIELDNAME] = fieldRow.PROPOSEDVALUE ?: "";
+                    }
                 } else if (fieldRow.SECTIONKEY EQ "contact") {
                     if (fieldRow.FIELDNAME EQ "emails") {
                         model.contact.emails = _deserializeJsonArray(fieldRow.PROPOSEDVALUE);
@@ -182,6 +189,88 @@ component output="false" singleton {
         return model;
     }
 
+    public struct function getLivePublicationsModel(required numeric userID) {
+        var profile = getReviewProfile(arguments.userID);
+        var publicationProfiles = isArray(profile.publicationProfiles ?: "") ? profile.publicationProfiles : [];
+        var publicationFetchSummary = isArray(profile.publicationFetchSummary ?: "") ? profile.publicationFetchSummary : [];
+        var profileRow = {};
+        var fetchRow = {};
+        var profileByCode = {};
+        var fetchByCode = {};
+
+        for (profileRow in publicationProfiles) {
+            if (len(trim(profileRow.SERVICECODE ?: ""))) {
+                profileByCode[lCase(trim(profileRow.SERVICECODE))] = profileRow;
+            }
+        }
+
+        for (fetchRow in publicationFetchSummary) {
+            if (len(trim(fetchRow.SERVICECODE ?: ""))) {
+                fetchByCode[lCase(trim(fetchRow.SERVICECODE))] = fetchRow;
+            }
+        }
+
+        return {
+            isEligible = variables.publicationsService.isFacultyPublicationEligible(arguments.userID),
+            maxShowcasedPerUser = variables.publicationsService.getMaxShowcasedPerUser(),
+            publicationProfiles = publicationProfiles,
+            publicationProfilesByCode = profileByCode,
+            publications = isArray(profile.publications ?: "") ? profile.publications : [],
+            publicationFetchSummary = publicationFetchSummary,
+            publicationFetchByCode = fetchByCode,
+            publicationConfig = isStruct(profile.publicationConfig ?: "") ? profile.publicationConfig : {}
+        };
+    }
+
+    public struct function saveLivePublications(required struct actor, required struct formScope) {
+        var effectiveUserID = resolveEffectiveUserID(arguments.actor);
+
+        if (effectiveUserID LTE 0) {
+            return { success = false, statusCode = 400, message = "UserReview session is invalid for live publication updates.", errors = ["invalid target user"] };
+        }
+
+        if (!variables.publicationsService.isFacultyPublicationEligible(effectiveUserID)) {
+            return { success = false, statusCode = 403, message = "Live ORCID publications are only available for eligible faculty users.", errors = ["user is not eligible"] };
+        }
+
+        return variables.publicationAdminService.saveProfiles(effectiveUserID, arguments.formScope);
+    }
+
+    public struct function fetchLivePublications(required struct actor, boolean limitRecentYears = true) {
+        var effectiveUserID = resolveEffectiveUserID(arguments.actor);
+
+        if (effectiveUserID LTE 0) {
+            return { success = false, statusCode = 400, message = "UserReview session is invalid for live publication fetch.", errors = ["invalid target user"] };
+        }
+
+        if (!variables.publicationsService.isFacultyPublicationEligible(effectiveUserID)) {
+            return { success = false, statusCode = 403, message = "Live ORCID publications are only available for eligible faculty users.", errors = ["user is not eligible"] };
+        }
+
+        return variables.publicationFetchService.fetchForUser(
+            userID = effectiveUserID,
+            serviceCode = "orcid",
+            limitRecentYears = arguments.limitRecentYears,
+            triggeredByAdminUserID = 0
+        );
+    }
+
+    public numeric function resolveEffectiveUserID(required struct actor) {
+        var launchContext = structKeyExists(arguments.actor, "launchContext") AND isStruct(arguments.actor.launchContext) ? arguments.actor.launchContext : {};
+
+        if (structCount(launchContext)) {
+            if (trim(launchContext.requestType ?: "") NEQ "profile_edit") {
+                return 0;
+            }
+            if (!isNumeric(launchContext.targetUserId ?: "") OR val(launchContext.targetUserId ?: 0) LTE 0) {
+                return 0;
+            }
+            return val(launchContext.targetUserId ?: 0);
+        }
+
+        return val(arguments.actor.userID ?: 0);
+    }
+
     public struct function saveSubmission(required struct actor, required struct formScope) {
         var eligibility = getEligibilityResult(arguments.actor.userID);
         var settings = getSettings();
@@ -190,24 +279,53 @@ component output="false" singleton {
         var pending = {};
         var submissionID = 0;
         var sortOrder = 0;
+        var launchContext = structKeyExists(arguments.actor, "launchContext") AND isStruct(arguments.actor.launchContext) ? arguments.actor.launchContext : {};
+        var isDelegated = structCount(launchContext) GT 0;
+        var effectiveUserID = arguments.actor.userID;
+        var effectiveSections = duplicate(settings.editableSections);
+
+        if (isDelegated) {
+            if (trim(launchContext.requestType ?: "") NEQ "profile_edit") {
+                return { success = false, message = "This delegated session does not support submission." };
+            }
+            if (!isNumeric(launchContext.targetUserId ?: "") OR val(launchContext.targetUserId ?: 0) LTE 0) {
+                return { success = false, message = "Delegated target user is invalid." };
+            }
+            effectiveUserID = val(launchContext.targetUserId ?: 0);
+            if (structKeyExists(launchContext, "sections") AND isArray(launchContext.sections) AND arrayLen(launchContext.sections)) {
+                effectiveSections = _normalizeSections(arrayToList(launchContext.sections));
+            }
+            eligibility = getEligibilityResult(effectiveUserID);
+        }
 
         if (NOT eligibility.success) {
             return { success = false, message = eligibility.message };
         }
 
-        profile = getReviewProfile(arguments.actor.userID);
+        profile = getReviewProfile(effectiveUserID);
 
-        if (arrayFindNoCase(settings.editableSections, "general")) {
+        if (arrayFindNoCase(effectiveSections, "general")) {
+            var currentAliases = _extractNameAliases(effectiveUserID);
+            var proposedAliases = _parseAliasRows(arguments.formScope, currentAliases);
             var generalFields = [
                 { name = "Prefix", label = "Prefix", currentValue = trim(profile.user.PREFIX ?: ""), proposedValue = trim(arguments.formScope.Prefix ?: "") },
                 { name = "Suffix", label = "Suffix", currentValue = trim(profile.user.SUFFIX ?: ""), proposedValue = trim(arguments.formScope.Suffix ?: "") },
                 { name = "Pronouns", label = "Pronouns", currentValue = trim(profile.user.PRONOUNS ?: ""), proposedValue = trim(arguments.formScope.Pronouns ?: "") },
-                { name = "FirstName", label = "First Name", currentValue = trim(profile.user.FIRSTNAME ?: ""), proposedValue = trim(arguments.formScope.FirstName ?: "") },
-                { name = "MiddleName", label = "Middle Name", currentValue = trim(profile.user.MIDDLENAME ?: ""), proposedValue = trim(arguments.formScope.MiddleName ?: "") },
-                { name = "LastName", label = "Last Name", currentValue = trim(profile.user.LASTNAME ?: ""), proposedValue = trim(arguments.formScope.LastName ?: "") },
                 { name = "Title2", label = "Title 2", currentValue = trim(profile.user.TITLE2 ?: ""), proposedValue = trim(arguments.formScope.Title2 ?: "") },
                 { name = "Title3", label = "Title 3", currentValue = trim(profile.user.TITLE3 ?: ""), proposedValue = trim(arguments.formScope.Title3 ?: "") }
             ];
+
+            if (_aliasValuesDiffer(currentAliases, proposedAliases)) {
+                sortOrder++;
+                arrayAppend(fieldRows, {
+                    sectionKey = "general",
+                    fieldName = "NameAliases",
+                    fieldLabel = "Name Aliases",
+                    currentValue = _toJson(currentAliases),
+                    proposedValue = _toJson(proposedAliases),
+                    sortOrder = sortOrder
+                });
+            }
 
             for (var generalField in generalFields) {
                 if (_valuesDiffer(generalField.currentValue, generalField.proposedValue)) {
@@ -224,11 +342,11 @@ component output="false" singleton {
             }
         }
 
-        if (arrayFindNoCase(settings.editableSections, "contact")) {
+        if (arrayFindNoCase(effectiveSections, "contact")) {
             var currentEmails = _extractContactEmails(profile.emails ?: [], profile.user.EMAILPRIMARY ?: "");
             var currentPhones = _extractContactPhones(profile.user, profile.phones ?: []);
             var currentAddresses = _extractContactAddresses(profile.addresses ?: []);
-            var proposedEmails = _parseEmailRows(arguments.formScope, profile.user.EMAILPRIMARY ?: "");
+            var proposedEmails = _parseEmailRows(arguments.formScope, profile.user.EMAILPRIMARY ?: "", currentEmails);
             var proposedPhones = _parsePhoneRows(arguments.formScope);
             var proposedAddresses = _parseAddressRows(arguments.formScope);
 
@@ -269,7 +387,7 @@ component output="false" singleton {
             }
         }
 
-        if (arrayFindNoCase(settings.editableSections, "bioinfo")) {
+        if (arrayFindNoCase(effectiveSections, "bioinfo")) {
             var bioFields = [
                 { name = "DOB", label = "Date of Birth", currentValue = isDate(profile.user.DOB ?: "") ? dateFormat(profile.user.DOB, "yyyy-mm-dd") : "", proposedValue = trim(arguments.formScope.DOB ?: "") },
                 { name = "Gender", label = "Gender", currentValue = trim(profile.user.GENDER ?: ""), proposedValue = trim(arguments.formScope.Gender ?: "") }
@@ -295,16 +413,16 @@ component output="false" singleton {
         }
 
         transaction {
-            pending = variables.dao.getOpenSubmissionForUser(arguments.actor.userID);
+            pending = variables.dao.getOpenSubmissionForUser(effectiveUserID);
             if (structCount(pending)) {
                 variables.dao.deleteSubmission(val(pending.SUBMISSIONID));
             }
 
             submissionID = variables.dao.createSubmission(
-                userID = arguments.actor.userID,
+                userID = effectiveUserID,
                 cougarnetID = trim(arguments.actor.username ?: arguments.actor.cougarnetID ?: ""),
                 displayName = trim(arguments.actor.displayName ?: ""),
-                sectionList = arrayToList(settings.editableSections)
+                sectionList = arrayToList(effectiveSections)
             );
 
             for (var fieldRow in fieldRows) {
@@ -320,7 +438,11 @@ component output="false" singleton {
             }
         }
 
-        return { success = true, message = "Your changes were submitted for review.", submissionID = submissionID };
+        return {
+            success = true,
+            message = isDelegated ? "Delegated changes were submitted for review." : "Your changes were submitted for review.",
+            submissionID = submissionID
+        };
     }
 
     public array function listSubmissions(string statusList = "pending,approved,partially_approved,rejected") {
@@ -511,6 +633,10 @@ component output="false" singleton {
         return _contactSignature(arguments.contactType, arguments.currentRows) NEQ _contactSignature(arguments.contactType, arguments.proposedRows);
     }
 
+    private boolean function _aliasValuesDiffer(required array currentRows, required array proposedRows) {
+        return _aliasSignature(arguments.currentRows) NEQ _aliasSignature(arguments.proposedRows);
+    }
+
     private string function _contactSignature(required string contactType, required array rows) {
         var normalizedRows = [];
 
@@ -553,6 +679,25 @@ component output="false" singleton {
         return arrayToList(normalizedRows, "||");
     }
 
+    private string function _aliasSignature(required array rows) {
+        var normalizedRows = [];
+
+        for (var row in arguments.rows) {
+            arrayAppend(normalizedRows,
+                lCase(trim(row.firstName ?: "")) & "|" &
+                lCase(trim(row.middleName ?: "")) & "|" &
+                lCase(trim(row.lastName ?: "")) & "|" &
+                lCase(trim(row.aliasType ?: "")) & "|" &
+                lCase(trim(row.sourceSystem ?: "")) & "|" &
+                val(row.isActive ?: 0) & "|" &
+                val(row.isPrimary ?: 0)
+            );
+        }
+
+        arraySort(normalizedRows, "textnocase");
+        return arrayToList(normalizedRows, "||");
+    }
+
     private array function _deserializeJsonArray(any rawValue = "") {
         if (NOT len(trim(arguments.rawValue ?: ""))) {
             return [];
@@ -581,9 +726,30 @@ component output="false" singleton {
             arrayAppend(result, {
                 address = address,
                 type = trim(emailRow.EMAILTYPE ?: ""),
-                isPrimary = val(emailRow.ISPRIMARY ?: 0)
+                isPrimary = val(emailRow.ISPRIMARY ?: 0),
+                isProtected = _isProtectedEmailType(emailRow.EMAILTYPE ?: "")
             });
         }
+        return result;
+    }
+
+    private array function _extractNameAliases(required numeric userID) {
+        var aliasRows = variables.aliasesService.getAliases(arguments.userID).data ?: [];
+        var result = [];
+
+        for (var aliasRow in aliasRows) {
+            arrayAppend(result, {
+                firstName = trim(aliasRow.FIRSTNAME ?: ""),
+                middleName = trim(aliasRow.MIDDLENAME ?: ""),
+                lastName = trim(aliasRow.LASTNAME ?: ""),
+                aliasType = trim(aliasRow.ALIASTYPE ?: ""),
+                sourceSystem = trim(aliasRow.SOURCESYSTEM ?: ""),
+                isActive = val(aliasRow.ISACTIVE ?: 0),
+                isPrimary = val(aliasRow.ISPRIMARY ?: 0),
+                isProtected = _isProtectedAliasSource(aliasRow.SOURCESYSTEM ?: "")
+            });
+        }
+
         return result;
     }
 
@@ -618,9 +784,10 @@ component output="false" singleton {
         return result;
     }
 
-    private array function _parseEmailRows(required struct formScope, string primaryEmail = "") {
-        var result = [];
+    private array function _parseEmailRows(required struct formScope, string primaryEmail = "", array currentRows = []) {
+        var result = _extractProtectedEmailRows(arguments.currentRows);
         var normalizedPrimaryEmail = lCase(trim(arguments.primaryEmail));
+        var hasProtectedPrimary = _rowsHavePrimary(result);
         var count = (structKeyExists(arguments.formScope, "emailCount") AND isNumeric(arguments.formScope.emailCount)) ? val(arguments.formScope.emailCount) : 0;
         for (var i = 0; i LT count; i++) {
             var address = lCase(trim(arguments.formScope["email_address_" & i] ?: ""));
@@ -630,14 +797,51 @@ component output="false" singleton {
                 len(address)
                 AND (NOT len(normalizedPrimaryEmail) OR address NEQ normalizedPrimaryEmail)
                 AND NOT reFindNoCase("^[^@]+@uh\.edu$", address)
+                AND NOT _isProtectedEmailType(emailType)
             ) {
                 arrayAppend(result, {
                     address = address,
                     type = emailType,
-                    isPrimary = isPrimary ? 1 : 0
+                    isPrimary = (hasProtectedPrimary ? 0 : (isPrimary ? 1 : 0)),
+                    isProtected = 0
                 });
             }
         }
+        return result;
+    }
+
+    private array function _parseAliasRows(required struct formScope, array currentAliases = []) {
+        var result = _extractProtectedAliases(arguments.currentAliases);
+        var hasProtectedPrimary = _rowsHavePrimary(result);
+        var count = (structKeyExists(arguments.formScope, "aliasCount") AND isNumeric(arguments.formScope.aliasCount)) ? val(arguments.formScope.aliasCount) : 0;
+
+        for (var i = 0; i LT count; i++) {
+            var firstName = trim(arguments.formScope["alias_firstName_" & i] ?: "");
+            var middleName = trim(arguments.formScope["alias_middleName_" & i] ?: "");
+            var lastName = trim(arguments.formScope["alias_lastName_" & i] ?: "");
+            var aliasType = trim(arguments.formScope["alias_aliasType_" & i] ?: "");
+            var sourceSystem = trim(arguments.formScope["alias_sourceSystem_" & i] ?: "");
+            var isActive = structKeyExists(arguments.formScope, "alias_isActive_" & i) ? 1 : 0;
+            var isPrimary = structKeyExists(arguments.formScope, "alias_primary") AND val(arguments.formScope.alias_primary) EQ i;
+
+            if (_isProtectedAliasSource(sourceSystem)) {
+                continue;
+            }
+
+            if (len(firstName) OR len(middleName) OR len(lastName)) {
+                arrayAppend(result, {
+                    firstName = firstName,
+                    middleName = middleName,
+                    lastName = lastName,
+                    aliasType = aliasType,
+                    sourceSystem = sourceSystem,
+                    isActive = isActive,
+                    isPrimary = (hasProtectedPrimary ? 0 : (isPrimary ? 1 : 0)),
+                    isProtected = 0
+                });
+            }
+        }
+
         return result;
     }
 
@@ -684,6 +888,14 @@ component output="false" singleton {
     }
 
     private void function _applyProposedFieldValue(required struct fieldRow) {
+        if (arguments.fieldRow.SECTIONKEY EQ "general" AND arguments.fieldRow.FIELDNAME EQ "NameAliases") {
+            variables.aliasesService.replaceAliases(
+                val(_getSubmissionUserID(arguments.fieldRow)),
+                _normalizeAliasSaveRows(_deserializeJsonArray(arguments.fieldRow.PROPOSEDVALUE))
+            );
+            return;
+        }
+
         if (arguments.fieldRow.SECTIONKEY EQ "general" OR arguments.fieldRow.SECTIONKEY EQ "bioinfo") {
             _applyScalarFieldValue(arguments.fieldRow);
             return;
@@ -833,5 +1045,80 @@ component output="false" singleton {
             reviewedByCougarnetID = arguments.reviewerCougarnetID,
             preserveReviewNote = true
         );
+    }
+
+    private array function _extractProtectedEmailRows(required array currentRows) {
+        var result = [];
+
+        for (var row in arguments.currentRows) {
+            if (_isProtectedEmailType(row.type ?: "")) {
+                arrayAppend(result, {
+                    address = lCase(trim(row.address ?: "")),
+                    type = trim(row.type ?: ""),
+                    isPrimary = val(row.isPrimary ?: 0),
+                    isProtected = 1
+                });
+            }
+        }
+
+        return result;
+    }
+
+    private array function _extractProtectedAliases(required array currentAliases) {
+        var result = [];
+
+        for (var row in arguments.currentAliases) {
+            if (_isProtectedAliasSource(row.sourceSystem ?: "")) {
+                arrayAppend(result, {
+                    firstName = trim(row.firstName ?: ""),
+                    middleName = trim(row.middleName ?: ""),
+                    lastName = trim(row.lastName ?: ""),
+                    aliasType = trim(row.aliasType ?: ""),
+                    sourceSystem = trim(row.sourceSystem ?: ""),
+                    isActive = val(row.isActive ?: 0),
+                    isPrimary = val(row.isPrimary ?: 0),
+                    isProtected = 1
+                });
+            }
+        }
+
+        return result;
+    }
+
+    private boolean function _rowsHavePrimary(required array rows) {
+        for (var row in arguments.rows) {
+            if (val(row.isPrimary ?: 0) EQ 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean function _isProtectedEmailType(string emailType = "") {
+        var normalizedType = lCase(trim(arguments.emailType ?: ""));
+        return listFindNoCase("@cougarnet,cougarnet", normalizedType) GT 0;
+    }
+
+    private boolean function _isProtectedAliasSource(string sourceSystem = "") {
+        var normalizedSource = lCase(trim(arguments.sourceSystem ?: ""));
+        return listFindNoCase("ldap,uh api,source uh api", normalizedSource) GT 0;
+    }
+
+    private array function _normalizeAliasSaveRows(required array aliasRows) {
+        var result = [];
+
+        for (var row in arguments.aliasRows) {
+            arrayAppend(result, {
+                firstName = trim(row.firstName ?: ""),
+                middleName = trim(row.middleName ?: ""),
+                lastName = trim(row.lastName ?: ""),
+                aliasType = trim(row.aliasType ?: ""),
+                sourceSystem = trim(row.sourceSystem ?: ""),
+                isActive = val(row.isActive ?: 0),
+                isPrimary = val(row.isPrimary ?: 0)
+            });
+        }
+
+        return result;
     }
 }

@@ -12,4 +12,8 @@ component output="false" singleton {
     public void function replacePhones( required numeric userID, required array phones ) {
         variables.PhoneDAO.replacePhones( userID, phones );
     }
+
+    public struct function getAllUserPhonesMap() {
+        return variables.PhoneDAO.getAllPrimaryPhonesMap();
+    }
 }

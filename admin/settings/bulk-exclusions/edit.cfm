@@ -1,4 +1,4 @@
-<!---
+﻿<!---
     Edit Bulk Exclusion Type — flags, codes, label, icon.
     Permission: settings.bulk_exclusions.manage.
 --->
@@ -148,8 +148,8 @@
                     </cfif>
                 </div>
                 <div>
-                    <a href="/admin/settings/bulk-exclusions/" class="btn btn-outline-secondary me-2">Cancel</a>
-                    <button type="submit" class="btn btn-primary">
+                    <a href="/admin/settings/bulk-exclusions/" class="btn btn-ui-cancel me-2">Cancel</a>
+                    <button type="submit" class="btn btn-ui-save">
                         <i class="bi bi-check-lg me-1"></i>Save Changes
                     </button>
                 </div>
@@ -165,20 +165,28 @@
 
 <cfset pageScripts = "">
 <cfsavecontent variable="pageScripts">
-<script>
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
     // Live icon preview
     document.getElementById('icon').addEventListener('input', function() {
         var preview = document.getElementById('iconPreview');
-        preview.innerHTML = '<i class="bi ' + this.value + '"></i>';
+        while (preview.firstChild) { preview.removeChild(preview.firstChild); }
+        var i = document.createElement('i');
+        i.className = 'bi ' + this.value;
+        preview.appendChild(i);
     });
 
     // Live codes badge preview
     document.getElementById('codes').addEventListener('input', function() {
         var container = document.getElementById('codesPreview');
         var codes = this.value.split(',').map(function(c){ return c.trim(); }).filter(Boolean);
-        container.innerHTML = codes.map(function(c){
-            return '<span class="badge settings-badge-neutral">' + c.replace(/</g,'&lt;') + '</span>';
-        }).join(' ');
+        while (container.firstChild) { container.removeChild(container.firstChild); }
+        codes.forEach(function(c) {
+            var span = document.createElement('span');
+            span.className = 'badge settings-badge-neutral';
+            span.textContent = c;
+            container.appendChild(span);
+            container.appendChild(document.createTextNode(' '));
+        });
     });
 </script>
 </cfsavecontent>

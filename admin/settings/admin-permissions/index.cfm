@@ -1,9 +1,9 @@
-<!---
+﻿<!---
     Admin Permissions — create, edit, delete permission definitions.
     Permission: settings.admin_permissions.manage.
 --->
 
-<cfif NOT request.hasPermission("settings.admin_permissions.manage")>
+<cfif NOT request.isSuperAdmin()>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -40,6 +40,29 @@
     </cfif>
 </cfif>
 
+<!--- Sort params --->
+<cfset allowedPermSortCols = ["PERMISSION_KEY","DISPLAY_NAME","CATEGORY","IS_ACTIVE","IS_SYSTEM"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedPermSortCols, url.sortCol) GT 0) ? url.sortCol : "PERMISSION_KEY">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfset baseSortParams = selectedRoleID GT 0 ? "&role=" & selectedRoleID : "">
+<cfscript>
+    arraySort(permissions, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function permSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        return "?sortCol=" & col & "&sortDir=" & dir & baseSortParams;
+    }
+    function permSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
@@ -61,18 +84,6 @@
     </div>
 </cfif>
 
-<cfif len(msgParam)>
-    <div class="alert alert-success alert-dismissible fade show mt-3">
-        #encodeForHTML(msgParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
-<cfif len(errParam)>
-    <div class="alert alert-danger alert-dismissible fade show mt-3">
-        #encodeForHTML(errParam)#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-</cfif>
 
 <div class="card border-0 shadow-sm mt-3 mb-4 settings-shell">
     <div class="card-body">
@@ -119,11 +130,11 @@
                 </div>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn <cfif structCount(editPermission)>btn-ui-save<cfelse>btn-ui-add</cfif>">
                     <cfif structCount(editPermission)>Update<cfelse>Create</cfif>
                 </button>
                 <cfif structCount(editPermission)>
-                    <a href="/admin/settings/admin-permissions/" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="/admin/settings/admin-permissions/" class="btn btn-ui-cancel">Cancel</a>
                 </cfif>
             </div>
         </form>
@@ -137,7 +148,7 @@
         <div class="mb-3 d-flex gap-2 align-items-end">
             <div style="flex: 1;">
                 <label for="roleFilter" class="form-label">Filter by Role</label>
-                <select id="roleFilter" class="form-select" onchange="window.location.href = this.value === '' ? '/admin/settings/admin-permissions/' : '/admin/settings/admin-permissions/?role=' + this.value">
+                <select id="roleFilter" class="form-select" data-navigate-on-change data-navigate-base="/admin/settings/admin-permissions/" data-navigate-param="role">
                     <option value="">All Permissions</option>
                     <cfloop array="#roles#" index="role">
                         <cfif role.ROLE_NAME NEQ "SUPER_ADMIN">
@@ -155,14 +166,14 @@
         </div>
         
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 settings-table">
+            <table class="table table-sm table-hover align-middle mb-0 settings-table">
                 <thead>
                     <tr>
-                        <th>Key</th>
-                        <th>Display Name</th>
-                        <th>Category</th>
-                        <th>Status</th>
-                        <th>Type</th>
+                        <th><a href="#permSortLink('PERMISSION_KEY')#" class="settings-sort-link">#encodeForHTML('Key')##permSortArrow('PERMISSION_KEY')#</a></th>
+                        <th><a href="#permSortLink('DISPLAY_NAME')#" class="settings-sort-link">Display Name#permSortArrow('DISPLAY_NAME')#</a></th>
+                        <th><a href="#permSortLink('CATEGORY')#" class="settings-sort-link">Category#permSortArrow('CATEGORY')#</a></th>
+                        <th><a href="#permSortLink('IS_ACTIVE')#" class="settings-sort-link">Status#permSortArrow('IS_ACTIVE')#</a></th>
+                        <th><a href="#permSortLink('IS_SYSTEM')#" class="settings-sort-link">Type#permSortArrow('IS_SYSTEM')#</a></th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -193,19 +204,19 @@
                         </td>
                         <td class="text-end">
                             <div class="settings-action-group">
-                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit Permission" data-bs-toggle="tooltip" data-bs-title="Edit Permission" aria-label="Edit Permission">
+                            <a href="/admin/settings/admin-permissions/?edit=#permissionRow.PERMISSION_ID#" class="btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit" title="Edit Permission" data-bs-toggle="tooltip" data-bs-title="Edit Permission" aria-label="Edit Permission">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <cfif val(permissionRow.IS_SYSTEM) EQ 0>
                                 <form method="post" action="/admin/settings/admin-permissions/save.cfm" class="d-inline">
                                     <input type="hidden" name="action" value="deletePermission">
                                     <input type="hidden" name="permissionID" value="#permissionRow.PERMISSION_ID#">
-                                    <button type="submit" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete" title="Delete Permission" data-bs-toggle="tooltip" data-bs-title="Delete Permission" aria-label="Delete Permission" onclick="return confirm('Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?')">
+                                    <button type="submit" class="btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete" title="Delete Permission" data-bs-toggle="tooltip" data-bs-title="Delete Permission" aria-label="Delete Permission" data-confirm="Delete permission #encodeForJavaScript(permissionRow.PERMISSION_KEY)#?">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             <cfelse>
-                                <button class="btn btn-sm btn-outline-secondary" disabled title="System permissions cannot be deleted">
+                                <button class="btn btn-sm btn-ui-cancel" disabled title="System permissions cannot be deleted">
                                     <i class="bi bi-lock"></i>
                                 </button>
                             </cfif>
@@ -219,17 +230,44 @@
     </div>
 </div>
 
+<div class="card mt-4 settings-shell settings-reference-card">
+    <div class="card-body">
+        <h5 class="mb-1"><i class="bi bi-key me-2"></i>Access Areas</h5>
+        <p class="text-muted small mb-2">Manage the permission strings (e.g. <code>module.action</code>) that can be granted to identity users via User Permissions.</p>
+        <a href="/admin/settings/admin-permissions/access-areas/" class="btn btn-sm btn-ui-go">
+            <i class="bi bi-arrow-right-circle me-1"></i>Manage Access Areas
+        </a>
+    </div>
+</div>
+
 <div class="mt-3 d-flex flex-wrap gap-2">
-    <a href="/admin/settings/admin-users/" class="btn btn-outline-secondary">
+    <a href="/admin/settings/admin-users/" class="btn btn-ui-go">
         <i class="bi bi-people me-1"></i>Back to Admin Users
     </a>
-    <a href="/admin/settings/admin-roles/" class="btn btn-outline-secondary">
+    <a href="/admin/settings/admin-roles/" class="btn btn-ui-go">
         <i class="bi bi-key me-1"></i>Manage Roles
     </a>
 </div>
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(msgParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(msgParam)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(errParam)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(errParam)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

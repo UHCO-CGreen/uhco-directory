@@ -1,4 +1,4 @@
-    <cfif NOT request.hasPermission("users.edit")>
+﻿    <cfif NOT request.hasPermission("users.edit")>
         <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
     </cfif>
 
@@ -34,7 +34,7 @@
                         >
                     </div>
                     <div class="col-lg-3 d-grid">
-                        <button class="btn btn-primary" type="button" id="runLookupBtn">
+                        <button class="btn btn-ui-filter" type="button" id="runLookupBtn">
                             Search Cougarnet
                         </button>
                     </div>
@@ -94,7 +94,7 @@
     </div>
     </cfoutput>
 
-    <script>
+    <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
     (function () {
         var runBtn = document.getElementById('runLookupBtn');
         var statusEl = document.getElementById('lookupStatus');
@@ -138,7 +138,7 @@
                         '<td>' + esc(row.department) + '</td>' +
                         '<td>' + esc(row.title) + '</td>' +
                         '<td class="text-end">' +
-                            '<button class="btn btn-sm btn-outline-primary js-select-row" type="button" data-idx="' + idx + '">Use ID</button>' +
+                            '<button class="btn btn-sm btn-ui-add js-select-row" type="button" data-idx="' + idx + '">Use ID</button>' +
                         '</td>' +
                     '</tr>';
             }).join('');

@@ -25,17 +25,10 @@
         <h1 class="mb-1"><i class="bi bi-diagram-3 me-2"></i>Quickpulls</h1>
         <p class="text-muted mb-0">Select a quickpull to manage its fixed return items and appendable fields.</p>
     </div>
-    <a href="/admin/settings/uhco-api/" class="btn btn-outline-secondary">
+    <a href="/admin/settings/uhco-api/" class="btn btn-ui-cancel">
         <i class="bi bi-arrow-left me-1"></i>Back to UHCO API
     </a>
 </div>
-
-<cfif len(actionMessage)>
-    <div class="alert alert-success">#encodeForHTML(actionMessage)#</div>
-</cfif>
-<cfif len(actionError)>
-    <div class="alert alert-danger">#encodeForHTML(actionError)#</div>
-</cfif>
 
 <div class="row g-4">
     <cfloop array="#quickpulls#" index="quickpull">
@@ -60,7 +53,7 @@
                         </cfloop>
                     </div>
 
-                    <a href="edit.cfm?quickpull=#urlEncodedFormat(quickpull.key)#" class="btn btn-primary">
+                    <a href="edit.cfm?quickpull=#urlEncodedFormat(quickpull.key)#" class="btn btn-ui-go">
                         <i class="bi bi-sliders me-1"></i>Edit #encodeForHTML(quickpull.label)#
                     </a>
                 </div>
@@ -71,6 +64,23 @@
 
 </div>
 
+</cfoutput>
+</cfsavecontent>
+
+<cfsavecontent variable="pageScripts">
+<cfoutput>
+<script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: 'success' });
+}
+</cfif>
+<cfif len(actionError)>
+if (window.AdminUI && typeof window.AdminUI.showToast === 'function') {
+    window.AdminUI.showToast("#encodeForJavaScript(actionError)#", { tone: 'danger' });
+}
+</cfif>
+</script>
 </cfoutput>
 </cfsavecontent>
 

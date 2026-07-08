@@ -1,5 +1,4 @@
-<!--- Super-admin only for now. --->
-<cfif NOT application.authService.hasRole("SUPER_ADMIN")>
+﻿<cfif NOT application.authService.hasRole("SUPER_ADMIN") AND NOT request.hasPermission("reporting.duplicate_users.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
@@ -40,27 +39,34 @@
         <cflocation url="#request.webRoot#/admin/reporting/duplicate_users_report.cfm?runID=#urlEncodedFormat(viewRunID)#&status=#urlEncodedFormat(statusFilter)#&msg=restored" addtoken="false">
     <cfelseif action EQ "enableSchedule">
         <cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
-        <cfset schedulerUrl = request.siteBaseUrl & "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json" & (len(scheduleTaskToken) ? "&token=" & urlEncodedFormat(scheduleTaskToken) : "")>
+        <cfset schedulerUrl = request.siteBaseUrl & "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json">
 
-        <cftry>
-            <cfschedule
-                action = "update"
-                task = "UHCO_DuplicateUsersReport"
-                operation = "HTTPRequest"
-                url = "#schedulerUrl#"
-                startDate = "#dateFormat(now(), 'MM/DD/YYYY')#"
-                startTime = "05:00 AM"
-                interval = "monthly"
-                requesttimeout = "600"
-                resolveurl = "false"
-                publish = "false">
-            <cfset scheduleMsg = "Monthly schedule enabled. Duplicate scan will run once per month at 5:00 AM.">
-            <cfset scheduleMsgClass = "alert-success">
-        <cfcatch>
-            <cfset scheduleMsg = "Could not register schedule: " & cfcatch.message>
+        <cfif NOT len(scheduleTaskToken)>
+            <cfset scheduleMsg = "Could not register schedule: scheduled_tasks.shared_secret is not configured.">
             <cfset scheduleMsgClass = "alert-danger">
-        </cfcatch>
-        </cftry>
+        <cfelse>
+            <cftry>
+                <cfschedule
+                    action = "update"
+                    task = "UHCO_DuplicateUsersReport"
+                    operation = "HTTPRequest"
+                    url = "#schedulerUrl#"
+                    username = "scheduler"
+                    password = "#scheduleTaskToken#"
+                    startDate = "#dateFormat(now(), 'mm/dd/yyyy')#"
+                    startTime = "05:00 AM"
+                    interval = "monthly"
+                    requesttimeout = "600"
+                    resolveurl = "false"
+                    publish = "false">
+                <cfset scheduleMsg = "Monthly schedule enabled. Duplicate scan will run once per month at 5:00 AM.">
+                <cfset scheduleMsgClass = "alert-success">
+            <cfcatch>
+                <cfset scheduleMsg = "Could not register schedule: " & cfcatch.message>
+                <cfset scheduleMsgClass = "alert-danger">
+            </cfcatch>
+            </cftry>
+        </cfif>
     <cfelseif action EQ "saveScheduledMode">
         <cfset scheduledRuleModeCandidate = duplicateSvc.normalizeRuleMode(form.scheduledRuleMode ?: "")>
         <cfset appConfigService.setValue("scheduled_tasks.uhco_duplicateusersreport.scan_mode", scheduledRuleModeCandidate)>
@@ -88,7 +94,7 @@
 </cfif>
 
 <cfset scheduleTaskToken = trim(appConfigService.getValue("scheduled_tasks.shared_secret", ""))>
-<cfset schedulerUrl = request.siteBaseUrl & "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json" & (len(scheduleTaskToken) ? "&token=" & urlEncodedFormat(scheduleTaskToken) : "")>
+<cfset schedulerUrl = request.siteBaseUrl & "/admin/settings/scheduled-tasks/tasks/run_duplicate_users_report_task.cfm?triggeredBy=scheduled&format=json">
 
 <cfset content = "">
 <cfsavecontent variable="content">
@@ -111,13 +117,13 @@
 </cfif>
 
 <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-4">
-    <a href="/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=#urlEncodedFormat(selectedRuleMode)#" class="btn btn-primary">
+    <a href="/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=#urlEncodedFormat(selectedRuleMode)#" class="btn btn-ui-filter">
         <i class="bi bi-play-fill"></i> Run Now (Quick)
     </a>
-    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="##schedulePanel">
+    <button class="btn btn-ui-cancel btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="##schedulePanel">
         <i class="bi bi-clock"></i> Schedule
     </button>
-    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="##historyPanel">
+    <button class="btn btn-ui-cancel btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="##historyPanel">
         <i class="bi bi-clock-history"></i> Run History
     </button>
 </div>
@@ -126,7 +132,7 @@
     <div class="small text-muted mb-2">Manual run mode</div>
     <div class="btn-group flex-wrap" role="group">
         <cfloop array="#availableRuleModes#" index="rm">
-            <a href="?mode=#urlEncodedFormat(rm.value)#&status=#urlEncodedFormat(statusFilter)#&runID=#urlEncodedFormat(viewRunID)#" class="btn btn-sm #selectedRuleMode EQ rm.value ? "btn-primary" : "btn-outline-primary"#">#encodeForHTML(rm.label)#</a>
+            <a href="?mode=#urlEncodedFormat(rm.value)#&status=#urlEncodedFormat(statusFilter)#&runID=#urlEncodedFormat(viewRunID)#" class="btn btn-sm #selectedRuleMode EQ rm.value ? "btn-ui-filter" : "btn-ui-cancel"#">#encodeForHTML(rm.label)#</a>
         </cfloop>
     </div>
 </div>
@@ -137,13 +143,13 @@
         <p class="text-muted small mb-2">Use this endpoint in ColdFusion Scheduler for monthly duplicate scanning. Scheduled default mode currently: <strong>#encodeForHTML(scheduledRuleMode)#</strong></p>
         <div class="input-group mb-3 report-scheduler-input">
             <input type="text" class="form-control form-control-sm font-monospace" value="#encodeForHTMLAttribute(schedulerUrl)#" readonly id="dupSchedUrlInput">
-            <button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('dupSchedUrlInput').value)">
+            <button class="btn btn-sm btn-ui-go" data-clipboard-source="dupSchedUrlInput">
                 <i class="bi bi-clipboard"></i>
             </button>
         </div>
         <form method="post">
             <input type="hidden" name="action" value="enableSchedule">
-            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle"></i> Enable Monthly Schedule</button>
+            <button type="submit" class="btn btn-sm btn-ui-save"><i class="bi bi-check-circle"></i> Enable Monthly Schedule</button>
         </form>
         <form method="post" class="mt-3 pt-3 border-top">
             <input type="hidden" name="action" value="saveScheduledMode">
@@ -154,7 +160,7 @@
                         <option value="#encodeForHTMLAttribute(rm.value)#" #scheduledRuleMode EQ rm.value ? "selected" : ""#>#encodeForHTML(rm.label)#</option>
                     </cfloop>
                 </select>
-                <button type="submit" class="btn btn-sm btn-outline-primary">Save Scheduled Mode</button>
+                <button type="submit" class="btn btn-sm btn-ui-save">Save Scheduled Mode</button>
             </div>
         </form>
     </div>
@@ -189,7 +195,7 @@
                         <td>#val(r.TOTALUSERS ?: 0)#</td>
                         <td>#val(r.TOTALPAIRS ?: 0)#</td>
                         <td>#encodeForHTML(r.STATUS ?: "")#</td>
-                        <td><a href="?runID=#r.RUNID#&status=#urlEncodedFormat(statusFilter)#" class="btn btn-sm btn-outline-secondary py-0 px-1">View</a></td>
+                        <td><a href="?runID=#r.RUNID#&status=#urlEncodedFormat(statusFilter)#" class="btn btn-sm btn-ui-go py-0 px-1">View</a></td>
                     </tr>
                 </cfloop>
                 </tbody>
@@ -278,7 +284,7 @@
                         <td><span class="badge #duplicateSvc.scoreBadgeClass(val(p.CONFIDENCESCORE ?: 0))#">#val(p.CONFIDENCESCORE ?: 0)#</span></td>
                         <td><span class="badge #p.STATUS EQ 'pending' ? 'bg-warning text-dark' : (p.STATUS EQ 'ignored' ? 'bg-secondary' : 'bg-success')#">#encodeForHTML(p.STATUS)#</span></td>
                         <td>
-                            <a href="/admin/users/merge.cfm?pairID=#p.PAIRID#" class="btn btn-sm btn-outline-primary py-0 px-1 mb-1">View</a>
+                            <a href="/admin/users/merge.cfm?pairID=#p.PAIRID#" class="btn btn-sm btn-ui-go py-0 px-1 mb-1">View</a>
                         </td>
                     </tr>
                 </cfloop>

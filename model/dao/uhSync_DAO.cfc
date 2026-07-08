@@ -4,6 +4,16 @@ component extends="dao.BaseDAO" output="false" singleton {
         super.init();        return this;
     }
 
+    private boolean function hasRunDurationColumn() {
+        var qry = executeQueryWithRetry(
+            "SELECT CAST(CASE WHEN COL_LENGTH('dbo.UHSyncRuns', 'DurationMs') IS NULL THEN 0 ELSE 1 END AS INT) AS HasDuration",
+            {},
+            { datasource=variables.datasource, timeout=15, fetchSize=1 }
+        );
+
+        return val(qry.HASDURATION ?: 0) EQ 1;
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // RUN MANAGEMENT
     // ──────────────────────────────────────────────────────────────────────────
@@ -24,19 +34,29 @@ component extends="dao.BaseDAO" output="false" singleton {
         required numeric totalCompared,
         required numeric totalDiffs,
         required numeric totalGone,
-        required numeric totalNew
+        required numeric totalNew,
+        numeric durationMs = 0
     ) {
+        var params = {
+            id = { value=runID,            cfsqltype="cf_sql_integer" },
+            c  = { value=totalCompared,    cfsqltype="cf_sql_integer" },
+            d  = { value=totalDiffs,       cfsqltype="cf_sql_integer" },
+            g  = { value=totalGone,        cfsqltype="cf_sql_integer" },
+            n  = { value=totalNew,         cfsqltype="cf_sql_integer" }
+        };
+        var sql = "UPDATE UHSyncRuns
+             SET TotalCompared = :c, TotalDiffs = :d, TotalGone = :g, TotalNew = :n";
+
+        if (hasRunDurationColumn()) {
+            sql &= ", DurationMs = :duration";
+            params.duration = { value=arguments.durationMs, cfsqltype="cf_sql_integer" };
+        }
+
+        sql &= " WHERE RunID = :id";
+
         executeQueryWithRetry(
-            "UPDATE UHSyncRuns
-             SET TotalCompared = :c, TotalDiffs = :d, TotalGone = :g, TotalNew = :n
-             WHERE RunID = :id",
-            {
-                id = { value=runID,            cfsqltype="cf_sql_integer" },
-                c  = { value=totalCompared,    cfsqltype="cf_sql_integer" },
-                d  = { value=totalDiffs,       cfsqltype="cf_sql_integer" },
-                g  = { value=totalGone,        cfsqltype="cf_sql_integer" },
-                n  = { value=totalNew,         cfsqltype="cf_sql_integer" }
-            },
+            sql,
+            params,
             { datasource=variables.datasource, timeout=30 }
         );
     }
@@ -46,8 +66,11 @@ component extends="dao.BaseDAO" output="false" singleton {
         // Inline the TOP value as a safe literal — SQL Server JDBC does not reliably
         // support TOP as a bound parameter placeholder ("TOP ?").
         var topN = val(arguments.maxRuns) > 0 ? val(arguments.maxRuns) : 10;
+        var selectDuration = hasRunDurationColumn()
+            ? ", DurationMs"
+            : ", CAST(NULL AS INT) AS DurationMs";
         var qry = executeQueryWithRetry(
-            "SELECT TOP #topN# RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew
+            "SELECT TOP #topN# RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew#selectDuration#
              FROM UHSyncRuns
              ORDER BY RunID DESC",
             {},
@@ -58,8 +81,11 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /** Return a single run record by RunID (as struct, empty if not found). */
     public struct function getRunByID( required numeric runID ) {
+        var selectDuration = hasRunDurationColumn()
+            ? ", DurationMs"
+            : ", CAST(NULL AS INT) AS DurationMs";
         var qry = executeQueryWithRetry(
-            "SELECT RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew
+            "SELECT RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew#selectDuration#
              FROM UHSyncRuns WHERE RunID = :id",
             { id = { value=runID, cfsqltype="cf_sql_integer" } },
             { datasource=variables.datasource, timeout=30 }
@@ -69,8 +95,11 @@ component extends="dao.BaseDAO" output="false" singleton {
 
     /** Return the latest run record (empty struct if none). */
     public struct function getLatestRun() {
+        var selectDuration = hasRunDurationColumn()
+            ? ", DurationMs"
+            : ", CAST(NULL AS INT) AS DurationMs";
         var qry = executeQueryWithRetry(
-            "SELECT TOP 1 RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew
+            "SELECT TOP 1 RunID, RunAt, TriggeredBy, TotalCompared, TotalDiffs, TotalGone, TotalNew#selectDuration#
              FROM UHSyncRuns
              ORDER BY RunID DESC",
             {},
@@ -181,8 +210,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                 FROM UserAliases ua
                 WHERE ua.UserID = u.UserID
                 ORDER BY
+                                        CASE
+                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                THEN 0 ELSE 1
+                                        END,
+                                        CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 2147483647),
                     ua.AliasID
             ) pa
@@ -231,8 +265,13 @@ component extends="dao.BaseDAO" output="false" singleton {
                 FROM UserAliases ua
                 WHERE ua.UserID = u.UserID
                 ORDER BY
+                                        CASE
+                                                WHEN LEN(LTRIM(RTRIM(ISNULL(ua.FirstName, '')))) > 0
+                                                    OR LEN(LTRIM(RTRIM(ISNULL(ua.LastName, '')))) > 0
+                                                THEN 0 ELSE 1
+                                        END,
+                                        CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     CASE WHEN ISNULL(ua.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-                    CASE WHEN ISNULL(ua.IsActive, 0) = 1 THEN 0 ELSE 1 END,
                     ISNULL(ua.SortOrder, 2147483647),
                     ua.AliasID
              ) pa
@@ -258,8 +297,11 @@ component extends="dao.BaseDAO" output="false" singleton {
     }
 
     /**
-     * Return unresolved diffs for a specific user from their most recent run.
+     * Return unresolved diffs for a specific user from their latest diff run.
      * Used on the Edit User page.
+     *
+     * Important: do not fall back to older unresolved runs after the latest run's
+     * rows are resolved, or previously handled fields will reappear on the page.
      */
     public array function getUnresolvedDiffsForUser( required numeric userID ) {
         var qry = executeQueryWithRetry(
@@ -270,7 +312,7 @@ component extends="dao.BaseDAO" output="false" singleton {
                AND d.RunID = (
                    SELECT MAX(d2.RunID)
                    FROM UHSyncDiffs d2
-                   WHERE d2.UserID = :uid AND d2.Resolution IS NULL
+                   WHERE d2.UserID = :uid
                )
              ORDER BY d.FieldName",
             { uid = { value=userID, cfsqltype="cf_sql_integer" } },

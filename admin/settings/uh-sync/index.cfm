@@ -7,6 +7,10 @@
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
 
+<cfset quarantineMode = "page">
+<cfset quarantineReturnTo = "/admin/settings/">
+<cfinclude template="/admin/users/_uh_workflow_quarantine_guard.cfm">
+
 <cfinclude template="/admin/settings/section-status-config.cfm">
 <cfset sectionStatus = getSettingsSectionStatus("uh-sync")>
 

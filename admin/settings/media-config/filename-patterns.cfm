@@ -1,4 +1,4 @@
-<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
+﻿<!--- ── Authorization: settings.media_config.manage ─────────────────────── --->
 <cfif NOT request.hasPermission("settings.media_config.manage")>
     <cflocation url="#request.webRoot#/admin/unauthorized.cfm" addtoken="false">
 </cfif>
@@ -78,6 +78,28 @@
     </cfif>
 </cfif>
 
+<!--- Sort params --->
+<cfset allowedPatternSortCols = ["PATTERN","DESCRIPTION","SORTORDER","ISACTIVE"]>
+<cfset sortCol = (structKeyExists(url, "sortCol") AND arrayFindNoCase(allowedPatternSortCols, url.sortCol) GT 0) ? url.sortCol : "SORTORDER">
+<cfset sortDir = ((url.sortDir ?: "") EQ "DESC") ? "DESC" : "ASC">
+<cfscript>
+    arraySort(patterns, function(a, b) {
+        var aVal = lCase(toString(isNull(a[sortCol]) ? "" : a[sortCol]));
+        var bVal = lCase(toString(isNull(b[sortCol]) ? "" : b[sortCol]));
+        if (aVal LT bVal) return sortDir EQ "ASC" ? -1 : 1;
+        if (aVal GT bVal) return sortDir EQ "ASC" ? 1 : -1;
+        return 0;
+    });
+    function patternSortLink(col) {
+        var dir = (sortCol EQ col AND sortDir EQ "ASC") ? "DESC" : "ASC";
+        return "?sortCol=" & col & "&sortDir=" & dir;
+    }
+    function patternSortArrow(col) {
+        if (sortCol EQ col) return sortDir EQ "ASC" ? " &uarr;" : " &darr;";
+        return "";
+    }
+</cfscript>
+
 <!--- ── Build page content ───────────────────────────────────────────────── --->
 <cfset content = "">
 <cfoutput>
@@ -100,17 +122,7 @@
 '>
 </cfoutput>
 
-<!--- ── Flash message ────────────────────────────────────────────────────── --->
-<cfif len(actionMessage)>
-    <cfoutput>
-    <cfset content &= '
-    <div class="alert #actionMessageClass# alert-dismissible fade show" role="alert">
-        #actionMessage#
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    '>
-    </cfoutput>
-</cfif>
+
 
 <!--- ── Form Card ────────────────────────────────────────────────────────── --->
 <cfoutput>
@@ -157,11 +169,11 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn #editMode ? 'btn-ui-save' : 'btn-ui-add'#">
                                 <i class="bi bi-check-lg me-1"></i> #editMode ? "Update" : "Create"#
                             </button>
                             <cfif editMode>
-                                <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-outline-secondary">Cancel</a>
+                                <a href="/admin/settings/media-config/filename-patterns.cfm" class="btn btn-ui-cancel">Cancel</a>
                             </cfif>
                         </div>
                     </form>
@@ -222,10 +234,10 @@
                         <table class="table table-hover table-sm align-middle mb-0 settings-table">
                             <thead>
                                 <tr>
-                                    <th>Pattern</th>
-                                    <th>Description</th>
-                                    <th class="text-center">Order</th>
-                                    <th class="text-center">Active</th>
+                                    <th><a href="#patternSortLink("PATTERN")#" class="settings-sort-link">Pattern#patternSortArrow("PATTERN")#</a></th>
+                                    <th><a href="#patternSortLink("DESCRIPTION")#" class="settings-sort-link">Description#patternSortArrow("DESCRIPTION")#</a></th>
+                                    <th class="text-center"><a href="#patternSortLink("SORTORDER")#" class="settings-sort-link">Order#patternSortArrow("SORTORDER")#</a></th>
+                                    <th class="text-center"><a href="#patternSortLink("ISACTIVE")#" class="settings-sort-link">Active#patternSortArrow("ISACTIVE")#</a></th>
                                     <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
@@ -253,11 +265,11 @@
                                     </td>
                                     <td class="text-end">
                                         <a href="/admin/settings/media-config/filename-patterns.cfm?edit=#val(p.FILENAMEPATTERNID)#"
-                                           class="btn btn-sm btn-edit users-list-action-button users-list-action-button-edit" title="Edit" aria-label="Edit Pattern">
+                                           class="btn btn-sm btn-ui-edit users-list-action-button users-list-action-button-edit" title="Edit" aria-label="Edit Pattern">
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-remove users-list-action-button users-list-action-button-delete"
-                                                onclick="confirmDelete(#val(p.FILENAMEPATTERNID)#, ''#encodeForJavaScript(p.PATTERN ?: "")#'')"
+                                        <button type="button" class="btn btn-sm btn-ui-delete users-list-action-button users-list-action-button-delete"
+                                                data-confirm-delete-id="#val(p.FILENAMEPATTERNID)#" data-confirm-delete-pattern="#encodeForHTMLAttribute(p.PATTERN ?: "")#"
                                                 title="Delete" aria-label="Delete Pattern">
                                             <i class="bi bi-trash"></i>
                                         </button>
@@ -292,11 +304,11 @@
                 <p class="text-muted small mb-0">This only removes the pattern definition. It does not affect any existing source assignments or generated images.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
                 <form method="post" action="/admin/settings/media-config/filename-patterns.cfm" id="deleteForm" class="d-inline">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="fileNamePatternID" id="deleteID" value="">
-                    <button type="submit" class="btn btn-danger">
+                    <button type="submit" class="btn btn-ui-delete">
                         <i class="bi bi-trash me-1"></i> Delete
                     </button>
                 </form>
@@ -311,13 +323,14 @@
 <cfset pageScripts = "">
 <cfoutput>
 <cfset pageScripts &= '
-<script>
-    function confirmDelete(id, pattern) {
-        document.getElementById("deleteID").value = id;
-        document.getElementById("deletePatternName").textContent = pattern;
-        new bootstrap.Modal(document.getElementById("deleteModal")).show();
-    }
-
+<cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#">
+<cfif len(actionMessage)>
+<cfset toastTone = actionMessageClass CONTAINS "success" ? "success" : (actionMessageClass CONTAINS "warning" ? "warning" : "danger")>
+if (window.AdminUI && typeof window.AdminUI.showToast === "function") {
+    window.AdminUI.showToast("#encodeForJavaScript(actionMessage)#", { tone: "#toastTone#" });
+}
+</cfif>
+</cfoutput>
     // Live preview of all active patterns
     (function() {
         const sample = { first: "john", last: "doe", middle: "michael", fi: "j", mi: "m" };
@@ -348,7 +361,9 @@
             resolved = resolved.replace(/\{mi\}/g, sample.mi);
 
             const tr = document.createElement("tr");
-            tr.innerHTML = "<td><code>" + r.pattern + "</code></td><td><code>" + resolved + "</code></td>";
+            const td1 = document.createElement("td"); const c1 = document.createElement("code"); c1.textContent = r.pattern; td1.appendChild(c1);
+            const td2 = document.createElement("td"); const c2 = document.createElement("code"); c2.textContent = resolved;  td2.appendChild(c2);
+            tr.appendChild(td1); tr.appendChild(td2);
             tbody.appendChild(tr);
         });
         if (!rows.length) {

@@ -245,6 +245,193 @@ component extends="dao.BaseDAO" output="false" singleton {
         return queryToArray(qry);
     }
 
+    public array function getPublishedVariantList() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT DISTINCT ImageVariant
+            FROM UserImages
+            WHERE LTRIM(RTRIM(ISNULL(ImageVariant, ''))) <> ''
+            ORDER BY ImageVariant
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=200 }
+        );
+
+        return queryToArray(qry);
+    }
+
+    public numeric function getPublishedUserSummaryCount( string searchTerm = "", string variantFilter = "" ) {
+        var normalizedSearch = trim(arguments.searchTerm ?: "");
+        var normalizedVariant = trim(arguments.variantFilter ?: "");
+        var params = {};
+        var whereParts = [
+            "EXISTS (SELECT 1 FROM UserImages uiAny WHERE uiAny.UserID = u.UserID)"
+        ];
+
+        if ( len(normalizedVariant) ) {
+            arrayAppend(whereParts, "EXISTS (SELECT 1 FROM UserImages uiVariant WHERE uiVariant.UserID = u.UserID AND UPPER(uiVariant.ImageVariant) = UPPER(:variantFilter))");
+            params.variantFilter = { value=normalizedVariant, cfsqltype="cf_sql_varchar" };
+        }
+
+        if ( len(normalizedSearch) ) {
+            params.searchLike = { value="%" & normalizedSearch & "%", cfsqltype="cf_sql_nvarchar" };
+            arrayAppend(whereParts,
+                "(
+                    CAST(u.UserID AS NVARCHAR(20)) LIKE :searchLike
+                    OR COALESCE(NULLIF(LTRIM(RTRIM(pa.FirstName)), ''), u.FirstName, '') LIKE :searchLike
+                    OR COALESCE(NULLIF(LTRIM(RTRIM(pa.LastName)), ''), u.LastName, '') LIKE :searchLike
+                    OR ISNULL(u.EmailPrimary, '') LIKE :searchLike
+                    OR EXISTS (
+                        SELECT 1
+                        FROM UserImages uiSearch
+                        WHERE uiSearch.UserID = u.UserID
+                          AND ISNULL(uiSearch.ImageVariant, '') LIKE :searchLike
+                    )
+                )"
+            );
+        }
+
+        var qry = executeQueryWithRetry(
+            "
+            SELECT COUNT(*) AS TotalUserCount
+            FROM Users u
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                  AND ua.IsActive = 1
+                  AND ISNULL(ua.IsPrimary, 0) = 1
+                ORDER BY ISNULL(ua.SortOrder, 999999), ua.AliasID
+            ) pa
+            WHERE #arrayToList(whereParts, ' AND ')#
+            ",
+            params,
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return val(qry.TOTALUSERCOUNT ?: 0);
+    }
+
+    public array function getPublishedUserSummaryPage(
+        numeric pageSize = 25,
+        numeric pageNumber = 1,
+        string searchTerm = "",
+        string variantFilter = ""
+    ) {
+        var size = max(1, min(200, int(val(arguments.pageSize ?: 25))));
+        var page = max(1, int(val(arguments.pageNumber ?: 1)));
+        var normalizedSearch = trim(arguments.searchTerm ?: "");
+        var normalizedVariant = trim(arguments.variantFilter ?: "");
+        var startRow = ((page - 1) * size) + 1;
+        var endRow = startRow + size - 1;
+        var params = {
+            startRow = { value=startRow, cfsqltype="cf_sql_integer" },
+            endRow = { value=endRow, cfsqltype="cf_sql_integer" }
+        };
+        var whereParts = [
+            "EXISTS (SELECT 1 FROM UserImages uiAny WHERE uiAny.UserID = u.UserID)"
+        ];
+
+        if ( len(normalizedVariant) ) {
+            arrayAppend(whereParts, "EXISTS (SELECT 1 FROM UserImages uiVariant WHERE uiVariant.UserID = u.UserID AND UPPER(uiVariant.ImageVariant) = UPPER(:variantFilter))");
+            params.variantFilter = { value=normalizedVariant, cfsqltype="cf_sql_varchar" };
+        }
+
+        if ( len(normalizedSearch) ) {
+            params.searchLike = { value="%" & normalizedSearch & "%", cfsqltype="cf_sql_nvarchar" };
+            arrayAppend(whereParts,
+                "(
+                    CAST(u.UserID AS NVARCHAR(20)) LIKE :searchLike
+                    OR COALESCE(NULLIF(LTRIM(RTRIM(pa.FirstName)), ''), u.FirstName, '') LIKE :searchLike
+                    OR COALESCE(NULLIF(LTRIM(RTRIM(pa.LastName)), ''), u.LastName, '') LIKE :searchLike
+                    OR ISNULL(u.EmailPrimary, '') LIKE :searchLike
+                    OR EXISTS (
+                        SELECT 1
+                        FROM UserImages uiSearch
+                        WHERE uiSearch.UserID = u.UserID
+                          AND ISNULL(uiSearch.ImageVariant, '') LIKE :searchLike
+                    )
+                )"
+            );
+        }
+
+        var qry = executeQueryWithRetry(
+            "
+            WITH FilteredUsers AS (
+                SELECT
+                    u.UserID,
+                    COALESCE(NULLIF(LTRIM(RTRIM(pa.FirstName)), ''), u.FirstName, '') AS FirstName,
+                    COALESCE(NULLIF(LTRIM(RTRIM(pa.LastName)), ''), u.LastName, '') AS LastName,
+                    ISNULL(u.EmailPrimary, '') AS EmailPrimary
+                FROM Users u
+                OUTER APPLY (
+                    SELECT TOP 1 ua.FirstName, ua.LastName
+                    FROM UserAliases ua
+                    WHERE ua.UserID = u.UserID
+                      AND ua.IsActive = 1
+                      AND ISNULL(ua.IsPrimary, 0) = 1
+                    ORDER BY ISNULL(ua.SortOrder, 999999), ua.AliasID
+                ) pa
+                WHERE #arrayToList(whereParts, ' AND ')#
+            ),
+            UserAggregates AS (
+                SELECT
+                    fu.UserID,
+                    fu.FirstName,
+                    fu.LastName,
+                    fu.EmailPrimary,
+                    COUNT(ui.ImageID) AS TotalPublished,
+                    MAX(ui.PublishedAt) AS LatestPublishedAt,
+                    ROW_NUMBER() OVER (
+                        ORDER BY fu.LastName, fu.FirstName, fu.UserID
+                    ) AS RowNum
+                FROM FilteredUsers fu
+                INNER JOIN UserImages ui
+                    ON ui.UserID = fu.UserID
+                GROUP BY fu.UserID, fu.FirstName, fu.LastName, fu.EmailPrimary
+            )
+            SELECT
+                ua.UserID,
+                ua.FirstName,
+                ua.LastName,
+                ua.EmailPrimary,
+                ua.TotalPublished,
+                ua.LatestPublishedAt,
+                thumb.ImageURL AS WebThumbURL,
+                profile.ImageURL AS WebProfileURL,
+                legacy.ImageURL AS LegacyAlumniURL
+            FROM UserAggregates ua
+            OUTER APPLY (
+                SELECT TOP 1 uiThumb.ImageURL
+                FROM UserImages uiThumb
+                WHERE uiThumb.UserID = ua.UserID
+                  AND UPPER(uiThumb.ImageVariant) = 'WEB_THUMB'
+                ORDER BY ISNULL(uiThumb.PublishedAt, '1900-01-01') DESC, uiThumb.SortOrder ASC, uiThumb.ImageID DESC
+            ) thumb
+            OUTER APPLY (
+                SELECT TOP 1 uiProfile.ImageURL
+                FROM UserImages uiProfile
+                WHERE uiProfile.UserID = ua.UserID
+                  AND UPPER(uiProfile.ImageVariant) = 'WEB_PROFILE'
+                ORDER BY ISNULL(uiProfile.PublishedAt, '1900-01-01') DESC, uiProfile.SortOrder ASC, uiProfile.ImageID DESC
+            ) profile
+            OUTER APPLY (
+                SELECT TOP 1 uiLegacy.ImageURL
+                FROM UserImages uiLegacy
+                WHERE uiLegacy.UserID = ua.UserID
+                  AND UPPER(uiLegacy.ImageVariant) = 'LEGACY_ALUMNI'
+                ORDER BY ISNULL(uiLegacy.PublishedAt, '1900-01-01') DESC, uiLegacy.SortOrder ASC, uiLegacy.ImageID DESC
+            ) legacy
+            WHERE ua.RowNum BETWEEN :startRow AND :endRow
+            ORDER BY ua.RowNum
+            ",
+            params,
+            { datasource=variables.datasource, timeout=30, fetchSize=size }
+        );
+
+        return queryToArray(qry);
+    }
+
     /**
      * Return published image counts grouped by user.
      */
@@ -259,6 +446,146 @@ component extends="dao.BaseDAO" output="false" singleton {
             {},
             { datasource=variables.datasource, timeout=30, fetchSize=1000 }
         );
+        return queryToArray(qry);
+    }
+
+    public numeric function getPublishedImageTotalCount() {
+        var qry = executeQueryWithRetry(
+            "
+            SELECT COUNT(*) AS TotalPublishedCount
+            FROM UserImages
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return val(qry.TOTALPUBLISHEDCOUNT ?: 0);
+    }
+
+    public numeric function getNeedsPublishingUserCount() {
+        var qry = executeQueryWithRetry(
+            "
+            WITH ActiveSourceCounts AS (
+                SELECT uis.UserID,
+                       COUNT(*) AS ActiveSourceCount
+                FROM UserImageSources uis
+                WHERE uis.IsActive = 1
+                GROUP BY uis.UserID
+            ),
+            PublishedCounts AS (
+                SELECT ui.UserID,
+                       COUNT(*) AS PublishedCount
+                FROM UserImages ui
+                GROUP BY ui.UserID
+            ),
+            GeneratedUnpublishedCounts AS (
+                SELECT uis.UserID,
+                       COUNT(*) AS GeneratedUnpublishedCount
+                FROM UserImageVariants uiv
+                INNER JOIN UserImageSources uis
+                    ON uis.UserImageSourceID = uiv.UserImageSourceID
+                INNER JOIN ImageVariantTypes ivt
+                    ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+                LEFT JOIN UserImages ui
+                    ON ui.UserImageSourceID = uiv.UserImageSourceID
+                   AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+                WHERE uis.IsActive = 1
+                  AND LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+                  AND ui.ImageID IS NULL
+                GROUP BY uis.UserID
+            )
+            SELECT COUNT(*) AS NeedsPublishingUserCount
+            FROM Users u
+            LEFT JOIN ActiveSourceCounts ascnt
+                ON ascnt.UserID = u.UserID
+            LEFT JOIN PublishedCounts pcnt
+                ON pcnt.UserID = u.UserID
+            LEFT JOIN GeneratedUnpublishedCounts gucnt
+                ON gucnt.UserID = u.UserID
+            WHERE (
+                ISNULL(ascnt.ActiveSourceCount, 0) > 0
+                AND ISNULL(pcnt.PublishedCount, 0) = 0
+            )
+               OR ISNULL(gucnt.GeneratedUnpublishedCount, 0) > 0
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=1 }
+        );
+
+        return val(qry.NEEDSPUBLISHINGUSERCOUNT ?: 0);
+    }
+
+    public array function getNeedsPublishingQueue() {
+        var qry = executeQueryWithRetry(
+            "
+            WITH ActiveSourceCounts AS (
+                SELECT uis.UserID,
+                       COUNT(*) AS ActiveSourceCount
+                FROM UserImageSources uis
+                WHERE uis.IsActive = 1
+                GROUP BY uis.UserID
+            ),
+            PublishedCounts AS (
+                SELECT ui.UserID,
+                       COUNT(*) AS PublishedCount
+                FROM UserImages ui
+                GROUP BY ui.UserID
+            ),
+            GeneratedUnpublishedCounts AS (
+                SELECT uis.UserID,
+                       COUNT(*) AS GeneratedUnpublishedCount
+                FROM UserImageVariants uiv
+                INNER JOIN UserImageSources uis
+                    ON uis.UserImageSourceID = uiv.UserImageSourceID
+                INNER JOIN ImageVariantTypes ivt
+                    ON ivt.ImageVariantTypeID = uiv.ImageVariantTypeID
+                LEFT JOIN UserImages ui
+                    ON ui.UserImageSourceID = uiv.UserImageSourceID
+                   AND UPPER(ui.ImageVariant) = UPPER(ivt.Code)
+                WHERE uis.IsActive = 1
+                  AND LTRIM(RTRIM(ISNULL(uiv.LocalPath, ''))) <> ''
+                  AND ui.ImageID IS NULL
+                GROUP BY uis.UserID
+            )
+            SELECT
+                u.UserID,
+                COALESCE(NULLIF(LTRIM(RTRIM(pa.FirstName)), ''), u.FirstName, '') AS FirstName,
+                COALESCE(NULLIF(LTRIM(RTRIM(pa.LastName)), ''), u.LastName, '') AS LastName,
+                ISNULL(u.EmailPrimary, '') AS EmailPrimary,
+                ISNULL(ascnt.ActiveSourceCount, 0) AS ActiveSourceCount,
+                ISNULL(pcnt.PublishedCount, 0) AS PublishedImageCount,
+                ISNULL(gucnt.GeneratedUnpublishedCount, 0) AS GeneratedUnpublishedCount,
+                CASE WHEN ISNULL(ascnt.ActiveSourceCount, 0) > 0 AND ISNULL(pcnt.PublishedCount, 0) = 0 THEN 1 ELSE 0 END AS NoPublishedWithSources,
+                CASE WHEN ISNULL(gucnt.GeneratedUnpublishedCount, 0) > 0 THEN 1 ELSE 0 END AS HasGeneratedUnpublished
+            FROM Users u
+            OUTER APPLY (
+                SELECT TOP 1 ua.FirstName, ua.LastName
+                FROM UserAliases ua
+                WHERE ua.UserID = u.UserID
+                  AND ua.IsActive = 1
+                  AND ISNULL(ua.IsPrimary, 0) = 1
+                ORDER BY ISNULL(ua.SortOrder, 999999), ua.AliasID
+            ) pa
+            LEFT JOIN ActiveSourceCounts ascnt
+                ON ascnt.UserID = u.UserID
+            LEFT JOIN PublishedCounts pcnt
+                ON pcnt.UserID = u.UserID
+            LEFT JOIN GeneratedUnpublishedCounts gucnt
+                ON gucnt.UserID = u.UserID
+            WHERE (
+                ISNULL(ascnt.ActiveSourceCount, 0) > 0
+                AND ISNULL(pcnt.PublishedCount, 0) = 0
+            )
+               OR ISNULL(gucnt.GeneratedUnpublishedCount, 0) > 0
+            ORDER BY
+                COALESCE(NULLIF(LTRIM(RTRIM(pa.LastName)), ''), u.LastName, ''),
+                COALESCE(NULLIF(LTRIM(RTRIM(pa.FirstName)), ''), u.FirstName, ''),
+                u.UserID
+            ",
+            {},
+            { datasource=variables.datasource, timeout=30, fetchSize=500 }
+        );
+
         return queryToArray(qry);
     }
 

@@ -1,9 +1,12 @@
 component output="false" singleton {
 
+    variables.algorithm = "HmacSHA256";
+
     public any function init() {
         variables.usersService = createObject("component", "cfc.users_service").init();
         variables.userReviewService = createObject("component", "cfc.userReview_service").init();
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
+        variables.ldapAuthGateway = createObject("component", "cfc.ldapAuthGateway_service").init();
         return this;
     }
 
@@ -12,19 +15,13 @@ component output="false" singleton {
         var ldapUser = "";
         var userResult = {};
         var eligibility = {};
+        var UserReviewLdapUser = "";
 
         try {
-            cfldap(
-                action = "QUERY",
-                name = "UserReviewLdapUser",
-                attributes = "displayName,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title",
-                start = "DC=cougarnet,DC=uh,DC=edu",
-                scope = "SUBTREE",
-                filter = "(&(objectClass=User)(objectCategory=Person)(sAMAccountName=#trim(arguments.username)#))",
-                maxrows = 1,
-                server = "cougarnet.uh.edu",
-                username = "COUGARNET\#trim(arguments.username)#",
-                password = arguments.password
+            UserReviewLdapUser = variables.ldapAuthGateway.queryUserByCredentials(
+                username = trim(arguments.username),
+                password = arguments.password,
+                attributes = "displayName,sAMAccountName,mail,telephoneNumber,accountExpires,userAccountControl,department,title"
             );
 
             if (UserReviewLdapUser.recordCount EQ 0) {
@@ -87,12 +84,14 @@ component output="false" singleton {
         }
     }
 
-    public struct function authenticateExternal(required string cougarnetID, required string token) {
+    public struct function authenticateExternal(required string cougarnetID, required string token, string launchContextToken = "") {
         var result = { success = false, message = "", user = {} };
         var expectedToken = trim(variables.appConfigService.getValue("user_review.external_auth_token", ""));
         var userResult = {};
         var eligibility = {};
         var normalizedCougarnet = lCase(trim(arguments.cougarnetID));
+        var launchContext = {};
+        var launchContextResult = { success = true, payload = {} };
 
         if (NOT len(expectedToken)) {
             result.message = "External UserReview authentication is not configured.";
@@ -104,16 +103,37 @@ component output="false" singleton {
             return result;
         }
 
+        if (len(trim(arguments.launchContextToken))) {
+            launchContextResult = _verifyLaunchContextToken(
+                token = trim(arguments.launchContextToken),
+                sharedSecret = expectedToken,
+                cougarnetID = normalizedCougarnet
+            );
+            if (NOT launchContextResult.success) {
+                result.message = launchContextResult.message;
+                return result;
+            }
+            launchContext = launchContextResult.payload;
+        }
+
         userResult = variables.usersService.getUserByCougarnet(normalizedCougarnet);
         if (NOT userResult.success) {
             result.message = "Your directory profile was not found in this system.";
             return result;
         }
 
-        eligibility = variables.userReviewService.getEligibilityResult(val(userResult.data.USERID));
-        if (NOT eligibility.success) {
-            result.message = eligibility.message;
-            return result;
+        if (structCount(launchContext)) {
+            eligibility = variables.userReviewService.getEligibilityResult(val(launchContext.targetUserId ?: 0));
+            if (NOT eligibility.success) {
+                result.message = eligibility.message;
+                return result;
+            }
+        } else {
+            eligibility = variables.userReviewService.getEligibilityResult(val(userResult.data.USERID));
+            if (NOT eligibility.success) {
+                result.message = eligibility.message;
+                return result;
+            }
         }
 
         result.success = true;
@@ -126,8 +146,87 @@ component output="false" singleton {
             authType = "external-post",
             loginAt = now()
         };
+        if (structCount(launchContext)) {
+            result.user.launchContext = launchContext;
+        }
 
         return result;
+    }
+
+    private struct function _verifyLaunchContextToken(required string token, required string sharedSecret, required string cougarnetID) {
+        var parts = listToArray(arguments.token, ".");
+        var expectedSignature = "";
+        var payloadJson = "";
+        var payload = {};
+        var normalizedCougarnet = lCase(trim(arguments.cougarnetID));
+
+        if (arrayLen(parts) NEQ 3) {
+            return { success = false, message = "Delegated launch token format is invalid." };
+        }
+
+        expectedSignature = _generateSignature(parts[1] & "." & parts[2], arguments.sharedSecret);
+        if (parts[3] NEQ expectedSignature) {
+            return { success = false, message = "Delegated launch token signature failed validation." };
+        }
+
+        try {
+            payloadJson = _base64UrlDecode(parts[2]);
+            payload = deserializeJSON(payloadJson);
+        } catch (any e) {
+            return { success = false, message = "Delegated launch token payload is invalid." };
+        }
+
+        if (trim(payload.kind ?: "") NEQ "delegated-user-review-launch") {
+            return { success = false, message = "Delegated launch token kind is invalid." };
+        }
+        if (!structKeyExists(payload, "exp") OR _dateToEpoch(now()) GT val(payload.exp ?: 0)) {
+            return { success = false, message = "Delegated launch token has expired." };
+        }
+        if (lCase(trim(payload.actorCougarnetId ?: "")) NEQ normalizedCougarnet) {
+            return { success = false, message = "Delegated launch token actor does not match the authenticated user." };
+        }
+        if (trim(payload.requestType ?: "") NEQ "profile_edit") {
+            return { success = false, message = "Only delegated profile edit launches are currently supported." };
+        }
+        if (!isNumeric(payload.targetUserId ?: "") OR val(payload.targetUserId ?: 0) LTE 0) {
+            return { success = false, message = "Delegated launch target user is invalid." };
+        }
+        if (!structKeyExists(payload, "sections") OR !isArray(payload.sections) OR !arrayLen(payload.sections)) {
+            return { success = false, message = "Delegated launch sections are missing." };
+        }
+
+        return { success = true, payload = payload };
+    }
+
+    private string function _generateSignature(required string input, required string secret) {
+        var mac = createObject("java", "javax.crypto.Mac").getInstance(variables.algorithm);
+        var keySpec = createObject("java", "javax.crypto.spec.SecretKeySpec").init(
+            charsetDecode(arguments.secret, "utf-8"),
+            variables.algorithm
+        );
+        var rawHmac = "";
+        var b64 = "";
+
+        mac.init(keySpec);
+        rawHmac = mac.doFinal(charsetDecode(arguments.input, "utf-8"));
+        b64 = binaryEncode(rawHmac, "base64");
+        b64 = replace(b64, "+", "-", "all");
+        b64 = replace(b64, "/", "_", "all");
+        b64 = replace(b64, "=", "", "all");
+        return b64;
+    }
+
+    private string function _base64UrlDecode(required string input) {
+        var b64 = replace(arguments.input, "-", "+", "all");
+        b64 = replace(b64, "_", "/", "all");
+        while ((len(b64) mod 4) NEQ 0) {
+            b64 &= "=";
+        }
+        return toString(binaryDecode(b64, "base64"));
+    }
+
+    private numeric function _dateToEpoch(required date dt) {
+        return int(arguments.dt.getTime() / 1000);
     }
 
     private void function _logAuthError(
@@ -171,6 +270,7 @@ component output="false" singleton {
     }
 
     public void function createSession(required struct user) {
+        sessionRotate();
         session.userReviewUser = duplicate(arguments.user);
     }
 
