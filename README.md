@@ -104,27 +104,6 @@ For local styling work:
 
 If application state needs to be rebuilt after config changes, the app supports `?reinit=true` in requests via [Application.cfc](Application.cfc).
 
-## Database Notes
-
-Important tables include:
-
-- `Users`
-- `UserFlags`, `UserFlagAssignments`
-- `Organizations`, `UserOrganizations`
-- `UserAcademicInfo`
-- `UserStudentProfile`
-- `UserAwards`
-- `UserEmails`
-- `UserPhones`
-- `UserAddresses`
-- `UserDegrees`
-- `UserExternalIDs`
-- `UserImages`
-
-Schema and migration scripts live under [sql](sql).
-
-Versioned schema migrations are now intended to live under [sql/migrations](sql/migrations), with workflow notes in [DB_MIGRATIONS.md](DB_MIGRATIONS.md).
-
 ## Project Structure
 
 ```text
