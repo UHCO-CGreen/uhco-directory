@@ -9,6 +9,8 @@ scripts/
 x_attending_wallboard/
 z_data_dumps/
 dev/
+_dev/
+node_modules/
 
 # File types
 *.csv
@@ -16,6 +18,12 @@ dev/
 *.docx
 *.txt
 *.bak
+*.log
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+desktop.ini
 
 # Other
 admin/reporting/OLD/
@@ -37,3 +45,9 @@ _published_images/*
 
 _temp_variants/*
 !_temp_variants/.gitkeep
+
+_temp_rosters/*
+!_temp_rosters/.gitkeep
+
+testing/_form_sessions/*
+!testing/_form_sessions/.gitkeep
