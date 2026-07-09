@@ -19,9 +19,9 @@ component output="false" singleton {
             {
                 key         = "users",
                 label       = "Users",
-                description = "Create new user records. Required: FirstName, LastName. Optional: EmailPrimary, Title1, Title2, Title3, Room, Building, Prefix, Suffix, Degrees, Campus, Division, DivisionName, Department, DepartmentName, Office_Mailing_Address, Mailcode.",
+                description = "Create new user records. Required: FirstName, LastName. Optional: EmailPrimary, Title1, Room, Building, Prefix, Suffix, Degrees, Campus, Division, DivisionName, Department, DepartmentName, Office_Mailing_Address, Mailcode.",
                 requiredCols = ["FirstName","LastName"],
-                optionalCols = ["EmailPrimary","Title1","Title2","Title3","Room","Building","Prefix","Suffix","Degrees","Campus","Division","DivisionName","Department","DepartmentName","Office_Mailing_Address","Mailcode"],
+                optionalCols = ["EmailPrimary","Title1","Room","Building","Prefix","Suffix","Degrees","Campus","Division","DivisionName","Department","DepartmentName","Office_Mailing_Address","Mailcode"],
                 icon         = "bi-person-plus",
                 workflow     = "direct"
             },
@@ -327,8 +327,6 @@ component output="false" singleton {
                     LastName                = trim(row.LastName ?: ""),
                     EmailPrimary            = trim(row.EmailPrimary ?: ""),
                     Title1                  = trim(row.Title1 ?: ""),
-                    Title2                  = trim(row.Title2 ?: ""),
-                    Title3                  = trim(row.Title3 ?: ""),
                     Room                    = trim(row.Room ?: ""),
                     Building                = trim(row.Building ?: ""),
                     Prefix                  = trim(row.Prefix ?: ""),

@@ -45,7 +45,9 @@ component output="false" singleton {
         profile.studentProfile = studentProfileService.getProfile( userID ).data;
         profile.residencies = studentProfileService.getResidencies( userID ).data;
         profile.awards      = studentProfileService.getAwards( userID ).data;
+        profile.appointments = _getDependency("userAppointments_service", "cfc.userAppointments_service").getAppointments( userID ).data;
         profile.bio         = bioService.getBio( userID ).data;
+        profile.clinicalBio = bioService.getBio( userID, "ClinicalBio" ).data;
         profile.publicationProfiles = publicationsService.getPublicationProfiles( userID ).data;
         profile.publications = publicationsService.getUserPublications( userID ).data;
         profile.publicationFetchSummary = publicationsService.getFetchSummary( userID ).data;
@@ -65,6 +67,10 @@ component output="false" singleton {
 
         if ( !isArray(profile.residencies) ) {
             profile.residencies = [];
+        }
+
+        if ( !isArray(profile.appointments) ) {
+            profile.appointments = [];
         }
 
         return profile;

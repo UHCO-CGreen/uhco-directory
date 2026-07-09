@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
         emails: 'saveEmailsBtn',
         phones: 'savePhonesBtn',
         aliases: 'saveAliasesBtn',
+        userappointments: 'saveAppointmentsBtn',
         addresses: 'saveAddressesBtn',
         degrees: 'saveDegreesBtn',
         awards: 'saveAwardsBtn',
@@ -1420,6 +1421,121 @@ document.addEventListener('DOMContentLoaded', function () {
     })();
 
     /* ────────────────────────────────────────────────────────
+       APPOINTMENT SECTION
+       ──────────────────────────────────────────────────────── */
+    (function () {
+        var container = document.getElementById('appointmentsContainer');
+        if (!container) return;
+        var modalEl = document.getElementById('appointmentModal');
+        var modal = new bootstrap.Modal(modalEl);
+
+        function getAllData() {
+            var items = [];
+            var hiddens = container.querySelectorAll('input[data-appointment-field="name"]');
+            hiddens.forEach(function (el) {
+                var idx = el.getAttribute('data-appointment-idx');
+                var get = function(f) { return (container.querySelector('input[data-appointment-field="'+f+'"][data-appointment-idx="'+idx+'"]') || {}).value || ''; };
+                items.push({ name: el.value, type: get('type') });
+            });
+            return items;
+        }
+
+        function rebuild(items) {
+            container.innerHTML = '';
+            if (!items.length) {
+                container.insertAdjacentHTML('beforeend', "<p class='text-muted small mb-0'>No appointments on file.</p>");
+            }
+            items.forEach(function (d, i) {
+                container.insertAdjacentHTML('beforeend',
+                    "<div class='card mb-2'><div class='card-body py-2 px-3'>" +
+                    "<div class='d-flex justify-content-between align-items-center'><div>" +
+                    "<strong>" + esc(d.name) + "</strong>" +
+                    (d.type ? " <span class='badge bg-info text-dark'>" + esc(d.type) + "</span>" : "") +
+                    "</div><div>" +
+                    "<button type='button' class='btn btn-sm btn-edit edit-appointment-btn' data-idx='" + i + "'><i class='bi bi-pencil-square me-1'></i>Edit</button> " +
+                    "<button type='button' class='btn btn-sm btn-remove remove-appointment-btn' data-idx='" + i + "'><i class='bi bi-trash me-1'></i>Remove</button>" +
+                    "</div></div></div></div>" +
+                    "<input type='hidden' data-appointment-field='name' data-appointment-idx='" + i + "' value='" + esc(d.name) + "'>" +
+                    "<input type='hidden' data-appointment-field='type' data-appointment-idx='" + i + "' value='" + esc(d.type) + "'>"
+                );
+            });
+        }
+
+        function clearModal() {
+            document.getElementById('appointmentEditIdx').value = '-1';
+            document.getElementById('appointmentName').value = '';
+            document.getElementById('appointmentType').value = '';
+            document.getElementById('appointmentModalLabel').textContent = 'Add Appointment';
+        }
+
+        function fillModal(idx) {
+            var items = getAllData();
+            var d = items[idx];
+            document.getElementById('appointmentEditIdx').value = idx;
+            document.getElementById('appointmentName').value = d.name;
+            document.getElementById('appointmentType').value = d.type;
+            document.getElementById('appointmentModalLabel').textContent = 'Edit Appointment';
+        }
+
+        function readModal() {
+            return {
+                name: document.getElementById('appointmentName').value.trim(),
+                type: document.getElementById('appointmentType').value.trim()
+            };
+        }
+
+        document.getElementById('addAppointmentBtn').addEventListener('click', function () { clearModal(); modal.show(); });
+
+        document.getElementById('saveAppointmentModalBtn').addEventListener('click', function () {
+            var d = readModal();
+            if (!d.name) { showValidationError('Appointment Name is required.'); return; }
+            var items = getAllData();
+            var editIdx = parseInt(document.getElementById('appointmentEditIdx').value);
+            if (editIdx >= 0 && items[editIdx]) {
+                items[editIdx] = d;
+            } else {
+                items.push(d);
+            }
+            rebuild(items);
+            saveAppointmentsToDatabase({ hideModalOnSuccess: true });
+        });
+
+        container.addEventListener('click', function (e) {
+            var btn = e.target.closest('.edit-appointment-btn');
+            if (btn) { fillModal(parseInt(btn.dataset.idx)); modal.show(); return; }
+            btn = e.target.closest('.remove-appointment-btn');
+            if (btn) {
+                var items = getAllData();
+                items.splice(parseInt(btn.dataset.idx), 1);
+                rebuild(items);
+                saveAppointmentsToDatabase();
+            }
+        });
+
+        function saveAppointmentsToDatabase(options) {
+            options = options || {};
+            var items = getAllData();
+            var body = new URLSearchParams();
+            body.append('userID', document.getElementById('pageUserID').value);
+            body.append('section', 'userappointments');
+            body.append('count', items.length);
+            items.forEach(function (d, i) {
+                body.append('name_' + i, d.name);
+                body.append('type_' + i, d.type);
+            });
+            var status = getSaveStatusEl('saveAppointmentsBtn', 'appointmentsSaveStatus');
+            if (!status) return Promise.resolve({ success: false, message: 'Save status unavailable' });
+            return ajaxSave('userappointments', body, status).then(function (data) {
+                if (data && data.success && options.hideModalOnSuccess) {
+                    modal.hide();
+                }
+                return data;
+            });
+        }
+
+    })();
+
+    /* ────────────────────────────────────────────────────────
        DEGREE SECTION (Bio tab)
        ──────────────────────────────────────────────────────── */
     (function () {
@@ -2149,6 +2265,7 @@ document.addEventListener('DOMContentLoaded', function () {
     wireRepeaterDirty('emails', document.getElementById('emailsContainer'));
     wireRepeaterDirty('phones', document.getElementById('phonesContainer'));
     wireRepeaterDirty('aliases', document.getElementById('aliasesContainer'));
+    wireRepeaterDirty('userappointments', document.getElementById('appointmentsContainer'));
     wireRepeaterDirty('addresses', document.getElementById('addressesContainer'));
     wireRepeaterDirty('degrees', document.getElementById('degreesContainer'));
     wireRepeaterDirty('awards', document.getElementById('awardsContainer'));
@@ -2355,7 +2472,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var body = new URLSearchParams();
             body.append('userID', pageUserID);
             body.append('section', 'general');
-            ['Prefix','Suffix','Pronouns','FirstName','MiddleName','LastName','Title1','Title2','Title3'].forEach(function (f) {
+            ['Prefix','Suffix','Pronouns','FirstName','MiddleName','LastName','Title1'].forEach(function (f) {
                 var el = pane.querySelector('[name="' + f + '"]');
                 body.append(f, el ? el.value : '');
             });
@@ -3291,11 +3408,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 body.append(f, el ? el.value : '');
             });
 
-            var editorEl = pane ? pane.querySelector('.users-edit-bio-editor') : null;
-            var editorBody = editorEl ? editorEl.querySelector('.ql-editor') : null;
-            var html = editorBody ? editorBody.innerHTML : '';
-            if (html === '<p><br></p>') html = '';
-            body.append('bioContent', html);
+            var getEditorHtml = function (editorEl) {
+                var editorBody = editorEl ? editorEl.querySelector('.ql-editor') : null;
+                var html = editorBody ? editorBody.innerHTML : '';
+                return (html === '<p><br></p>') ? '' : html;
+            };
+
+            var clinicalEditorEl = pane ? pane.querySelector('.users-edit-bio-editor[data-bio-type="ClinicalBio"]') : null;
+            var proEditorEl = pane
+                ? (clinicalEditorEl
+                    ? pane.querySelector('.users-edit-bio-editor[data-bio-type="ProfessionalBio"]')
+                    : pane.querySelector('.users-edit-bio-editor'))
+                : null;
+
+            body.append('bioContent', getEditorHtml(proEditorEl));
+            if (clinicalEditorEl) {
+                body.append('clinicalBioContent', getEditorHtml(clinicalEditorEl));
+            }
 
             saveSectionAjax('bioinfo', body, document.getElementById('save-bioinfo-status'));
         });

@@ -31,8 +31,13 @@
 
 <cfset profile["SHOWCASED_PUBLICATIONS"] = publicationsService.getShowcasedPublications(val(resourceID)).data>
 
+<cfif isStruct(profile.user ?: {})>
+    <cfset profile.user["APPOINTMENTS"] = profile.appointments ?: []>
+</cfif>
+
 <!--- Strip flat name/contact fields from user node — all data is in NAMES envelope --->
-<cfset stripFields = ["FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PREFERREDNAME", "MAIDENNAME", "EMAILPRIMARY"]>
+<!--- TITLE2/TITLE3 retired in favor of the APPOINTMENTS array; TITLE1 (official UH title) stays --->
+<cfset stripFields = ["FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PREFERREDNAME", "MAIDENNAME", "EMAILPRIMARY", "TITLE2", "TITLE3"]>
 <cfif isStruct(profile.user ?: {})>
     <cfloop array="#stripFields#" item="fieldKey">
         <cfset structDelete(profile.user, fieldKey)>

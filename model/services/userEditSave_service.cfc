@@ -10,6 +10,7 @@ component output="false" singleton {
         variables.addressesService = createObject("component", "cfc.addresses_service").init();
         variables.degreesService = createObject("component", "cfc.degrees_service").init();
         variables.aliasesService = createObject("component", "cfc.aliases_service").init();
+        variables.userAppointmentsService = createObject("component", "cfc.userAppointments_service").init();
         variables.academicService = createObject("component", "cfc.academic_service").init();
         variables.studentProfileService = createObject("component", "cfc.studentProfile_service").init();
         variables.bioService = createObject("component", "cfc.bio_service").init();
@@ -21,7 +22,7 @@ component output="false" singleton {
         var normalizedSection = lCase(trim(arguments.section ?: ""));
 
         // Sections tracked by the change log (publications handled separately by its own system)
-        var trackedSections = "emails,general,flags,orgs,extids,phones,aliases,awards,residencies,degrees,addresses,addaddress,uh,bioinfo,studentprofile,bio,tabdegrees,addldapemailifmissing,addldapaliasifmissing";
+        var trackedSections = "emails,general,flags,orgs,extids,phones,aliases,awards,residencies,degrees,addresses,addaddress,uh,bioinfo,studentprofile,bio,tabdegrees,addldapemailifmissing,addldapaliasifmissing,userappointments";
         var useChangeLog    = listFindNoCase(trackedSections, normalizedSection) GT 0
             AND structKeyExists(application, "changeLogSvc")
             AND isObject(application.changeLogSvc);
@@ -76,6 +77,9 @@ component output="false" singleton {
                 break;
             case "residencies":
                 result = saveResidencies(arguments.userID, arguments.formData);
+                break;
+            case "userappointments":
+                result = saveUserAppointments(arguments.userID, arguments.formData);
                 break;
             case "degrees":
                 result = saveDegrees(arguments.userID, arguments.formData);
@@ -383,6 +387,25 @@ component output="false" singleton {
         return success("Awards saved.");
     }
 
+    public struct function saveUserAppointments(required numeric userID, required struct formData) {
+        var appointmentCount = (structKeyExists(arguments.formData, "count") AND isNumeric(arguments.formData.count)) ? val(arguments.formData.count) : 0;
+        var appointmentsToSave = [];
+        var i = 0;
+        var appointmentName = "";
+        var appointmentType = "";
+
+        for (i = 0; i <= appointmentCount - 1; i++) {
+            appointmentName = structKeyExists(arguments.formData, "name_#i#") ? trim(arguments.formData["name_#i#"]) : "";
+            appointmentType = structKeyExists(arguments.formData, "type_#i#") ? trim(arguments.formData["type_#i#"]) : "";
+            if (len(appointmentName)) {
+                arrayAppend(appointmentsToSave, { appointmentName = appointmentName, appointmentType = appointmentType });
+            }
+        }
+
+        variables.userAppointmentsService.replaceAppointments(arguments.userID, appointmentsToSave);
+        return success("Appointments saved.");
+    }
+
     public struct function saveResidencies(required numeric userID, required struct formData) {
         var residencyCount = (structKeyExists(arguments.formData, "count") AND isNumeric(arguments.formData.count)) ? val(arguments.formData.count) : 0;
         var residenciesToSave = [];
@@ -568,7 +591,11 @@ component output="false" singleton {
         );
 
         if (structKeyExists(arguments.formData, "bioContent")) {
-            variables.bioService.saveBio(arguments.userID, arguments.formData.bioContent ?: "");
+            variables.bioService.saveBio(arguments.userID, arguments.formData.bioContent ?: "", "ProfessionalBio");
+        }
+
+        if (structKeyExists(arguments.formData, "clinicalBioContent")) {
+            variables.bioService.saveBio(arguments.userID, arguments.formData.clinicalBioContent ?: "", "ClinicalBio");
         }
 
         return success("Biographical info saved.");

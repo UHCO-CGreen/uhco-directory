@@ -3,6 +3,7 @@
 
 <cfset dirService = createObject("component", "cfc.directory_service").init()>
 <cfset publicationsService = createObject("component", "cfc.publications_service").init()>
+<cfset userAppointmentsService = createObject("component", "cfc.userAppointments_service").init()>
 
 <!--- Query params --->
 <cfset search      = trim(url.search ?: "")>
@@ -82,12 +83,14 @@
 }>
 
 <!--- Strip flat name/contact fields — structured data is in NAMES/ADDRESSES/DEGREES envelopes --->
-<cfset stripFields = ["FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PREFERREDNAME", "MAIDENNAME", "EMAILPRIMARY", "PHONE", "OFFICE_MAILING_ADDRESS", "CURRENT_MAILING_ADDRESS", "ADDRESS"]>
+<!--- TITLE2/TITLE3 retired in favor of the APPOINTMENTS array; TITLE1 (official UH title) stays --->
+<cfset stripFields = ["FIRSTNAME", "MIDDLENAME", "LASTNAME", "FULLNAME", "PREFERREDNAME", "MAIDENNAME", "EMAILPRIMARY", "PHONE", "OFFICE_MAILING_ADDRESS", "CURRENT_MAILING_ADDRESS", "ADDRESS", "TITLE2", "TITLE3"]>
 <cfloop array="#payload.data#" item="personRow">
     <cfloop array="#stripFields#" item="fieldKey">
         <cfset structDelete(personRow, fieldKey)>
     </cfloop>
     <cfset personRow["SHOWCASED_PUBLICATIONS"] = publicationsService.getShowcasedPublications(val(personRow.USERID ?: 0)).data>
+    <cfset personRow["APPOINTMENTS"] = userAppointmentsService.getAppointments(val(personRow.USERID ?: 0)).data>
 </cfloop>
 
 <cfset auth.sendResponse(payload)>

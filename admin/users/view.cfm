@@ -149,6 +149,9 @@
 <!--- ── Aliases ── --->
 <cfset aliasesSvc    = createObject("component", "cfc.aliases_service").init()>
 <cfset userAliases   = aliasesSvc.getAliases(val(url.userID)).data>
+
+<!--- ── Appointments ── --->
+<cfset userAppointments = (structKeyExists(profile, "appointments") AND isArray(profile.appointments)) ? profile.appointments : []>
 <cfset primaryAlias = {}>
 <cfset resolvedFirstName = trim(profile.user.FIRSTNAME ?: "")>
 <cfset resolvedMiddleName = trim(profile.user.MIDDLENAME ?: "")>
@@ -194,6 +197,17 @@
 <cfset bioData     = bioSvc.getBio(val(url.userID)).data>
 <cfset bioContent  = structIsEmpty(bioData) ? "" : (bioData.BIOCONTENT ?: "")>
 
+<cfset isFacultyProfile = false>
+<cfloop from="1" to="#arrayLen(profile.flags)#" index="ff">
+    <cfif listFindNoCase("clinical-attending,faculty-adjunct,faculty-fulltime", lCase(trim(profile.flags[ff].FLAGNAME ?: "")))>
+        <cfset isFacultyProfile = true>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfset clinicalBioData    = isFacultyProfile ? bioSvc.getBio(val(url.userID), "ClinicalBio").data : {}>
+<cfset clinicalBioContent = structIsEmpty(clinicalBioData) ? "" : (clinicalBioData.BIOCONTENT ?: "")>
+
 <cfset externalIDService = createObject("component", "cfc.externalID_service").init()>
 <cfset allSystems        = externalIDService.getSystems().data>
 <cfset userExternalIDs   = externalIDService.getExternalIDs(val(url.userID)).data>
@@ -220,8 +234,6 @@
 <cfset mailcode    = profile.user.MAILCODE     ?: "">
 <cfset cougarnetid = profile.user.COUGARNETID  ?: "">
 <cfset title1      = profile.user.TITLE1       ?: "">
-<cfset title2      = profile.user.TITLE2       ?: "">
-<cfset title3      = profile.user.TITLE3       ?: "">
 <cfset uhApiId     = trim(profile.user.UH_API_ID ?: "")>
 <cfset showAcademicInfo   = false>
 <cfset showStudentProfile = false>
@@ -286,6 +298,18 @@
         <cfset userAliasesHtml &= "<tr><td>" & (len(aliasFirst) ? EncodeForHTML(aliasFirst) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasMiddle) ? EncodeForHTML(aliasMiddle) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasLast) ? EncodeForHTML(aliasLast) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(aliasTypeSystem) ? EncodeForHTML(aliasTypeSystem) : "<span class='text-muted'>-</span>") & "</td><td>" & aliasStatusHtml & "</td></tr>">
     </cfloop>
     <cfset userAliasesHtml &= "</tbody></table></div></div>">
+</cfif>
+
+<cfset userAppointmentsHtml = "">
+<cfif arrayLen(userAppointments)>
+    <cfset userAppointmentsHtml = "<div class='mb-3'><strong>Appointments:</strong><div class='table-responsive mt-2'><table class='table table-sm table-striped mb-0'><thead><tr><th>Appointment Name</th><th>Type</th></tr></thead><tbody>">
+    <cfloop from="1" to="#arrayLen(userAppointments)#" index="apptIndex">
+        <cfset apptItem = userAppointments[apptIndex]>
+        <cfset apptName = trim(apptItem.APPOINTMENTNAME ?: "")>
+        <cfset apptType = trim(apptItem.APPOINTMENTTYPE ?: "")>
+        <cfset userAppointmentsHtml &= "<tr><td>" & (len(apptName) ? EncodeForHTML(apptName) : "<span class='text-muted'>-</span>") & "</td><td>" & (len(apptType) ? EncodeForHTML(apptType) : "<span class='text-muted'>-</span>") & "</td></tr>">
+    </cfloop>
+    <cfset userAppointmentsHtml &= "</tbody></table></div></div>">
 </cfif>
 
 <cfset profileThumbnail = "/assets/images/uh.png">
@@ -353,9 +377,9 @@
         <cfbreak>
     </cfif>
 </cfloop>
-<cfset hasGeneralInfo = len(trim(preferredName)) OR len(trim(maidenName)) OR arrayLen(userAliases) GT 0 OR len(trim(pronouns)) OR len(trim(cougarnetid)) OR len(trim(title1)) OR len(trim(title2)) OR len(trim(title3))>
+<cfset hasGeneralInfo = len(trim(preferredName)) OR len(trim(maidenName)) OR arrayLen(userAliases) GT 0 OR len(trim(pronouns)) OR len(trim(cougarnetid)) OR len(trim(title1)) OR arrayLen(userAppointments) GT 0>
 <cfset hasContactInfo = arrayLen(userEmails) GT 0 OR arrayLen(userPhones) GT 0 OR arrayLen(userAddresses) GT 0>
-<cfset hasBioInfo = isDate(userDOB) OR len(trim(userGender)) OR arrayLen(userDegrees) GT 0 OR arrayLen(spAwards) GT 0 OR len(trim(bioContent))>
+<cfset hasBioInfo = isDate(userDOB) OR len(trim(userGender)) OR arrayLen(userDegrees) GT 0 OR arrayLen(spAwards) GT 0 OR len(trim(bioContent)) OR len(trim(clinicalBioContent))>
 <cfset hasFlags = arrayLen(profile.flags) GT 0>
 <cfset hasOrganizations = arrayLen(profile.organizations) GT 0>
 <cfset hasExternal = arrayLen(allSystems) GT 0>
@@ -385,12 +409,7 @@
 <cfif len(title1)>
     <cfset generalInfoHtml &= "<p><strong>Title 1:</strong> " & EncodeForHTML(title1) & "</p>">
 </cfif>
-<cfif len(title2)>
-    <cfset generalInfoHtml &= "<p><strong>Title 2:</strong> " & EncodeForHTML(title2) & "</p>">
-</cfif>
-<cfif len(title3)>
-    <cfset generalInfoHtml &= "<p><strong>Title 3:</strong> " & EncodeForHTML(title3) & "</p>">
-</cfif>
+<cfset generalInfoHtml &= userAppointmentsHtml>
 <cfset generalInfoHtml &= "</div>">
 
 <cfset contactInfoHtml &= "<div class='users-view-panel-grid'><div class='mb-3'><h6 class='mb-2'>Emails</h6>">
@@ -482,7 +501,11 @@
     </cfloop>
     <cfset bioInfoHtml &= "</ul></div>">
 </cfif>
-<cfset bioInfoHtml &= "<div><strong>Bio / About Me:</strong>" & (len(trim(bioContent)) ? "<div class='mt-2'>" & bioContent & "</div>" : "<p class='text-muted mb-0 mt-2'>No bio content.</p>") & "</div></div>">
+<cfset bioInfoHtml &= "<div><strong>Bio / About Me:</strong>" & (len(trim(bioContent)) ? "<div class='mt-2'>" & bioContent & "</div>" : "<p class='text-muted mb-0 mt-2'>No bio content.</p>") & "</div>">
+<cfif isFacultyProfile AND len(trim(clinicalBioContent))>
+    <cfset bioInfoHtml &= "<div class='mt-3'><strong>Clinical Bio:</strong><div class='mt-2'>" & clinicalBioContent & "</div></div>">
+</cfif>
+<cfset bioInfoHtml &= "</div>">
 
 <cfset flagsHtml = "<div class='users-view-pill-stack'>">
 <cfif arrayLen(profile.flags) GT 0>

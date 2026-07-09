@@ -109,7 +109,7 @@
 
 <cftry>
 <cfswitch expression="#section#">
-    <cfcase value="emails,addldapemailifmissing,addldapaliasifmissing,phones,aliases,awards,residencies,degrees,addresses,addAddress,general,flags,orgs,extids,publications,uh,bioinfo,studentprofile,bio,tabdegrees">
+    <cfcase value="emails,addldapemailifmissing,addldapaliasifmissing,phones,aliases,awards,residencies,degrees,addresses,addAddress,general,flags,orgs,extids,publications,uh,bioinfo,studentprofile,bio,tabdegrees,userappointments">
         <cfset emitAsyncServiceResult(userEditSaveService.handle(section, userID, form))>
     </cfcase>
 

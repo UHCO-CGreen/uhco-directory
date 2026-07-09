@@ -947,6 +947,16 @@ components:
         Replaces flat FIRSTNAME/MIDDLENAME/LASTNAME/FULLNAME fields wherever it appears (part of an
         uncommitted, in-progress refactor). Always exactly one element in the containing array.
 
+    AppointmentItem:
+      type: object
+      properties:
+        APPOINTMENTNAME: { type: string }
+        APPOINTMENTTYPE: { type: string }
+      description: >
+        Replaces the retired flat TITLE2/TITLE3 fields wherever it appears — a person may have any
+        number of appointments, each with a free-text name and an optional free-text type. TITLE1
+        (the official UH title, synced separately) is unaffected and still appears as a flat field.
+
     Flag:
       type: object
       required: [FLAGID, FLAGNAME]
@@ -1174,8 +1184,6 @@ components:
         PRONOUNS: { type: string }
         UH_API_ID: { type: string }
         TITLE1: { type: string }
-        TITLE2: { type: string }
-        TITLE3: { type: string }
         ROOM: { type: string }
         BUILDING: { type: string }
         PREFIX: { type: string }
@@ -1223,6 +1231,10 @@ components:
         SHOWCASED_PUBLICATIONS:
           type: array
           items: { $ref: "#/components/schemas/OpaqueRecord" }
+        APPOINTMENTS:
+          type: array
+          items: { $ref: "#/components/schemas/AppointmentItem" }
+          description: Replaces the retired flat TITLE2/TITLE3 fields.
 
     UserRow:
       type: object
@@ -1232,8 +1244,6 @@ components:
         PRONOUNS: { type: string }
         UH_API_ID: { type: string }
         TITLE1: { type: string }
-        TITLE2: { type: string }
-        TITLE3: { type: string }
         ROOM: { type: string }
         BUILDING: { type: string }
         PREFIX: { type: string }
@@ -1265,6 +1275,10 @@ components:
           items: { $ref: "#/components/schemas/NameEnvelopeItem" }
           minItems: 1
           maxItems: 1
+        APPOINTMENTS:
+          type: array
+          items: { $ref: "#/components/schemas/AppointmentItem" }
+          description: Replaces the retired flat TITLE2/TITLE3 fields.
       description: >
         FIRSTNAME, MIDDLENAME, LASTNAME, FULLNAME, PREFERREDNAME, MAIDENNAME, and EMAILPRIMARY are
         deliberately stripped from this object (name data lives in NAMES; email lives in the sibling
@@ -1290,6 +1304,7 @@ components:
         residencies: { type: array, items: { $ref: "#/components/schemas/ResidencyEntry" } }
         awards: { type: array, items: { $ref: "#/components/schemas/Award" } }
         bio: { $ref: "#/components/schemas/Bio" }
+        clinicalBio: { $ref: "#/components/schemas/Bio", description: "Faculty-only. Empty object ({}) when no ClinicalBio row exists, e.g. for non-Faculty users." }
         publicationProfiles: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
         publications: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
         publicationFetchSummary: { type: array, items: { $ref: "#/components/schemas/OpaqueRecord" } }
@@ -1411,8 +1426,6 @@ components:
         MAIDENNAME: { type: string }
         EMAILPRIMARY: { type: string }
         TITLE1: { type: string }
-        TITLE2: { type: string }
-        TITLE3: { type: string }
         DIVISION: { type: string }
         DIVISIONNAME: { type: string }
         DEPARTMENT: { type: string }
@@ -1438,6 +1451,10 @@ components:
           items: { $ref: "#/components/schemas/NameEnvelopeItem" }
           minItems: 1
           maxItems: 1
+        APPOINTMENTS:
+          type: array
+          items: { $ref: "#/components/schemas/AppointmentItem" }
+          description: Replaces the retired flat TITLE2/TITLE3 fields.
       description: >
         Effectively the ENTIRE Users database table row (SELECT u.*) plus quickpull-specific
         additions — this is not a lean curated subset like the other QuickPulls types. The properties

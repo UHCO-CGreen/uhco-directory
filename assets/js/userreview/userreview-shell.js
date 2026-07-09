@@ -38,6 +38,7 @@
                 case 'email':   window.addEmailRow();   break;
                 case 'phone':   window.addPhoneRow();   break;
                 case 'address': window.addAddressRow(); break;
+                case 'appointment': window.addAppointmentRow(); break;
             }
         }
     });
@@ -207,5 +208,29 @@
             '</div>';
         container.appendChild(row);
         syncIndexes('addressRows', 'address');
+    };
+
+    window.addAppointmentRow = function (data) {
+        data = data || {};
+        var container = document.getElementById('appointmentRows');
+        var row = document.createElement('div');
+        row.className = 'row-card mb-3';
+        row.dataset.row = 'appointment';
+        row.innerHTML =
+            '<div class="row g-3 align-items-end">' +
+                '<div class="col-md-6">' +
+                    '<label class="form-label">Appointment Name</label>' +
+                    '<input class="form-control" data-name="name" value="' + escapeHtml(data.appointmentName || '') + '">' +
+                '</div>' +
+                '<div class="col-md-4">' +
+                    '<label class="form-label">Appointment Type</label>' +
+                    '<input class="form-control" data-name="type" value="' + escapeHtml(data.appointmentType || '') + '">' +
+                '</div>' +
+                '<div class="col-md-2 d-flex gap-2 align-items-center">' +
+                    removeBtn('appointmentRows', 'appointment') +
+                '</div>' +
+            '</div>';
+        container.appendChild(row);
+        syncIndexes('appointmentRows', 'appointment');
     };
 })();

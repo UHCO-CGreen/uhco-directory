@@ -407,6 +407,11 @@ component output="false" singleton {
         user.WEBPROFILEIMAGE = structKeyExists(webProfileMap, key) ? webProfileMap[key] : "";
         user.WEBTHUMBIMAGE = structKeyExists(webThumbMap, key) ? webThumbMap[key] : "";
 
+        // TITLE2/TITLE3 retired in favor of the APPOINTMENTS array; TITLE1 (official UH title) stays
+        structDelete(user, "TITLE2");
+        structDelete(user, "TITLE3");
+        user.APPOINTMENTS = profile.appointments ?: [];
+
         // Apply configured additional fields
         _applyConfiguredFieldsToRow(user, userID, "myuhco", {});
         variables.nameResolutionService.attachPrimaryNameEnvelopeToRow(user, {}, "USERID", false);
@@ -717,6 +722,7 @@ component output="false" singleton {
         var academic = arguments.profile.academic ?: {};
         var studentProfile = arguments.profile.studentProfile ?: {};
         var residencies = arguments.profile.residencies ?: [];
+        var appointments = arguments.profile.appointments ?: [];
         var bio = arguments.profile.bio ?: {};
 
         for ( var itemKey in arguments.selectedItems ) {
@@ -774,6 +780,9 @@ component output="false" singleton {
                     break;
                 case "RESIDENCIES":
                     arguments.row["RESIDENCIES"] = residencies;
+                    break;
+                case "APPOINTMENTS":
+                    arguments.row["APPOINTMENTS"] = appointments;
                     break;
             }
         }
@@ -848,8 +857,6 @@ component output="false" singleton {
             { value = "PRONOUNS", label = "Pronouns" },
             { value = "EMAILPRIMARY", label = "Primary Email" },
             { value = "TITLE1", label = "Primary Title" },
-            { value = "TITLE2", label = "Secondary Title" },
-            { value = "TITLE3", label = "Tertiary Title" },
             { value = "DIVISION", label = "Division" },
             { value = "DIVISIONNAME", label = "Division Name" },
             { value = "DEPARTMENT", label = "Department" },
@@ -882,7 +889,8 @@ component output="false" singleton {
             { value = "ALLDEGREES", label = "All Degrees (Full Data)" },
             { value = "UHCODEGREES", label = "UHCO Degrees (Full Data)" },
             { value = "AWARDS", label = "Awards" },
-            { value = "RESIDENCIES", label = "Residencies (Full Data)" }
+            { value = "RESIDENCIES", label = "Residencies (Full Data)" },
+            { value = "APPOINTMENTS", label = "Appointments (Full Data)" }
         ];
     }
 

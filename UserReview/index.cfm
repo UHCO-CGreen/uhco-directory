@@ -17,6 +17,7 @@
 <cfset statusMessage = trim(url.msg ?: "")>
 <cfset errorMessage = trim(url.error ?: "")>
 <cfset seedAliasesJson = serializeJSON(formModel.general.NameAliases)>
+<cfset seedAppointmentsJson = serializeJSON(formModel.general.Appointments)>
 <cfset seedEmailsJson = serializeJSON(formModel.contact.emails)>
 <cfset seedPhonesJson = serializeJSON(formModel.contact.phones)>
 <cfset seedAddressesJson = serializeJSON(formModel.contact.addresses)>
@@ -138,13 +139,13 @@
                     <input class="form-control" value="#encodeForHTMLAttribute(formModel.general.Title1)#" readonly disabled>
                     <div class="form-text">This title is your Official UH title and is shown for reference and cannot be changed here.</div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Title 2</label>
-                    <input class="form-control" name="Title2" value="#encodeForHTMLAttribute(formModel.general.Title2)#">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Title 3</label>
-                    <input class="form-control" name="Title3" value="#encodeForHTMLAttribute(formModel.general.Title3)#">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="h6 mb-0">Appointments</h4>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-add-row="appointment">Add Appointment</button>
+                    </div>
+                    <div id="appointmentRows"></div>
+                    <input type="hidden" id="appointmentCount" name="appointmentCount" value="0">
                 </div>
             </div>
         </div>
@@ -339,6 +340,7 @@
 
 <cfoutput><script nonce="#encodeForHTMLAttribute(request.cspNonce ?: '')#"></cfoutput>
     const seedAliases = <cfoutput>#seedAliasesJson#</cfoutput>;
+    const seedAppointments = <cfoutput>#seedAppointmentsJson#</cfoutput>;
     const seedEmails = <cfoutput>#seedEmailsJson#</cfoutput>;
     const seedPhones = <cfoutput>#seedPhonesJson#</cfoutput>;
     const seedAddresses = <cfoutput>#seedAddressesJson#</cfoutput>;
@@ -371,6 +373,13 @@
             isActive: Number(getSeedValue(data, ['isActive', 'ISACTIVE', 'IsActive'], 1)),
             isPrimary: Number(getSeedValue(data, ['isPrimary', 'ISPRIMARY', 'IsPrimary'], 0)),
             isProtected: Number(getSeedValue(data, ['isProtected', 'ISPROTECTED', 'IsProtected'], 0))
+        };
+    }
+
+    function normalizeAppointmentSeed(data = {}) {
+        return {
+            appointmentName: getSeedValue(data, ['appointmentName', 'APPOINTMENTNAME', 'AppointmentName']),
+            appointmentType: getSeedValue(data, ['appointmentType', 'APPOINTMENTTYPE', 'AppointmentType'])
         };
     }
 
@@ -417,6 +426,7 @@
     // Row management functions (addAliasRow, addEmailRow, addPhoneRow, addAddressRow,
     // removeRow delegated handler) now live in /assets/js/userreview/userreview-shell.js
     seedAliases.map(normalizeAliasSeed).forEach(window.addAliasRow);
+    seedAppointments.map(normalizeAppointmentSeed).forEach(window.addAppointmentRow);
     seedEmails.map(normalizeEmailSeed).forEach(window.addEmailRow);
     seedPhones.map(normalizePhoneSeed).forEach(window.addPhoneRow);
     seedAddresses.map(normalizeAddressSeed).forEach(window.addAddressRow);

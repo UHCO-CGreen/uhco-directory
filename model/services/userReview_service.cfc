@@ -6,6 +6,7 @@ component output="false" singleton {
         variables.directoryService = createObject("component", "cfc.directory_service").init();
         variables.flagsService = createObject("component", "cfc.flags_service").init();
         variables.aliasesService = createObject("component", "cfc.aliases_service").init();
+        variables.userAppointmentsService = createObject("component", "cfc.userAppointments_service").init();
         variables.appConfigService = createObject("component", "cfc.appConfig_service").init();
         variables.emailsService = createObject("component", "cfc.emails_service").init();
         variables.phoneService = createObject("component", "cfc.phone_service").init();
@@ -139,6 +140,7 @@ component output="false" singleton {
         var pending = getOpenSubmissionForUser(arguments.userID);
         var latestReviewedSubmission = getLatestReviewedSubmissionForUser(arguments.userID);
         var nameAliases = _extractNameAliases(arguments.userID);
+        var appointments = _extractAppointments(arguments.userID);
         var model = {
             general = {
                 Prefix = trim(profile.user.PREFIX ?: ""),
@@ -146,8 +148,7 @@ component output="false" singleton {
                 Pronouns = trim(profile.user.PRONOUNS ?: ""),
                 NameAliases = nameAliases,
                 Title1 = trim(profile.user.TITLE1 ?: ""),
-                Title2 = trim(profile.user.TITLE2 ?: ""),
-                Title3 = trim(profile.user.TITLE3 ?: "")
+                Appointments = appointments
             },
             bioinfo = {
                 DOB = isDate(profile.user.DOB ?: "") ? dateFormat(profile.user.DOB, "yyyy-mm-dd") : "",
@@ -171,6 +172,8 @@ component output="false" singleton {
                 if (fieldRow.SECTIONKEY EQ "general" OR fieldRow.SECTIONKEY EQ "bioinfo") {
                     if (fieldRow.SECTIONKEY EQ "general" AND fieldRow.FIELDNAME EQ "NameAliases") {
                         model.general.NameAliases = _deserializeJsonArray(fieldRow.PROPOSEDVALUE);
+                    } else if (fieldRow.SECTIONKEY EQ "general" AND fieldRow.FIELDNAME EQ "Appointments") {
+                        model.general.Appointments = _deserializeJsonArray(fieldRow.PROPOSEDVALUE);
                     } else {
                         model[fieldRow.SECTIONKEY][fieldRow.FIELDNAME] = fieldRow.PROPOSEDVALUE ?: "";
                     }
@@ -307,12 +310,12 @@ component output="false" singleton {
         if (arrayFindNoCase(effectiveSections, "general")) {
             var currentAliases = _extractNameAliases(effectiveUserID);
             var proposedAliases = _parseAliasRows(arguments.formScope, currentAliases);
+            var currentAppointments = _extractAppointments(effectiveUserID);
+            var proposedAppointments = _parseAppointmentRows(arguments.formScope);
             var generalFields = [
                 { name = "Prefix", label = "Prefix", currentValue = trim(profile.user.PREFIX ?: ""), proposedValue = trim(arguments.formScope.Prefix ?: "") },
                 { name = "Suffix", label = "Suffix", currentValue = trim(profile.user.SUFFIX ?: ""), proposedValue = trim(arguments.formScope.Suffix ?: "") },
-                { name = "Pronouns", label = "Pronouns", currentValue = trim(profile.user.PRONOUNS ?: ""), proposedValue = trim(arguments.formScope.Pronouns ?: "") },
-                { name = "Title2", label = "Title 2", currentValue = trim(profile.user.TITLE2 ?: ""), proposedValue = trim(arguments.formScope.Title2 ?: "") },
-                { name = "Title3", label = "Title 3", currentValue = trim(profile.user.TITLE3 ?: ""), proposedValue = trim(arguments.formScope.Title3 ?: "") }
+                { name = "Pronouns", label = "Pronouns", currentValue = trim(profile.user.PRONOUNS ?: ""), proposedValue = trim(arguments.formScope.Pronouns ?: "") }
             ];
 
             if (_aliasValuesDiffer(currentAliases, proposedAliases)) {
@@ -323,6 +326,18 @@ component output="false" singleton {
                     fieldLabel = "Name Aliases",
                     currentValue = _toJson(currentAliases),
                     proposedValue = _toJson(proposedAliases),
+                    sortOrder = sortOrder
+                });
+            }
+
+            if (_appointmentValuesDiffer(currentAppointments, proposedAppointments)) {
+                sortOrder++;
+                arrayAppend(fieldRows, {
+                    sectionKey = "general",
+                    fieldName = "Appointments",
+                    fieldLabel = "Appointments",
+                    currentValue = _toJson(currentAppointments),
+                    proposedValue = _toJson(proposedAppointments),
                     sortOrder = sortOrder
                 });
             }
@@ -698,6 +713,24 @@ component output="false" singleton {
         return arrayToList(normalizedRows, "||");
     }
 
+    private boolean function _appointmentValuesDiffer(required array currentRows, required array proposedRows) {
+        return _appointmentSignature(arguments.currentRows) NEQ _appointmentSignature(arguments.proposedRows);
+    }
+
+    private string function _appointmentSignature(required array rows) {
+        var normalizedRows = [];
+
+        for (var row in arguments.rows) {
+            arrayAppend(normalizedRows,
+                lCase(trim(row.appointmentName ?: "")) & "|" &
+                lCase(trim(row.appointmentType ?: ""))
+            );
+        }
+
+        arraySort(normalizedRows, "textnocase");
+        return arrayToList(normalizedRows, "||");
+    }
+
     private array function _deserializeJsonArray(any rawValue = "") {
         if (NOT len(trim(arguments.rawValue ?: ""))) {
             return [];
@@ -747,6 +780,20 @@ component output="false" singleton {
                 isActive = val(aliasRow.ISACTIVE ?: 0),
                 isPrimary = val(aliasRow.ISPRIMARY ?: 0),
                 isProtected = _isProtectedAliasSource(aliasRow.SOURCESYSTEM ?: "")
+            });
+        }
+
+        return result;
+    }
+
+    private array function _extractAppointments(required numeric userID) {
+        var appointmentRows = variables.userAppointmentsService.getAppointments(arguments.userID).data ?: [];
+        var result = [];
+
+        for (var appointmentRow in appointmentRows) {
+            arrayAppend(result, {
+                appointmentName = trim(appointmentRow.APPOINTMENTNAME ?: ""),
+                appointmentType = trim(appointmentRow.APPOINTMENTTYPE ?: "")
             });
         }
 
@@ -887,11 +934,35 @@ component output="false" singleton {
         return result;
     }
 
+    private array function _parseAppointmentRows(required struct formScope) {
+        var result = [];
+        var count = (structKeyExists(arguments.formScope, "appointmentCount") AND isNumeric(arguments.formScope.appointmentCount)) ? val(arguments.formScope.appointmentCount) : 0;
+        for (var i = 0; i LT count; i++) {
+            var appointmentName = trim(arguments.formScope["appointment_name_" & i] ?: "");
+            if (NOT len(appointmentName)) {
+                continue;
+            }
+            arrayAppend(result, {
+                appointmentName = appointmentName,
+                appointmentType = trim(arguments.formScope["appointment_type_" & i] ?: "")
+            });
+        }
+        return result;
+    }
+
     private void function _applyProposedFieldValue(required struct fieldRow) {
         if (arguments.fieldRow.SECTIONKEY EQ "general" AND arguments.fieldRow.FIELDNAME EQ "NameAliases") {
             variables.aliasesService.replaceAliases(
                 val(_getSubmissionUserID(arguments.fieldRow)),
                 _normalizeAliasSaveRows(_deserializeJsonArray(arguments.fieldRow.PROPOSEDVALUE))
+            );
+            return;
+        }
+
+        if (arguments.fieldRow.SECTIONKEY EQ "general" AND arguments.fieldRow.FIELDNAME EQ "Appointments") {
+            variables.userAppointmentsService.replaceAppointments(
+                val(_getSubmissionUserID(arguments.fieldRow)),
+                _normalizeAppointmentSaveRows(_deserializeJsonArray(arguments.fieldRow.PROPOSEDVALUE))
             );
             return;
         }
@@ -927,8 +998,6 @@ component output="false" singleton {
             Building = currentUser.BUILDING ?: "",
             UH_API_ID = currentUser.UH_API_ID ?: "",
             Title1 = currentUser.TITLE1 ?: "",
-            Title2 = currentUser.TITLE2 ?: "",
-            Title3 = currentUser.TITLE3 ?: "",
             Degrees = currentUser.DEGREES ?: "",
             Prefix = currentUser.PREFIX ?: "",
             Suffix = currentUser.SUFFIX ?: "",
@@ -959,8 +1028,6 @@ component output="false" singleton {
             case "FirstName": userData.FirstName = arguments.fieldRow.PROPOSEDVALUE ?: ""; break;
             case "MiddleName": userData.MiddleName = arguments.fieldRow.PROPOSEDVALUE ?: ""; break;
             case "LastName": userData.LastName = arguments.fieldRow.PROPOSEDVALUE ?: ""; break;
-            case "Title2": userData.Title2 = arguments.fieldRow.PROPOSEDVALUE ?: ""; break;
-            case "Title3": userData.Title3 = arguments.fieldRow.PROPOSEDVALUE ?: ""; break;
             case "DOB":
                 userData.DOB = {
                     value = arguments.fieldRow.PROPOSEDVALUE ?: "",
@@ -1116,6 +1183,19 @@ component output="false" singleton {
                 sourceSystem = trim(row.sourceSystem ?: ""),
                 isActive = val(row.isActive ?: 0),
                 isPrimary = val(row.isPrimary ?: 0)
+            });
+        }
+
+        return result;
+    }
+
+    private array function _normalizeAppointmentSaveRows(required array appointmentRows) {
+        var result = [];
+
+        for (var row in arguments.appointmentRows) {
+            arrayAppend(result, {
+                appointmentName = trim(row.appointmentName ?: ""),
+                appointmentType = trim(row.appointmentType ?: "")
             });
         }
 

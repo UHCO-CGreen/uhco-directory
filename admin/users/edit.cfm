@@ -478,6 +478,7 @@
     <cfset dropboxFolderResultHtml  = "<div class='alert alert-success d-flex align-items-center gap-3 py-2 mb-0'><i class='bi bi-folder-check fs-5 flex-shrink-0'></i><div><strong>Folder on Record</strong> <code class='ms-1'>#_dbxPath#</code><span class='text-muted small ms-2'>(click Verify to refresh)</span></div><a href='/admin/user-media/sources.cfm?userid=#val(user.USERID)#' class='btn btn-sm btn-ui-go ms-auto' target='_blank'><i class='bi bi-card-image me-1'></i>User-Media</a></div>">
 </cfif>
 <cfset userAliases = aliasesService.getAliases(val(url.userID)).data>
+<cfset userAppointments = (structKeyExists(profile, "appointments") AND isArray(profile.appointments)) ? profile.appointments : []>
 <cfset userEmails = (structKeyExists(profile, "emails") AND isArray(profile.emails)) ? profile.emails : []>
 <cfset userPhones = (structKeyExists(profile, "phones") AND isArray(profile.phones)) ? profile.phones : []>
 <cfset userAddresses = (structKeyExists(profile, "addresses") AND isArray(profile.addresses)) ? profile.addresses : []>
@@ -490,6 +491,9 @@
 <cfset bioRecord = (structKeyExists(profile, "bio") AND isStruct(profile.bio)) ? profile.bio : {}>
 <cfset bioContent = trim(toString(bioRecord.BIOCONTENT ?: bioRecord.BioContent ?: ""))>
 <cfset bioContent = bioService.sanitizeForRender(bioContent)>
+<cfset clinicalBioRecord = (structKeyExists(profile, "clinicalBio") AND isStruct(profile.clinicalBio)) ? profile.clinicalBio : {}>
+<cfset clinicalBioContent = trim(toString(clinicalBioRecord.BIOCONTENT ?: clinicalBioRecord.BioContent ?: ""))>
+<cfset clinicalBioContent = bioService.sanitizeForRender(clinicalBioContent)>
 <cfset aliasTypeOptsJS = "">
 <cfset aliasTypeLblsJS = "">
 <cfloop from="1" to="#arrayLen(aliasTypes)#" index="local.aliasTypeIndex">
@@ -909,6 +913,8 @@
                     <span class='navbar-text'><strong>Actions:</strong></span>
                     <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addAliasBtn'><i class='bi bi-person-plus me-1'></i>Add Name Alias</button>
                     <span id='aliasesSaveStatus' class='save-status ms-1'></span>
+                    <button type='button' class='btn btn-sm btn-ui-add users-edit-outline-button' id='addAppointmentBtn'><i class='bi bi-briefcase me-1'></i>Add Appointment</button>
+                    <span id='appointmentsSaveStatus' class='save-status ms-1'></span>
                 </div>
                 <div class='d-flex align-items-center gap-2'>
                     <button type='button' class='btn btn-sm btn-ui-save' id='save-general-btn'><i class='bi bi-floppy me-1'></i>Save General Info</button>
@@ -1039,13 +1045,49 @@
                     <label class='form-label'>Title 1 (UH Title)" & (isSuperAdmin ? " <span class='badge badge-warning'>Super Admin</span>" : "") & "</label>
                     <input class='form-control' name='Title1' value='#user.TITLE1#'" & (isSuperAdmin ? "" : " readonly") & ">
                 </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>Title 2 (UHCO Appointments)</label>
-                    <input class='form-control' name='Title2' value='#user.TITLE2#'>
+            </div>
+
+            <div class='mb-4'>
+                <div class='d-flex align-items-center gap-2 mb-1'>
+                    <label class='form-label fw-semibold mb-0'>Appointments</label>
                 </div>
-                <div class='col-md-4'>
-                    <label class='form-label'>Title 3 (UHCO Appointments)</label>
-                    <input class='form-control' name='Title3' value='#user.TITLE3#'>
+                <small class='text-muted d-block mb-2'>UHCO Appointments are additional titles or roles associated with this person, such as secondary or affiliated appointments.</small>
+                <div id='appointmentsContainer'>
+                    " & (arrayLen(userAppointments) EQ 0 ? "<p class='text-muted small mb-0'>No appointments on file.</p>" : "") & "
+">
+
+<cfloop from="1" to="#arrayLen(userAppointments)#" index="local.pi">
+    <cfset local.appt = userAppointments[local.pi]>
+    <cfif len(trim(local.appt.APPOINTMENTTYPE ?: ""))> <cfset local.apptTypeBadge = "<span class='badge badge-secondary'>#EncodeForHTML(local.appt.APPOINTMENTTYPE)#</span>"><cfelse><cfset local.apptTypeBadge = ""></cfif>
+
+    <cfset content &= "
+                    <div class='card mb-2 appointment-card users-edit-item-card card-surface' data-idx='#(local.pi-1)#'>
+                        <div class='card-body py-2 px-3 users-edit-item-card-body'>
+                            <div class='d-flex justify-content-between align-items-center'>
+                                <div>
+                                    <strong>#EncodeForHTML(trim(local.appt.APPOINTMENTNAME ?: ""))#</strong>
+                                    #local.apptTypeBadge#
+                                </div>
+                                <div>
+                                    <button type='button' class='btn btn-sm btn-ui-edit edit-appointment-btn users-edit-secondary-button' data-idx='#(local.pi-1)#'><i class='bi bi-pencil-square me-1'></i>Edit</button>
+                                    <button type='button' class='btn btn-sm btn-ui-delete remove-appointment-btn users-edit-danger-button' data-idx='#(local.pi-1)#'><i class='bi bi-trash me-1'></i>Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+    ">
+</cfloop>
+<cfset content &= "
+                <input type='hidden' id='appointmentCount' value='#arrayLen(userAppointments)#'>
+">
+<cfloop from="1" to="#arrayLen(userAppointments)#" index="local.pi">
+    <cfset local.appt = userAppointments[local.pi]>
+    <cfset content &= "
+                <input type='hidden' data-appointment-field='name' data-appointment-idx='#(local.pi-1)#' value='#EncodeForHTMLAttribute(local.appt.APPOINTMENTNAME ?: "")#'>
+                <input type='hidden' data-appointment-field='type' data-appointment-idx='#(local.pi-1)#' value='#EncodeForHTMLAttribute(local.appt.APPOINTMENTTYPE ?: "")#'>
+    ">
+</cfloop>
+<cfset content &= "
                 </div>
             </div>
 " & (canManageDropboxFolder ? "
@@ -1591,9 +1633,24 @@
             <h6 class="fw-bold mb-3">Faculty</h6>
             <input type="hidden" name="processBio" value="1">
             <div class="mb-4">
-                <label class="form-label fw-bold">Bio / About Me</label>
-                <div class="users-edit-bio-editor"><cfoutput>#bioContent#</cfoutput></div>
-                <input type="hidden" name="bioContent" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+                <ul class="nav nav-tabs mb-2" id="facultyBioTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="professionalBioTabBtn" data-bs-toggle="tab" data-bs-target="#professionalBioTabPane" type="button" role="tab" aria-controls="professionalBioTabPane" aria-selected="true">Professional Bio</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="clinicalBioTabBtn" data-bs-toggle="tab" data-bs-target="#clinicalBioTabPane" type="button" role="tab" aria-controls="clinicalBioTabPane" aria-selected="false">Clinical Bio</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="facultyBioTabsContent">
+                    <div class="tab-pane fade show active" id="professionalBioTabPane" role="tabpanel" aria-labelledby="professionalBioTabBtn">
+                        <div class="users-edit-bio-editor" data-bio-type="ProfessionalBio"><cfoutput>#bioContent#</cfoutput></div>
+                        <input type="hidden" name="bioContent" value="<cfoutput>#EncodeForHTMLAttribute(bioContent)#</cfoutput>">
+                    </div>
+                    <div class="tab-pane fade" id="clinicalBioTabPane" role="tabpanel" aria-labelledby="clinicalBioTabBtn">
+                        <div class="users-edit-bio-editor" data-bio-type="ClinicalBio"><cfoutput>#clinicalBioContent#</cfoutput></div>
+                        <input type="hidden" name="clinicalBioContent" value="<cfoutput>#EncodeForHTMLAttribute(clinicalBioContent)#</cfoutput>">
+                    </div>
+                </div>
             </div>
         </cfif>
         <cfif showStaffProfile>
@@ -1950,6 +2007,33 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-ui-save" id="saveAliasModalBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--- ── Appointment Modal ── --->
+<div class="modal fade" id="appointmentModal" tabindex="-1" aria-labelledby="appointmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="appointmentModalLabel">Add Appointment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="appointmentEditIdx" value="-1">
+                <div class="mb-3">
+                    <label class="form-label">Appointment Name</label>
+                    <input class="form-control" id="appointmentName">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Appointment Type</label>
+                    <input class="form-control" id="appointmentType">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ui-cancel" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ui-save" id="saveAppointmentModalBtn">Save</button>
             </div>
         </div>
     </div>

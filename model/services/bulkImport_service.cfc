@@ -91,7 +91,7 @@ component output="false" singleton {
                 label = "Bulk Profile Fields",
                 description = "Generate a filtered CSV for one-row profile and academic updates such as titles, bio, externships, commencement age, DOB, gender, and grad years.",
                 requiredCols = ["UserID", "FirstName", "LastName", "ImportMode"],
-                optionalCols = ["Title1", "Title2", "Title3", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"],
+                optionalCols = ["Title1", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"],
                 icon = "bi-pencil-square",
                 workflow = "generated",
                 isGeneratedTemplate = true,
@@ -385,7 +385,7 @@ component output="false" singleton {
                 headers = ["UserID", "FirstName", "LastName", "ImportMode", "AwardName", "AwardType"];
                 break;
             case "bulk_profile":
-                headers = ["UserID", "FirstName", "LastName", "ImportMode", "Title1", "Title2", "Title3", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"];
+                headers = ["UserID", "FirstName", "LastName", "ImportMode", "Title1", "DOB", "Gender", "BioContent", "FirstExternship", "SecondExternship", "CommencementAge", "CurrentGradYear", "OriginalGradYear"];
                 break;
             case "bulk_external_ids":
                 headers = ["UserID", "FirstName", "LastName", "ImportMode"];
@@ -420,8 +420,6 @@ component output="false" singleton {
             var fullProfile = variables.directoryService.getFullProfile(val(arguments.user.USERID));
             itemRow = duplicate(baseRow);
             itemRow.Title1 = trim(fullProfile.user.TITLE1 ?: "");
-            itemRow.Title2 = trim(fullProfile.user.TITLE2 ?: "");
-            itemRow.Title3 = trim(fullProfile.user.TITLE3 ?: "");
             itemRow.DOB = _formatDateForCsv(fullProfile.user.DOB ?: "");
             itemRow.Gender = trim(fullProfile.user.GENDER ?: "");
             itemRow.BioContent = trim(fullProfile.bio.BIOCONTENT ?: "");
@@ -748,8 +746,6 @@ component output="false" singleton {
         var bioContent = _resolveProfileValue(trim(row.BioContent ?: ""), trim(fullProfile.bio.BIOCONTENT ?: ""), modeValue);
 
         userUpdate.Title1 = _resolveProfileValue(trim(row.Title1 ?: ""), trim(currentUser.TITLE1 ?: ""), modeValue);
-        userUpdate.Title2 = _resolveProfileValue(trim(row.Title2 ?: ""), trim(currentUser.TITLE2 ?: ""), modeValue);
-        userUpdate.Title3 = _resolveProfileValue(trim(row.Title3 ?: ""), trim(currentUser.TITLE3 ?: ""), modeValue);
 
         if (modeValue EQ "replace") {
             userUpdate.DOB = len(dobValue) ? { value=parseDateTime(dobValue), cfsqltype="cf_sql_date", null=false } : { value="", cfsqltype="cf_sql_date", null=true };
@@ -764,8 +760,6 @@ component output="false" singleton {
         }
 
         userChanged = _stringValuesDiffer(userUpdate.Title1, currentUser.TITLE1 ?: "")
-            OR _stringValuesDiffer(userUpdate.Title2, currentUser.TITLE2 ?: "")
-            OR _stringValuesDiffer(userUpdate.Title3, currentUser.TITLE3 ?: "")
             OR len(dobValue)
             OR len(genderValue)
             OR modeValue EQ "replace";

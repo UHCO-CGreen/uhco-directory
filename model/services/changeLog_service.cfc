@@ -35,7 +35,8 @@ component output="false" singleton {
             "bio"             : "Bio",
             "studentprofile"  : "Student Profile",
             "awards"          : "Awards",
-            "residencies"     : "Residencies"
+            "residencies"     : "Residencies",
+            "userappointments": "Appointments"
         };
 
         // Maps section → tables that are snapshotted before/after.
@@ -48,7 +49,7 @@ component output="false" singleton {
                 { table="Users",             pk="UserID", multi=false },
                 { table="UserAcademicInfo",  pk="UserID", multi=false },
                 { table="UserStudentProfile",pk="UserID", multi=false },
-                { table="UserBio",           pk="UserID", multi=false }
+                { table="UserBio",           pk="UserID", multi=true }
             ],
             "flags"          : [{ table="UserFlagAssignments",  pk="UserID", multi=true }],
             "emails"         : [{ table="UserEmails",           pk="UserID", multi=true }],
@@ -62,14 +63,15 @@ component output="false" singleton {
             "addaddress"     : [{ table="UserAddresses",        pk="UserID", multi=true }],
             "orgs"           : [{ table="UserOrganizations",    pk="UserID", multi=true }],
             "extids"         : [{ table="UserExternalIDs",      pk="UserID", multi=true }],
-            "bio"            : [{ table="UserBio",              pk="UserID", multi=false }],
+            "bio"            : [{ table="UserBio",              pk="UserID", multi=true }],
             "studentprofile" : [
                 { table="UserAcademicInfo",   pk="UserID", multi=false },
                 { table="UserStudentProfile", pk="UserID", multi=false },
                 { table="UserDegrees",        pk="UserID", multi=true  }
             ],
             "awards"         : [{ table="UserAwards",           pk="UserID", multi=true }],
-            "residencies"    : [{ table="UserResidency",        pk="UserID", multi=true }]
+            "residencies"    : [{ table="UserResidency",        pk="UserID", multi=true }],
+            "userappointments": [{ table="UserAppointments",    pk="UserID", multi=true }]
         };
 
         return this;
