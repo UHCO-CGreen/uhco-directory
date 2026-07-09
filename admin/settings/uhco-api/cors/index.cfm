@@ -40,7 +40,7 @@
         <h5 class="mb-2 settings-section-title"><i class="bi bi-toggle2-off me-2"></i>IP Range Trust Check</h5>
         <p class="text-muted small">
             When enabled, any request whose source IP matches an active range below is trusted
-            to make a cross-origin call using <strong>any</strong> Origin — not just the ones listed
+            to make a cross-origin call using <strong>any</strong> Origin - not just the ones listed
             above. Scope ranges as narrowly as practical. Off by default, and cannot be turned on
             until at least one active IP range exists.
         </p>
