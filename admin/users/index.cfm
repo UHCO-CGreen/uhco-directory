@@ -184,45 +184,25 @@
     <cfset impersonationState = application.authService.getImpersonationState()>
 </cfif>
 
-<!--- Load top-level orgs for filter dropdown --->
+<!--- Load orgs for filter (arbitrary-depth tree; a "root" org is one whose parent is blank or not itself a known org) --->
 <cfif showOrgFilter>
     <cfset allOrgsResult = orgsService.getAllOrgs()>
     <cfset allOrgs = allOrgsResult.data>
-    <cfset orgChildrenByParent = {}>
     <cfset orgIDs = {}>
-    <cfset rootOrgs = []>
+    <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
+        <cfset orgIDs[toString(allOrgs[iOrg].ORGID)] = true>
+    </cfloop>
     <cfset filterableOrgLookup = {}>
+    <cfset orgTreeForJs = []>
     <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
         <cfset orgItem = allOrgs[iOrg]>
-        <cfset orgIDs[toString(orgItem.ORGID)] = true>
-    </cfloop>
-    <cfloop from="1" to="#arrayLen(allOrgs)#" index="iOrg">
-        <cfset orgItem = allOrgs[iOrg]>
+        <cfset orgKey = toString(orgItem.ORGID)>
         <cfset parentValue = trim((orgItem.PARENTORGID ?: "") & "")>
-        <cfset parentKey = "ROOT">
-        <cfif len(parentValue) AND structKeyExists(orgIDs, parentValue)>
-            <cfset parentKey = parentValue>
+        <cfset isRootOrg = NOT (len(parentValue) AND structKeyExists(orgIDs, parentValue))>
+        <cfif NOT isRootOrg>
+            <cfset filterableOrgLookup[orgKey] = orgItem.ORGNAME>
         </cfif>
-        <cfif NOT structKeyExists(orgChildrenByParent, parentKey)>
-            <cfset orgChildrenByParent[parentKey] = []>
-        </cfif>
-        <cfset arrayAppend(orgChildrenByParent[parentKey], orgItem)>
-    </cfloop>
-    <cfset rootOrgs = structKeyExists(orgChildrenByParent, "ROOT") ? orgChildrenByParent["ROOT"] : []>
-    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
-        <cfset rootOrg = rootOrgs[iRoot]>
-        <cfset childKey = toString(rootOrg.ORGID)>
-        <cfset childOrgs = structKeyExists(orgChildrenByParent, childKey) ? orgChildrenByParent[childKey] : []>
-        <cfloop from="1" to="#arrayLen(childOrgs)#" index="iChild">
-            <cfset childOrg = childOrgs[iChild]>
-            <cfset filterableOrgLookup[toString(childOrg.ORGID)] = childOrg.ORGNAME>
-            <cfset grandChildKey = toString(childOrg.ORGID)>
-            <cfset grandChildOrgs = structKeyExists(orgChildrenByParent, grandChildKey) ? orgChildrenByParent[grandChildKey] : []>
-            <cfloop from="1" to="#arrayLen(grandChildOrgs)#" index="iGrandChild">
-                <cfset grandChildOrg = grandChildOrgs[iGrandChild]>
-                <cfset filterableOrgLookup[toString(grandChildOrg.ORGID)] = grandChildOrg.ORGNAME>
-            </cfloop>
-        </cfloop>
+        <cfset arrayAppend(orgTreeForJs, [orgKey, orgItem.ORGNAME, (isRootOrg ? "" : parentValue)])>
     </cfloop>
 </cfif>
 
@@ -260,21 +240,24 @@
 <cfif hideTestUsersForAdmin AND len(testUserFlagID) AND selectedFlagFilter EQ testUserFlagID>
     <cfset selectedFlagFilter = "">
 </cfif>
-<cfset requestedFilterPanel = structKeyExists(url, "filterPanel") ? lcase(trim(url.filterPanel)) : "">
-<cfset activeFilterPanel = "">
-<cfif requestedFilterPanel EQ "flags">
-    <cfset activeFilterPanel = "flags">
-<cfelseif requestedFilterPanel EQ "grad" AND showGradFilter>
-    <cfset activeFilterPanel = "grad">
-<cfelseif requestedFilterPanel EQ "orgs" AND showOrgFilter>
-    <cfset activeFilterPanel = "orgs">
-<cfelseif len(selectedFlagFilter)>
-    <cfset activeFilterPanel = "flags">
-<cfelseif showGradFilter AND len(selectedGradYear)>
-    <cfset activeFilterPanel = "grad">
-<cfelseif showOrgFilter AND orgFilterHasSelection>
-    <cfset activeFilterPanel = "orgs">
+<cfset filterPanelParamPresent = structKeyExists(url, "filterPanel")>
+<cfset requestedFilterPanelList = filterPanelParamPresent ? lcase(trim(url.filterPanel)) : "">
+<cfset openFilterPanels = { flags = false, grad = false, orgs = false }>
+<cfif filterPanelParamPresent>
+    <!--- Explicit param is authoritative, including empty (user closed everything) --->
+    <cfset openFilterPanels.flags = listFindNoCase(requestedFilterPanelList, "flags") GT 0>
+    <cfset openFilterPanels.grad  = showGradFilter AND listFindNoCase(requestedFilterPanelList, "grad") GT 0>
+    <cfset openFilterPanels.orgs  = showOrgFilter AND listFindNoCase(requestedFilterPanelList, "orgs") GT 0>
+<cfelse>
+    <!--- No filterPanel param at all (bookmarked/external link) - auto-open panels that already have a selection --->
+    <cfset openFilterPanels.flags = len(selectedFlagFilter) GT 0>
+    <cfset openFilterPanels.grad  = showGradFilter AND len(selectedGradYear) GT 0>
+    <cfset openFilterPanels.orgs  = showOrgFilter AND orgFilterHasSelection>
 </cfif>
+<cfset activeFilterPanelList = "">
+<cfif openFilterPanels.flags><cfset activeFilterPanelList = listAppend(activeFilterPanelList, "flags")></cfif>
+<cfif openFilterPanels.grad><cfset activeFilterPanelList = listAppend(activeFilterPanelList, "grad")></cfif>
+<cfif openFilterPanels.orgs><cfset activeFilterPanelList = listAppend(activeFilterPanelList, "orgs")></cfif>
 <cfset flagFilterCount = len(selectedFlagFilter) ? 1 : 0>
 <cfset gradFilterCount = (showGradFilter AND len(selectedGradYear)) ? 1 : 0>
 <cfset currentListUrl = cgi.script_name & (len(trim(cgi.query_string ?: "")) ? "?" & trim(cgi.query_string) : "?list=" & urlEncodedFormat(listType))>
@@ -610,86 +593,71 @@
         </cfif>
     </cfloop>
 </cfif>
+<cfset selectedOrgLabel = "">
+<cfif showOrgFilter AND orgFilterHasSelection>
+    <cfif includeNoOrgFilter AND arrayLen(selectedOrgFilterIDs) EQ 0>
+        <cfset selectedOrgLabel = "No Organization">
+    <cfelseif arrayLen(selectedOrgFilterIDs) EQ 1 AND structKeyExists(filterableOrgLookup, selectedOrgFilterIDs[1])>
+        <cfset selectedOrgLabel = filterableOrgLookup[selectedOrgFilterIDs[1]]>
+    <cfelse>
+        <cfset selectedOrgLabel = selectedOrgFilterCount & " Organizations">
+    </cfif>
+</cfif>
+<cffunction name="buildChipRemovalLink" returntype="string" access="private" output="false">
+    <cfargument name="omit" type="string" required="true">
+    <cfset var qp = "list=" & urlEncodedFormat(listType)
+        & "&sortCol=" & urlEncodedFormat(sortColumn)
+        & "&sortDir=" & urlEncodedFormat(sortDirection)
+        & "&perPage=" & perPage & "&page=1">
+    <cfif arguments.omit NEQ "flag" AND len(selectedFlagFilter)>
+        <cfset qp &= "&filterFlag=" & urlEncodedFormat(selectedFlagFilter)>
+    </cfif>
+    <cfif arguments.omit NEQ "grad" AND showGradFilter AND len(selectedGradYear)>
+        <cfset qp &= "&filterGradYear=" & urlEncodedFormat(selectedGradYear)>
+    </cfif>
+    <cfif arguments.omit NEQ "orgs" AND showOrgFilter AND len(selectedOrgFilter)>
+        <cfset qp &= "&filterOrg=" & urlEncodedFormat(selectedOrgFilter)>
+    </cfif>
+    <cfif arguments.omit NEQ "letter" AND len(selectedLetter)>
+        <cfset qp &= "&letter=" & urlEncodedFormat(selectedLetter)>
+    </cfif>
+    <cfif len(searchTerm)>
+        <cfset qp &= "&search=" & urlEncodedFormat(searchTerm)>
+    </cfif>
+    <cfset var remainingPanels = activeFilterPanelList>
+    <cfset var panelKey = (arguments.omit EQ "flag" ? "flags" : (arguments.omit EQ "grad" ? "grad" : (arguments.omit EQ "orgs" ? "orgs" : "")))>
+    <cfif len(panelKey) AND listFindNoCase(remainingPanels, panelKey)>
+        <cfset remainingPanels = listDeleteAt(remainingPanels, listFindNoCase(remainingPanels, panelKey))>
+    </cfif>
+    <cfset qp &= "&filterPanel=" & urlEncodedFormat(remainingPanels)>
+    <cfreturn "?" & qp>
+</cffunction>
+
 <cfset activeFilterChipsHTML = "">
 <cfif len(selectedFlagLabel)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-flag me-1'></i>Flag: " & encodeForHTML(selectedFlagLabel) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-flag me-1'></i>Flag: " & encodeForHTML(selectedFlagLabel) & "<a href='" & buildChipRemovalLink('flag') & "' class='users-list-active-chip-remove' aria-label='Remove Flag filter' title='Remove filter'><i class='bi bi-x'></i></a></span>">
 </cfif>
 <cfif showGradFilter AND len(selectedGradYear)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-mortarboard me-1'></i>Grad Year: " & encodeForHTML(selectedGradYear) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-mortarboard me-1'></i>Grad Year: " & encodeForHTML(selectedGradYear) & "<a href='" & buildChipRemovalLink('grad') & "' class='users-list-active-chip-remove' aria-label='Remove Grad Year filter' title='Remove filter'><i class='bi bi-x'></i></a></span>">
 </cfif>
 <cfif showOrgFilter AND orgFilterHasSelection>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-diagram-3 me-1'></i>Organizations: " & selectedOrgFilterCount & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-diagram-3 me-1'></i>Organization: " & encodeForHTML(selectedOrgLabel) & "<a href='" & buildChipRemovalLink('orgs') & "' class='users-list-active-chip-remove' aria-label='Remove Organization filter' title='Remove filter'><i class='bi bi-x'></i></a></span>">
 </cfif>
 <cfif len(selectedLetter)>
-    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-type me-1'></i>Last Name: " & encodeForHTML(selectedLetter) & "</span>">
+    <cfset activeFilterChipsHTML &= "<span class='badge rounded-pill badge-light users-list-active-chip'><i class='bi bi-type me-1'></i>Last Name: " & encodeForHTML(selectedLetter) & "<a href='" & buildChipRemovalLink('letter') & "' class='users-list-active-chip-remove' aria-label='Remove Last Name filter' title='Remove filter'><i class='bi bi-x'></i></a></span>">
 </cfif>
 <cfset orgFilterPanelHTML = "">
 <cfif showOrgFilter>
+    <cfset orgTreeJson = replace(serializeJSON(orgTreeForJs), "</", "<\/", "all")>
     <cfset orgFilterPanelHTML = "
-            <div class='users-list-org-filter-wrap'>
-                <div class='d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3'>
-                    <div>
-                        <div class='fw-semibold users-list-org-filter-title'>Organization Filters</div>
-                        <div class='text-muted small users-list-org-filter-note'>Top-level organizations are headings only. Select child organizations or their children to filter results.</div>
-                    </div>
+            <div class='users-list-org-cascade'>
+                <div class='mb-2'>
+                    <div class='fw-semibold users-list-org-filter-title'>Organization Filter</div>
+                    <div class='text-muted small users-list-org-filter-note'>Select a Unit, then drill down to narrow to a specific organization.</div>
                 </div>
-                <div class='form-check mb-3'>
-                    <input class='form-check-input' type='checkbox' name='filterOrg' value='NOORGS' id='filterOrgNoOrg'#(includeNoOrgFilter ? " checked" : "")#>
-                    <label class='form-check-label' for='filterOrgNoOrg'>No Org</label>
-                </div>
-                <div class='row row-cols-1 row-cols-xl-2 g-3 users-list-org-filter-grid'>
-    ">
-    <cfloop from="1" to="#arrayLen(rootOrgs)#" index="iRoot">
-        <cfset rootOrg = rootOrgs[iRoot]>
-        <cfset childOrgs = structKeyExists(orgChildrenByParent, toString(rootOrg.ORGID)) ? orgChildrenByParent[toString(rootOrg.ORGID)] : []>
-        <cfset orgFilterPanelHTML &= "
-                                <div class='col'>
-                                    <div class='card h-100 border-light-subtle users-list-org-group-card'>
-                                        <div class='card-header bg-white users-list-org-group-header'>
-                                            <div class='fw-semibold users-list-org-group-title'>#EncodeForHTML(rootOrg.ORGNAME)#</div>
-                                            #(len(trim(rootOrg.ORGDESCRIPTION ?: "")) ? "<div class='small text-muted mt-1 users-list-org-group-description'>" & EncodeForHTML(rootOrg.ORGDESCRIPTION) & "</div>" : "")#
-                                        </div>
-                                        <div class='card-body p-3 users-list-org-group-body'>
-        ">
-        <cfif arrayLen(childOrgs) EQ 0>
-            <cfset orgFilterPanelHTML &= "<div class='text-muted small'>No child organizations available.</div>">
-        <cfelse>
-            <cfloop from="1" to="#arrayLen(childOrgs)#" index="iChild">
-                <cfset childOrg = childOrgs[iChild]>
-                <cfset childOrgKey = toString(childOrg.ORGID)>
-                <cfset grandChildOrgs = structKeyExists(orgChildrenByParent, childOrgKey) ? orgChildrenByParent[childOrgKey] : []>
-                <cfset orgFilterPanelHTML &= "
-                                            <div class='mb-3'>
-                                                <div class='form-check mb-1'>
-                                                    <input class='form-check-input' type='checkbox' name='filterOrg' value='#childOrg.ORGID#' id='filterOrg#childOrg.ORGID#'#(structKeyExists(selectedOrgFilterLookup, childOrgKey) ? " checked" : "")#>
-                                                    <label class='form-check-label user-select-none' for='filterOrg#childOrg.ORGID#'>#EncodeForHTML(childOrg.ORGNAME)#</label>
-                                                </div>
-                ">
-                <cfif arrayLen(grandChildOrgs) GT 0>
-                    <cfset orgFilterPanelHTML &= "<div class='ms-4 mt-2 d-flex flex-column gap-2'>">
-                    <cfloop from="1" to="#arrayLen(grandChildOrgs)#" index="iGrandChild">
-                        <cfset grandChildOrg = grandChildOrgs[iGrandChild]>
-                        <cfset grandChildOrgKey = toString(grandChildOrg.ORGID)>
-                        <cfset orgFilterPanelHTML &= "
-                                                    <div class='form-check'>
-                                                        <input class='form-check-input' type='checkbox' name='filterOrg' value='#grandChildOrg.ORGID#' id='filterOrg#grandChildOrg.ORGID#'#(structKeyExists(selectedOrgFilterLookup, grandChildOrgKey) ? " checked" : "")#>
-                                                        <label class='form-check-label user-select-none small text-muted' for='filterOrg#grandChildOrg.ORGID#'>#EncodeForHTML(grandChildOrg.ORGNAME)#</label>
-                                                    </div>
-                        ">
-                    </cfloop>
-                    <cfset orgFilterPanelHTML &= "</div>">
-                </cfif>
-                <cfset orgFilterPanelHTML &= "</div>">
-            </cfloop>
-        </cfif>
-        <cfset orgFilterPanelHTML &= "
-                                        </div>
-                                    </div>
-                                </div>
-        ">
-    </cfloop>
-    <cfset orgFilterPanelHTML &= "
-                </div>
+                <div class='users-list-org-cascade-selects' id='usersListOrgCascadeSelects'></div>
+                <input type='hidden' name='filterOrg' id='usersListOrgFilterInput' value='#encodeForHTMLAttribute(selectedOrgFilter)#'>
+                <script type='application/json' id='usersListOrgTreeData'>#orgTreeJson#</script>
             </div>
     ">
 </cfif>
@@ -720,7 +688,7 @@
                         <input type='hidden' name='filterOrg' value='#encodeForHTMLAttribute(selectedOrgFilter)#'>
                         <input type='hidden' name='perPage' value='#perPage#'>
                         <input type='hidden' name='letter' value='#encodeForHTMLAttribute(selectedLetter)#'>
-                        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanel)#'>
+                        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanelList)#'>
                         <input type='hidden' name='page'    value='1'>
                         <div class='input-group users-list-toolbar-search users-list-toolbar-input-group'>
                             <button type='button' class='btn btn-sm btn-ui-help users-list-help-button' data-bs-toggle='modal' data-bs-target='##searchHelpModal' title='Search help'><i class='bi bi-question-circle'></i></button>
@@ -794,7 +762,7 @@
         <input type='hidden' name='search' value='#encodeForHTMLAttribute(searchTerm)#'>
         <input type='hidden' name='letter' value='#encodeForHTMLAttribute(selectedLetter)#'>
         <input type='hidden' name='page' value='1'>
-        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanel)#' id='usersListFilterPanelInput'>
+        <input type='hidden' name='filterPanel' value='#encodeForHTMLAttribute(activeFilterPanelList)#' id='usersListFilterPanelInput'>
         <div class='users-page-secondary-toolbar users-list-secondary-toolbar'>
             <div class='users-page-secondary-toolbar-heading'>
                 <div class='users-page-secondary-toolbar-eyebrow'>User Records</div>
@@ -825,11 +793,11 @@
                 <div class='tab-pane fade#(advSearchIsActive ? "" : " show active")#' id='usersFiltersTabPane' role='tabpanel' aria-labelledby='usersFiltersTabBtn'>
                 <div class='users-list-filter-toolbar-row users-list-action-row'>
                     <div class='users-list-filter-toolbar-group'>
-                    <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(activeFilterPanel EQ "flags" ? "btn-ui-filter" : "btn-ui-cancel")#' data-filter-panel-trigger='flags' aria-expanded='#(activeFilterPanel EQ "flags" ? "true" : "false")#' aria-controls='usersListFilterPanel'>
+                    <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(openFilterPanels.flags ? "btn-ui-filter" : "btn-ui-cancel")#' data-filter-panel-trigger='flags' aria-expanded='#(openFilterPanels.flags ? "true" : "false")#' aria-controls='usersListFilterPanel'>
                         <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & flagFilterCount & "</span>" : "")#
                     </button>
-                    #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "grad" ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='grad' aria-expanded='" & (activeFilterPanel EQ "grad" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
-                    #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (activeFilterPanel EQ "orgs" ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (activeFilterPanel EQ "orgs" ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
+                    #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (openFilterPanels.grad ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='grad' aria-expanded='" & (openFilterPanels.grad ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
+                    #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (openFilterPanels.orgs ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (openFilterPanels.orgs ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
                     #(request.isSuperAdmin() AND len(testUsersLink) ? "<a href='" & testUsersLink & "' class='btn btn-sm " & ((listType EQ "all" AND selectedFlagFilter EQ testUserFlagID) ? "btn-ui-filter" : "btn-ui-cancel") & " users-list-test-users-button'><i class='bi bi-person-badge me-1'></i>Test Users</a>" : "")#
                     <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per Page:</label>
                     <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
@@ -841,8 +809,8 @@
                     </div>
                     " & (len(activeFilterChipsHTML) ? "<div class='d-flex flex-wrap gap-2 align-items-center users-list-active-filters'>" & activeFilterChipsHTML & "</div>" : "") & "
                 </div>
-                <div class='users-list-filter-panel#(len(activeFilterPanel) ? "" : " d-none")#' id='usersListFilterPanel'>
-                <div class='users-list-filter-section#(activeFilterPanel EQ "flags" ? "" : " d-none")#' data-filter-panel='flags'>
+                <div class='users-list-filter-panel#(len(activeFilterPanelList) ? "" : " d-none")#' id='usersListFilterPanel'>
+                <div class='users-list-filter-section#(openFilterPanels.flags ? "" : " d-none")#' data-filter-panel='flags'>
                     <div class='d-flex flex-wrap align-items-center gap-2'>
                         <label for='flagFilter' class='mb-0 users-list-filter-label'>Flag:</label>
                         <select name='filterFlag' id='flagFilter' class='form-select users-list-select-auto'>
@@ -875,7 +843,7 @@
 <!--- Grad year filter (conditional) --->
 <cfif showGradFilter>
     <cfset content &= "
-                <div class='users-list-filter-section#(activeFilterPanel EQ "grad" ? "" : " d-none")#' data-filter-panel='grad'>
+                <div class='users-list-filter-section#(openFilterPanels.grad ? "" : " d-none")#' data-filter-panel='grad'>
                     <div class='d-flex flex-wrap align-items-center gap-2'>
                         <label for='gradYearFilter' class='mb-0 users-list-filter-label'>Grad Year:</label>
                         <select name='filterGradYear' id='gradYearFilter' class='form-select users-list-select-auto'>
@@ -895,7 +863,7 @@
 <!--- Organization filter panel --->
 <cfif showOrgFilter>
     <cfset content &= "
-                <div class='users-list-filter-section#(activeFilterPanel EQ "orgs" ? "" : " d-none")#' data-filter-panel='orgs'>
+                <div class='users-list-filter-section#(openFilterPanels.orgs ? "" : " d-none")#' data-filter-panel='orgs'>
                     #orgFilterPanelHTML#
                 </div>
     ">
@@ -1195,41 +1163,51 @@
     var toolbarSearchForm = document.querySelector('.users-list-toolbar-search-form');
     var toolbarFilterPanelInput = toolbarSearchForm ? toolbarSearchForm.querySelector('input[name="filterPanel"]') : null;
 
-    function setActiveFilterPanel(panelName) {
-        var activePanel = panelName || '';
+    function getOpenPanels() {
+        var raw = filterPanelInput ? filterPanelInput.value : '';
+        return raw ? raw.split(',').filter(Boolean) : [];
+    }
 
+    function setOpenPanels(panels) {
+        var value = panels.join(',');
         if (filterPanelInput) {
-            filterPanelInput.value = activePanel;
+            filterPanelInput.value = value;
         }
         if (toolbarFilterPanelInput) {
-            toolbarFilterPanelInput.value = activePanel;
+            toolbarFilterPanelInput.value = value;
         }
         if (filterPanelCard) {
-            filterPanelCard.classList.toggle('d-none', !activePanel);
+            filterPanelCard.classList.toggle('d-none', panels.length === 0);
         }
 
         filterPanelButtons.forEach(function (button) {
-            var isActive = button.getAttribute('data-filter-panel-trigger') === activePanel;
-            button.classList.toggle('btn-ui-filter', isActive);
-            button.classList.toggle('btn-ui-cancel', !isActive);
-            button.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+            var isOpen = panels.indexOf(button.getAttribute('data-filter-panel-trigger')) !== -1;
+            button.classList.toggle('btn-ui-filter', isOpen);
+            button.classList.toggle('btn-ui-cancel', !isOpen);
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
 
         filterPanelSections.forEach(function (section) {
-            var isActive = section.getAttribute('data-filter-panel') === activePanel;
-            section.classList.toggle('d-none', !isActive);
+            var isOpen = panels.indexOf(section.getAttribute('data-filter-panel')) !== -1;
+            section.classList.toggle('d-none', !isOpen);
         });
     }
 
     filterPanelButtons.forEach(function (button) {
         button.addEventListener('click', function () {
             var panelName = button.getAttribute('data-filter-panel-trigger') || '';
-            var nextPanel = filterPanelInput && filterPanelInput.value === panelName ? '' : panelName;
-            setActiveFilterPanel(nextPanel);
+            var panels = getOpenPanels();
+            var idx = panels.indexOf(panelName);
+            if (idx === -1) {
+                panels.push(panelName);
+            } else {
+                panels.splice(idx, 1);
+            }
+            setOpenPanels(panels);
         });
     });
 
-    setActiveFilterPanel(filterPanelInput ? filterPanelInput.value : '');
+    setOpenPanels(getOpenPanels());
 
     advancedForm.addEventListener('submit', function (event) {
         event.preventDefault();
@@ -1241,18 +1219,169 @@
             params.append(el.name, el.value);
         });
 
-        // Collapse multiple filterOrg values into a single comma-joined param
-        var orgValues = [];
-        advancedForm.querySelectorAll('input[name="filterOrg"]:checked').forEach(function (cb) {
-            orgValues.push(cb.value);
-        });
-        params.delete('filterOrg');
-        if (orgValues.length) {
-            params.set('filterOrg', orgValues.join(','));
-        }
-
         window.location.href = window.location.pathname + '?' + params.toString();
     });
+})();
+
+// ── Organization Filter Cascade ──────────────────────────────────────────
+(function () {
+    var cascadeRoot = document.getElementById('usersListOrgCascadeSelects');
+    if (!cascadeRoot) return;
+
+    var orgDataEl = document.getElementById('usersListOrgTreeData');
+    var orgFilterInput = document.getElementById('usersListOrgFilterInput');
+    var orgTreeRaw = [];
+    try {
+        orgTreeRaw = orgDataEl ? JSON.parse(orgDataEl.textContent || '[]') : [];
+    } catch (e) {
+        orgTreeRaw = [];
+    }
+
+    var levelLabels = ['Unit', 'Root Organization', 'Child Organization'];
+    function labelForLevel(depth) {
+        return levelLabels[depth] || 'Sub-Organization';
+    }
+
+    // Build a lookup by id and root/children lists, preserving the server-rendered order.
+    var orgNodesById = {};
+    orgTreeRaw.forEach(function (row) {
+        orgNodesById[row[0]] = { id: row[0], name: row[1], parentId: row[2], children: [] };
+    });
+    var orgRootNodes = [];
+    orgTreeRaw.forEach(function (row) {
+        var node = orgNodesById[row[0]];
+        if (node.parentId && orgNodesById[node.parentId]) {
+            orgNodesById[node.parentId].children.push(node);
+        } else {
+            orgRootNodes.push(node);
+        }
+    });
+
+    function buildPathToRoot(id) {
+        var path = [];
+        var cur = orgNodesById[id];
+        while (cur) {
+            path.unshift(cur.id);
+            cur = cur.parentId ? orgNodesById[cur.parentId] : null;
+        }
+        return path;
+    }
+
+    function removeLevelsFrom(depth) {
+        cascadeRoot.querySelectorAll('[data-org-level]').forEach(function (el) {
+            if (parseInt(el.getAttribute('data-org-level'), 10) >= depth) {
+                el.remove();
+            }
+        });
+    }
+
+    function appendLevelSelect(depth, nodes, selectedId, parentName) {
+        var select = document.createElement('select');
+        select.className = 'form-select users-list-select-auto users-list-org-cascade-select';
+        select.setAttribute('data-org-level', depth);
+        select.setAttribute('aria-label', labelForLevel(depth));
+
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = depth === 0 ? 'All Organizations' : ('Any in ' + parentName);
+        select.appendChild(placeholder);
+
+        if (depth === 0) {
+            var noOrgOpt = document.createElement('option');
+            noOrgOpt.value = 'NOORGS';
+            noOrgOpt.textContent = '— No Organization —';
+            select.appendChild(noOrgOpt);
+        }
+
+        nodes.forEach(function (node) {
+            var opt = document.createElement('option');
+            opt.value = node.id;
+            opt.textContent = node.name;
+            select.appendChild(opt);
+        });
+
+        select.value = selectedId || '';
+
+        select.addEventListener('change', function () {
+            handleLevelChange(depth, select.value);
+        });
+
+        cascadeRoot.appendChild(select);
+        return select;
+    }
+
+    function handleLevelChange(depth, value) {
+        removeLevelsFrom(depth + 1);
+
+        if (depth === 0) {
+            // Units are navigational only (never a filter value on their own), matching
+            // the server, which excludes root orgs from the filterable lookup.
+            if (value === '' || value === 'NOORGS') {
+                orgFilterInput.value = value;
+                return;
+            }
+            var rootNode = orgNodesById[value];
+            if (!rootNode) return;
+            orgFilterInput.value = '';
+            if (rootNode.children.length) {
+                appendLevelSelect(1, rootNode.children, '', rootNode.name);
+            }
+            return;
+        }
+
+        if (value === '') {
+            // Reset to whichever level is currently selected above this one (Unit doesn't count).
+            var parentSelect = depth - 1 > 0 ? cascadeRoot.querySelector('[data-org-level="' + (depth - 1) + '"]') : null;
+            orgFilterInput.value = parentSelect ? parentSelect.value : '';
+            return;
+        }
+
+        var node = orgNodesById[value];
+        if (!node) return;
+
+        orgFilterInput.value = node.id;
+
+        if (node.children.length) {
+            appendLevelSelect(depth + 1, node.children, '', node.name);
+        }
+    }
+
+    function renderInitial() {
+        cascadeRoot.innerHTML = '';
+        var raw = (orgFilterInput.value || '').split(',')[0].trim();
+        orgFilterInput.value = raw; // normalize away any stale multi-value list from an old bookmark
+
+        if (!raw) {
+            appendLevelSelect(0, orgRootNodes, '', '');
+            return;
+        }
+        if (raw === 'NOORGS') {
+            appendLevelSelect(0, orgRootNodes, 'NOORGS', '');
+            return;
+        }
+        if (!orgNodesById[raw]) {
+            orgFilterInput.value = '';
+            appendLevelSelect(0, orgRootNodes, '', '');
+            return;
+        }
+
+        var path = buildPathToRoot(raw);
+        var nodesForLevel = orgRootNodes;
+        var parentName = '';
+        for (var depth = 0; depth < path.length; depth++) {
+            appendLevelSelect(depth, nodesForLevel, path[depth], parentName);
+            var node = orgNodesById[path[depth]];
+            nodesForLevel = node.children;
+            parentName = node.name;
+        }
+
+        var leafNode = orgNodesById[raw];
+        if (leafNode.children.length) {
+            appendLevelSelect(path.length, leafNode.children, '', leafNode.name);
+        }
+    }
+
+    renderInitial();
 })();
 
 // ── Advanced Search Tab ──────────────────────────────────────────────────

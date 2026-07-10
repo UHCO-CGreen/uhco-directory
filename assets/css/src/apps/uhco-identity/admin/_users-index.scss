@@ -281,6 +281,25 @@
 	border: 1px solid rgba(79, 101, 122, 0.2);
 }
 
+.users-list-active-chip-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-left: 0.35rem;
+	width: 1.1rem;
+	height: 1.1rem;
+	border-radius: 50%;
+	color: inherit;
+	opacity: 0.65;
+	text-decoration: none;
+
+	&:hover,
+	&:focus-visible {
+		opacity: 1;
+		background-color: rgba(79, 101, 122, 0.15);
+	}
+}
+
 .users-list-filter-panel {
 	overflow: visible;
 }
@@ -600,25 +619,25 @@
 	transform: translateY(-1px);
 }
 
-.users-list-org-filter-panel {
-	border-radius: 0.8rem;
-}
-
-.users-list-org-filter-panel-body {
-	background: linear-gradient(180deg, #fdfefe 0%, #f6f9fc 100%);
-}
-
-.users-list-org-filter-title,
-.users-list-org-group-title {
+.users-list-org-filter-title {
 	color: #1b3950;
 }
 
-.users-list-org-group-card {
-	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+.users-list-org-cascade-selects {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
 }
 
-.users-list-org-group-header {
-	background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%) !important;
+.users-list-org-cascade-select {
+	min-width: 12rem;
+	flex: 1 1 12rem;
+}
+
+@media (max-width: 575.98px) {
+	.users-list-org-cascade-select {
+		flex: 1 1 100%;
+	}
 }
 
 .users-list-empty-state {
@@ -716,14 +735,6 @@
 
 	.users-list-page-header .d-flex {
 		justify-content: flex-start;
-	}
-
-	.users-list-org-group-body {
-		padding: 0.9rem !important;
-	}
-
-	.users-list-org-group-body .ms-4 {
-		margin-left: 1rem !important;
 	}
 
 	.users-list-table {
