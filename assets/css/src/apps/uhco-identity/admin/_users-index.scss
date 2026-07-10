@@ -224,8 +224,24 @@
 	margin-left: auto;
 }
 
-.users-list-filter-panel-toggle {
+.users-list-filter-switch {
+	display: inline-flex;
+	align-items: center;
+	margin-bottom: 0;
+	padding-top: 0.15rem;
+	padding-bottom: 0.15rem;
+}
+
+.users-list-filter-switch .form-check-input {
+	cursor: pointer;
+}
+
+.users-list-filter-switch .form-check-label {
+	display: inline-flex;
+	align-items: center;
 	font-weight: 600;
+	cursor: pointer;
+	user-select: none;
 }
 
 .users-list-active-filters {

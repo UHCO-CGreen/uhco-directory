@@ -804,13 +804,14 @@
                 <div class='tab-pane fade#(advSearchIsActive ? "" : " show active")#' id='usersFiltersTabPane' role='tabpanel' aria-labelledby='usersFiltersTabBtn'>
                 <div class='users-list-filter-toolbar-row users-list-action-row'>
                     <div class='users-list-filter-toolbar-group'>
-                    <button type='button' class='btn btn-sm users-list-filter-panel-toggle #(openFilterPanels.flags ? "btn-ui-filter" : "btn-ui-cancel")#' data-filter-panel-trigger='flags' aria-expanded='#(openFilterPanels.flags ? "true" : "false")#' aria-controls='usersListFilterPanel'>
-                        <i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & flagFilterCount & "</span>" : "")#
-                    </button>
-                    #(showGradFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (openFilterPanels.grad ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='grad' aria-expanded='" & (openFilterPanels.grad ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & gradFilterCount & "</span>" : "") & "</button>" : "")#
-                    #(showOrgFilter ? "<button type='button' class='btn btn-sm users-list-filter-panel-toggle " & (openFilterPanels.orgs ? "btn-ui-filter" : "btn-ui-cancel") & "' data-filter-panel-trigger='orgs' aria-expanded='" & (openFilterPanels.orgs ? "true" : "false") & "' aria-controls='usersListFilterPanel'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</button>" : "")#
-                    #(request.isSuperAdmin() AND len(testUsersLink) ? "<a href='" & testUsersLink & "' class='btn btn-sm " & ((listType EQ "all" AND selectedFlagFilter EQ testUserFlagID) ? "btn-ui-filter" : "btn-ui-cancel") & " users-list-test-users-button'><i class='bi bi-person-badge me-1'></i>Test Users</a>" : "")#
-                    <label for='perPageSelect' class='mb-0 users-list-filter-label'>Per Page:</label>
+                    <div class='form-check form-switch users-list-filter-switch me-2 border-end pe-2'>
+                        <input class='form-check-input' type='checkbox' role='switch' id='filterSwitchFlags' data-filter-panel-trigger='flags' aria-expanded='#(openFilterPanels.flags ? "true" : "false")#' aria-controls='usersListFilterPanel'#(openFilterPanels.flags ? " checked" : "")#>
+                        <label class='form-check-label ms-2' for='filterSwitchFlags'><i class='bi bi-flag me-1'></i>Flags#(flagFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & flagFilterCount & "</span>" : "")#</label>
+                    </div>
+                    #(showGradFilter ? "<div class='form-check form-switch users-list-filter-switch me-2 border-end pe-2'><input class='form-check-input' type='checkbox' role='switch' id='filterSwitchGrad' data-filter-panel-trigger='grad' aria-expanded='" & (openFilterPanels.grad ? "true" : "false") & "' aria-controls='usersListFilterPanel'" & (openFilterPanels.grad ? " checked" : "") & "><label class='form-check-label ms-2' for='filterSwitchGrad'><i class='bi bi-mortarboard me-1'></i>Grad Year" & (gradFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & gradFilterCount & "</span>" : "") & "</label></div>" : "")#
+                    #(showOrgFilter ? "<div class='form-check form-switch users-list-filter-switch me-2 border-end pe-2'><input class='form-check-input' type='checkbox' role='switch' id='filterSwitchOrgs' data-filter-panel-trigger='orgs' aria-expanded='" & (openFilterPanels.orgs ? "true" : "false") & "' aria-controls='usersListFilterPanel'" & (openFilterPanels.orgs ? " checked" : "") & "><label class='form-check-label ms-2' for='filterSwitchOrgs'><i class='bi bi-diagram-3 me-1'></i>Organizations" & (selectedOrgFilterCount GT 0 ? " <span class='badge badge-light ms-1'>" & selectedOrgFilterCount & "</span>" : "") & "</label></div>" : "")#
+                    
+                    <label for='perPageSelect' class='mb-0 users-list-filter-label border-start ps-2'>Per Page:</label>
                     <select name='perPage' id='perPageSelect' class='form-select users-list-select-auto'>
                         <option value='10'  #(perPage == 10  ? 'selected' : '')#>10</option>
                         <option value='25'  #(perPage == 25  ? 'selected' : '')#>25</option>
@@ -892,12 +893,14 @@
                 <div id='usersFiltersFooter' class='d-flex align-items-center gap-2#(advSearchIsActive ? " d-none" : "")#'>
                     <button type='submit' class='btn btn-sm btn-ui-filter users-list-apply-button'><i class='bi bi-funnel me-1'></i>Apply Filters</button>
                     " & (hasActiveFilters ? "<a href='#clearLink#' class='btn btn-sm btn-ui-clear users-list-clear-button'><i class='bi bi-x-circle me-1'></i>Clear All</a>" : "") & "
+                    #(request.isSuperAdmin() AND len(testUsersLink) ? "<a href='" & testUsersLink & "' class='btn btn-sm " & ((listType EQ "all" AND selectedFlagFilter EQ testUserFlagID) ? "btn-ui-filter" : "btn-ui-cancel") & " users-list-test-users-button'><i class='bi bi-person-badge me-1'></i>Show Test Users Only</a>" : "")#
                 </div>
                 <div id='usersAdvSearchFooter' class='d-flex align-items-center gap-2 flex-wrap w-100#(advSearchIsActive ? "" : " d-none")#'>
                     <button type='button' class='btn btn-sm btn-ui-filter' id='usersAdvSearchApply'><i class='bi bi-search me-1'></i>Search</button>
                     <a href='##' class='btn btn-sm btn-ui-clear users-list-clear-button#(advSearchIsActive ? "" : " d-none")#' id='usersAdvSearchClear'><i class='bi bi-x-circle me-1'></i>Clear All</a>
                     <span class='text-muted small ms-1'>Conditions are combined with AND/OR. Searching with this panel replaces any text in the toolbar search box.</span>
                 </div>
+                
             </div><!-- /card-footer -->
         </div><!-- /users-search-filter-card -->
     </form>
@@ -1170,7 +1173,7 @@
 
     var filterPanelInput = document.getElementById('usersListFilterPanelInput');
     var filterPanelCard = document.getElementById('usersListFilterPanel');
-    var filterPanelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-filter-panel-trigger]'));
+    var filterPanelToggles = Array.prototype.slice.call(document.querySelectorAll('[data-filter-panel-trigger]'));
     var filterPanelSections = Array.prototype.slice.call(document.querySelectorAll('[data-filter-panel]'));
     var toolbarSearchForm = document.querySelector('.users-list-toolbar-search-form');
     var toolbarFilterPanelInput = toolbarSearchForm ? toolbarSearchForm.querySelector('input[name="filterPanel"]') : null;
@@ -1192,11 +1195,10 @@
             filterPanelCard.classList.toggle('d-none', panels.length === 0);
         }
 
-        filterPanelButtons.forEach(function (button) {
-            var isOpen = panels.indexOf(button.getAttribute('data-filter-panel-trigger')) !== -1;
-            button.classList.toggle('btn-ui-filter', isOpen);
-            button.classList.toggle('btn-ui-cancel', !isOpen);
-            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        filterPanelToggles.forEach(function (toggle) {
+            var isOpen = panels.indexOf(toggle.getAttribute('data-filter-panel-trigger')) !== -1;
+            toggle.checked = isOpen;
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
 
         filterPanelSections.forEach(function (section) {
@@ -1205,14 +1207,14 @@
         });
     }
 
-    filterPanelButtons.forEach(function (button) {
-        button.addEventListener('click', function () {
-            var panelName = button.getAttribute('data-filter-panel-trigger') || '';
+    filterPanelToggles.forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            var panelName = toggle.getAttribute('data-filter-panel-trigger') || '';
             var panels = getOpenPanels();
             var idx = panels.indexOf(panelName);
-            if (idx === -1) {
+            if (toggle.checked && idx === -1) {
                 panels.push(panelName);
-            } else {
+            } else if (!toggle.checked && idx !== -1) {
                 panels.splice(idx, 1);
             }
             setOpenPanels(panels);
