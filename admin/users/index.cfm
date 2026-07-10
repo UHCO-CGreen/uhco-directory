@@ -103,6 +103,8 @@
 <cfset allFlags       = allFlagsResult.data>
 <cfset allUserFlagMap = flagsService.getAllUserFlagMap()>
 <cfset allUserOrgMap  = orgsService.getAllUserOrgMap()>
+<!--- "All Faculty" is a synthetic filter combining several real flags - not itself an assignable flag --->
+<cfset allFacultyFlagNames = "Faculty-Adjunct,Faculty-Fulltime,Professor-Emeritus,Joint Faculty Appointment">
 <cfset showTestUsersForAdmin = request.canManageTestUsers()>
 <cfset hideTestUsersForAdmin = request.shouldExcludeTestUsers()>
 <cfset testUserFlagID = "">
@@ -408,6 +410,13 @@
             <cfif arrayLen(userFlags) EQ 0>
                 <cfset arrayAppend(flagFiltered, u)>
             </cfif>
+        <cfelseif selectedFlagFilter EQ "ALLFACULTY">
+            <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
+                <cfif listFindNoCase(allFacultyFlagNames, userFlags[f].FLAGNAME)>
+                    <cfset arrayAppend(flagFiltered, u)>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
         <cfelse>
             <cfset selectedFlagID = val(selectedFlagFilter)>
             <cfloop from="1" to="#arrayLen(userFlags)#" index="f">
@@ -585,6 +594,8 @@
 <cfset selectedFlagLabel = "">
 <cfif selectedFlagFilter EQ "NOFLAGS">
     <cfset selectedFlagLabel = "No Flags">
+<cfelseif selectedFlagFilter EQ "ALLFACULTY">
+    <cfset selectedFlagLabel = "All Faculty">
 <cfelseif len(selectedFlagFilter) AND isNumeric(selectedFlagFilter)>
     <cfloop array="#allFlags#" index="flagOption">
         <cfif toString(flagOption.FLAGID) EQ toString(selectedFlagFilter)>
@@ -816,6 +827,7 @@
                         <select name='filterFlag' id='flagFilter' class='form-select users-list-select-auto'>
                             <option value=''>All</option>
                             <option value='NOFLAGS'#(selectedFlagFilter == 'NOFLAGS' ? ' selected' : '')#>No Flags</option>
+                            <option value='ALLFACULTY'#(selectedFlagFilter == 'ALLFACULTY' ? ' selected' : '')#>All Faculty</option>
 ">
 
 <cfif showTestUsersForAdmin AND len(testUserFlagID)>
