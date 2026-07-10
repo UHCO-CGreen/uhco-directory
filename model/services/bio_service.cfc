@@ -5,19 +5,19 @@ component output="false" singleton {
         return this;
     }
 
-    public struct function getBio( required numeric userID ) {
-        return { success=true, data=variables.bioDAO.getBio( userID ) };
+    public struct function getBio( required numeric userID, string bioType = "ProfessionalBio" ) {
+        return { success=true, data=variables.bioDAO.getBio( userID, arguments.bioType ) };
     }
 
     public string function sanitizeForRender( required string bioContent ) {
         return sanitizeHTML( trim(arguments.bioContent) );
     }
 
-    public void function saveBio( required numeric userID, required string bioContent ) {
+    public void function saveBio( required numeric userID, required string bioContent, string bioType = "ProfessionalBio" ) {
         var cleaned = sanitizeHTML( trim(bioContent) );
         variables.bioDAO.saveBio( userID, {
             BioContent = { value=cleaned, cfsqltype="cf_sql_longvarchar", null=!len(cleaned) }
-        });
+        }, arguments.bioType );
     }
 
     /**
