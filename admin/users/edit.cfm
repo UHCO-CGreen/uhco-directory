@@ -223,10 +223,10 @@
             }
         </cfscript>
 
+        <!--- Staff/Faculty excluded: UH API has no way to distinguish which of the 4 local faculty
+              flags (or Staff vs other roles) applies, so those must be set manually by an admin. --->
         <cfset uhSyncFlagCompareRows = [
-            { label="Student", apiKeys="student,is_student,isStudent", flagName="Current-Student" },
-            { label="Staff", apiKeys="staff,is_staff,isStaff", flagName="Staff" },
-            { label="Faculty", apiKeys="faculty,is_faculty,isFaculty", flagName="Faculty-Fulltime" }
+            { label="Student", apiKeys="student,is_student,isStudent", flagName="Current-Student" }
         ]>
 
         <cfloop from="1" to="#arrayLen(uhSyncFlagCompareRows)#" index="flagCompareIndex">

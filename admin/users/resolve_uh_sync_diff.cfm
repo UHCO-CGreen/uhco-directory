@@ -316,22 +316,16 @@
     <cfset allFlagsResult = flagsService.getAllFlags()>
     <cfset syncFlagsUpdated = 0>
 
+    <!--- Staff/Faculty excluded: UH API has no way to distinguish which of the 4 local faculty
+          flags (or Staff vs other roles) applies, so those must be set manually by an admin. --->
     <cfif structKeyExists(allFlagsResult, "success") AND allFlagsResult.success>
         <cfset currentFlagsResult = flagsService.getUserFlags(applyUserID)>
         <cfset userHasCurrentStudent = false>
-        <cfset userHasStaff = false>
-        <cfset userHasFaculty = false>
         <cfset currentStudentFlagID = 0>
-        <cfset staffFlagID = 0>
-        <cfset facultyFlagID = 0>
 
         <cfloop from="1" to="#arrayLen(allFlagsResult.data)#" index="flagIndex">
             <cfif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Current-Student") EQ 0>
                 <cfset currentStudentFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
-            <cfelseif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Staff") EQ 0>
-                <cfset staffFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
-            <cfelseif compareNoCase(trim(allFlagsResult.data[flagIndex].FLAGNAME ?: ""), "Faculty-Fulltime") EQ 0>
-                <cfset facultyFlagID = val(allFlagsResult.data[flagIndex].FLAGID ?: 0)>
             </cfif>
         </cfloop>
 
@@ -339,14 +333,10 @@
             <cfloop from="1" to="#arrayLen(currentFlagsResult.data)#" index="userFlagIndex">
                 <cfset thisFlagID = val(currentFlagsResult.data[userFlagIndex].FLAGID ?: 0)>
                 <cfif thisFlagID EQ currentStudentFlagID><cfset userHasCurrentStudent = true></cfif>
-                <cfif thisFlagID EQ staffFlagID><cfset userHasStaff = true></cfif>
-                <cfif thisFlagID EQ facultyFlagID><cfset userHasFaculty = true></cfif>
             </cfloop>
         </cfif>
 
         <cfset apiStudent = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "student,is_student,isStudent")))>
-        <cfset apiStaff = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "staff,is_staff,isStaff")))>
-        <cfset apiFaculty = lCase(trim(resolveSyncAllGetApiValue(syncApiPerson, "faculty,is_faculty,isFaculty")))>
 
         <cfif currentStudentFlagID GT 0>
             <cfif listFindNoCase("yes,true,1,y", apiStudent) AND NOT userHasCurrentStudent>
@@ -354,26 +344,6 @@
                 <cfset syncFlagsUpdated++>
             <cfelseif listFindNoCase("no,false,0,n", apiStudent) AND userHasCurrentStudent>
                 <cfset flagsService.removeFlag(applyUserID, currentStudentFlagID)>
-                <cfset syncFlagsUpdated++>
-            </cfif>
-        </cfif>
-
-        <cfif staffFlagID GT 0>
-            <cfif listFindNoCase("yes,true,1,y", apiStaff) AND NOT userHasStaff>
-                <cfset flagsService.addFlag(applyUserID, staffFlagID)>
-                <cfset syncFlagsUpdated++>
-            <cfelseif listFindNoCase("no,false,0,n", apiStaff) AND userHasStaff>
-                <cfset flagsService.removeFlag(applyUserID, staffFlagID)>
-                <cfset syncFlagsUpdated++>
-            </cfif>
-        </cfif>
-
-        <cfif facultyFlagID GT 0>
-            <cfif listFindNoCase("yes,true,1,y", apiFaculty) AND NOT userHasFaculty>
-                <cfset flagsService.addFlag(applyUserID, facultyFlagID)>
-                <cfset syncFlagsUpdated++>
-            <cfelseif listFindNoCase("no,false,0,n", apiFaculty) AND userHasFaculty>
-                <cfset flagsService.removeFlag(applyUserID, facultyFlagID)>
                 <cfset syncFlagsUpdated++>
             </cfif>
         </cfif>
@@ -777,8 +747,6 @@
         <cfset apiOfficeAddr   = trim(rsdGet(apiPerson, "office_mailing_address,officeMailingAddress,mailing_address"))>
         <cfset apiMailcode     = trim(rsdGet(apiPerson, "mailcode,mail_code"))>
         <cfset apiStudent      = lCase(trim(rsdGet(apiPerson, "student,is_student,isStudent")))>
-        <cfset apiStaff        = lCase(trim(rsdGet(apiPerson, "staff,is_staff,isStaff")))>
-        <cfset apiFaculty      = lCase(trim(rsdGet(apiPerson, "faculty,is_faculty,isFaculty")))>
 
         <!--- Fallback to stored values if API re-fetch had sparse data --->
         <cfif NOT len(apiFirstName)><cfset apiFirstName = trim(newRow.FIRSTNAME ?: "")></cfif>
@@ -830,15 +798,13 @@
         <!--- Assign flags from API booleans --->
         <cfset flagsService     = createObject("component", "cfc.flags_service").init()>
         <cfset allFlagsResult   = flagsService.getAllFlags()>
+        <!--- Staff/Faculty excluded: UH API has no way to distinguish which of the 4 local faculty
+              flags (or Staff vs other roles) applies, so those must be set manually by an admin. --->
         <cfif structKeyExists(allFlagsResult, "success") AND allFlagsResult.success>
             <cfloop from="1" to="#arrayLen(allFlagsResult.data)#" index="f">
                 <cfset fname = trim(allFlagsResult.data[f].FLAGNAME ?: "")>
                 <cfset fid   = val(allFlagsResult.data[f].FLAGID ?: 0)>
                 <cfif compareNoCase(fname, "Current-Student") EQ 0 AND listFindNoCase("yes,true,1,y", apiStudent)>
-                    <cfset flagsService.addFlag(newUserID, fid)>
-                <cfelseif compareNoCase(fname, "Staff") EQ 0 AND listFindNoCase("yes,true,1,y", apiStaff)>
-                    <cfset flagsService.addFlag(newUserID, fid)>
-                <cfelseif compareNoCase(fname, "Faculty-Fulltime") EQ 0 AND listFindNoCase("yes,true,1,y", apiFaculty)>
                     <cfset flagsService.addFlag(newUserID, fid)>
                 </cfif>
             </cfloop>
