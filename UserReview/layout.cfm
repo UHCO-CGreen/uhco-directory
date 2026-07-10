@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/bootstrap-icons.css">
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+<script src="/assets/js/userreview/userreview-shell.js"></script>
 <div class="container py-4 py-lg-5 ur-shell">
     <div class="ur-header p-4 p-lg-5 mb-4">
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -30,7 +32,5 @@
 
     <cfoutput>#content#</cfoutput>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-<script src="/assets/js/userreview/userreview-shell.js"></script>
 </body>
 </html>
