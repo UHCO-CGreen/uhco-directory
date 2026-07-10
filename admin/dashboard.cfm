@@ -82,8 +82,8 @@
                     <small class='text-muted'>#duplicateSubtitle#</small>
                 </div>
                 <div class='dashboard-actions'>
-                    <a href='/admin/reporting/duplicate_users_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
-                    <a href='/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=alumni_vs_faculty' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                    <a href='/admin/reporting/duplicate_users_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>Report</a>
+                    <a href='/admin/reporting/run_duplicate_users_report.cfm?scan=quick&mode=alumni_vs_faculty' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run</a>
                 </div>
             </div>
         </div>
@@ -537,8 +537,8 @@
                     <small class='text-muted'>#uhSyncSubtitle#</small>
                 </div>
                 <div class='dashboard-actions'>
-                    <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
-                    <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                    <a href='/admin/reporting/uh_sync_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>Report</a>
+                    <a href='/admin/reporting/run_uh_sync_report.cfm' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run</a>
                 </div>
             </div>
         </div>
@@ -558,9 +558,9 @@
                     <p class='card-text dashboard-card-text'>Manage UHCO API settings and integrations.</p>
                 </div>
                 <div class='dashboard-actions'>
-                    <a href='/admin/settings/uhco-api/tokens/index.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-key-fill sidebar-icon me-2'></i>Manage Tokens</a>
-                    <a href='/admin/settings/uhco-api/secrets/index.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-shield-lock-fill sidebar-icon me-2'></i>Manage Secrets</a>
-                    <a href='/api/docs.html' class='btn btn-sm btn-ui-help'><i class='bi bi-book-fill me-2'></i>Documentation</a>
+                    <a href='/admin/settings/uhco-api/tokens/index.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-key-fill sidebar-icon me-2'></i>Tokens</a>
+                    <a href='/admin/settings/uhco-api/secrets/index.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-shield-lock-fill sidebar-icon me-2'></i>Secrets</a>
+                    <a href='/api/docs.html' class='btn btn-sm btn-ui-help'><i class='bi bi-book-fill me-2'></i>Docs</a>
                 </div>
             </div>
         </div>
@@ -672,8 +672,8 @@
                         </div>
                         <div class='dashboard-actions'>
                             
-                            <a href='/admin/reporting/data_quality_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>View Report</a>
-                            <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run Now</a>
+                            <a href='/admin/reporting/data_quality_report.cfm' class='btn btn-sm btn-ui-go'><i class='bi bi-file-earmark-text-fill me-2'></i>Report</a>
+                            <a href='/admin/reporting/run_data_quality_report.cfm' class='btn btn-sm btn-ui-filter'><i class='bi bi-play-fill me-2'></i>Run</a>
                         </div>
                     </div>
                 </div>
