@@ -34,14 +34,15 @@ component extends="dao.BaseDAO" output="false" singleton {
         var sortIdx = 0;
         for ( var ph in arguments.phones ) {
             executeQueryWithRetry(
-                "INSERT INTO UserPhone (UserID, PhoneNumber, PhoneType, IsPrimary, SortOrder)
-                 VALUES (:id, :PhoneNumber, :PhoneType, :IsPrimary, :SortOrder)",
+                "INSERT INTO UserPhone (UserID, PhoneNumber, PhoneType, IsPrimary, SortOrder, CountryCode)
+                 VALUES (:id, :PhoneNumber, :PhoneType, :IsPrimary, :SortOrder, :CountryCode)",
                 {
-                    id          = { value=userID,                   cfsqltype="cf_sql_integer"  },
-                    PhoneNumber = { value=ph.number,                cfsqltype="cf_sql_nvarchar" },
-                    PhoneType   = { value=ph.type,                  cfsqltype="cf_sql_nvarchar" },
-                    IsPrimary   = { value=(ph.isPrimary ? 1 : 0),   cfsqltype="cf_sql_bit"      },
-                    SortOrder   = { value=sortIdx,                  cfsqltype="cf_sql_integer"  }
+                    id          = { value=userID,                       cfsqltype="cf_sql_integer"  },
+                    PhoneNumber = { value=ph.number,                    cfsqltype="cf_sql_nvarchar" },
+                    PhoneType   = { value=ph.type,                      cfsqltype="cf_sql_nvarchar" },
+                    IsPrimary   = { value=(ph.isPrimary ? 1 : 0),       cfsqltype="cf_sql_bit"      },
+                    SortOrder   = { value=sortIdx,                      cfsqltype="cf_sql_integer"  },
+                    CountryCode = { value=(ph.countryCode ?: "US"),     cfsqltype="cf_sql_nvarchar" }
                 },
                 { datasource=variables.datasource, timeout=30 }
             );

@@ -43,6 +43,18 @@
         }
     });
 
+    // e164 is a stored "+..." value (self-describing, no country hint needed).
+    // Returns { text, country } for pre-filling a phone row's number input and
+    // country select; falls back to the raw value with a "US" country guess
+    // if it can't be parsed (e.g. legacy/malformed data).
+    function phoneNationalDisplay(e164) {
+        try {
+            var parsed = libphonenumber.parsePhoneNumberFromString(e164 || '');
+            if (parsed) return { text: parsed.formatNational(), country: parsed.country || 'US' };
+        } catch (e) { /* fall through */ }
+        return { text: e164 || '', country: 'US' };
+    }
+
     function removeBtn(containerId, prefix) {
         return '<button type="button" class="btn btn-outline-danger btn-sm"' +
                ' data-remove-row="' + containerId + '" data-row-prefix="' + prefix + '">Remove</button>';
@@ -129,21 +141,26 @@
     window.addPhoneRow = function (data) {
         data = data || {};
         var container = document.getElementById('phoneRows');
+        var seeded = phoneNationalDisplay(data.number || '');
         var row = document.createElement('div');
         row.className = 'row-card mb-3';
         row.dataset.row = 'phone';
         row.innerHTML =
             '<div class="row g-3 align-items-end">' +
-                '<div class="col-md-6">' +
+                '<div class="col-md-4">' +
+                    '<label class="form-label">Country</label>' +
+                    '<select class="form-select" data-name="country"></select>' +
+                '</div>' +
+                '<div class="col-md-4">' +
                     '<label class="form-label">Number</label>' +
-                    '<input class="form-control" data-name="number" value="' + escapeHtml(data.number || '') + '">' +
+                    '<input class="form-control" data-name="number" inputmode="tel" autocomplete="off" value="' + escapeHtml(seeded.text) + '">' +
                 '</div>' +
                 '<div class="col-md-4">' +
                     '<label class="form-label">Type</label>' +
                     '<input class="form-control" data-name="type" value="' + escapeHtml(data.type || '') + '">' +
                 '</div>' +
-                '<div class="col-md-2 d-flex gap-2 align-items-center">' +
-                    '<div class="form-check mt-4">' +
+                '<div class="col-md-12 d-flex gap-2 align-items-center">' +
+                    '<div class="form-check">' +
                         '<input class="form-check-input" type="radio" name="phone_primary" ' + (Number(data.isPrimary || 0) ? 'checked' : '') + '>' +
                         '<label class="form-check-label">Primary</label>' +
                     '</div>' +
@@ -151,6 +168,9 @@
                 '</div>' +
             '</div>';
         container.appendChild(row);
+        var countrySelect = row.querySelector('select[data-name="country"]');
+        PhoneCountryUI.populateSelect(countrySelect, seeded.country);
+        PhoneCountryUI.wireAsYouType(row.querySelector('input[data-name="number"]'), countrySelect);
         syncIndexes('phoneRows', 'phone');
     };
 

@@ -59,6 +59,8 @@
 <cfset content = "">
 <cfsavecontent variable="content">
 <cfoutput>
+<script src="/assets/vendor/libphonenumber-js/libphonenumber-min.js"></script>
+<script src="/assets/js/shared/phone-country-select.js"></script>
 
 <cfif len(statusMessage)>
     <div class="alert alert-success">#encodeForHTML(statusMessage)#</div>

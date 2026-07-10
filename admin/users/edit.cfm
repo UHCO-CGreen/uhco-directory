@@ -12,6 +12,7 @@
 <cfset organizationsService = createObject("component", "cfc.organizations_service").init()>
 <cfset aliasesService = createObject("component", "cfc.aliases_service").init()>
 <cfset bioService = createObject("component", "cfc.bio_service").init()>
+<cfset phoneService = createObject("component", "cfc.phone_service").init()>
 <cfset editViewHelper = createObject("component", "cfc.adminUsersEditView_service").init()>
 <cfset degreesService = createObject("component", "cfc.degrees_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
@@ -1170,7 +1171,7 @@
                         <div class='card-body py-2 px-3 users-edit-item-card-body'>
                             <div class='d-flex justify-content-between align-items-center'>
                                 <div>
-                                    <strong>#EncodeForHTML(local.ph.PHONENUMBER)#</strong>
+                                    <strong>#EncodeForHTML(phoneService.formatForDisplay(local.ph.PHONENUMBER, "NATIONAL"))#</strong>
                                     <cfif len(trim(local.ph.PHONETYPE ?: ""))> <span class='badge badge-secondary'>#EncodeForHTML(local.ph.PHONETYPE)#</span></cfif>
                                     <cfif val(local.ph.ISPRIMARY ?: 0)> <span class='badge badge-isprimary'><i class='bi bi-check2 me-1'></i>Primary</span></cfif>
                                 </div>
@@ -1192,6 +1193,7 @@
                 <input type='hidden' data-phone-field='number' data-phone-idx='#(local.pi-1)#' value='#EncodeForHTMLAttribute(local.ph.PHONENUMBER)#'>
                 <input type='hidden' data-phone-field='type' data-phone-idx='#(local.pi-1)#' value='#EncodeForHTMLAttribute(local.ph.PHONETYPE ?: "")#'>
                 <input type='hidden' data-phone-field='primary' data-phone-idx='#(local.pi-1)#' value='#val(local.ph.ISPRIMARY ?: 0)#'>
+                <input type='hidden' data-phone-field='country' data-phone-idx='#(local.pi-1)#' value='#EncodeForHTMLAttribute(local.ph.COUNTRYCODE ?: "US")#'>
     ">
 </cfloop>
 <cfset content &= "
@@ -1943,8 +1945,12 @@
             <div class="modal-body">
                 <input type="hidden" id="phoneEditIdx" value="-1">
                 <div class="mb-3">
+                    <label class="form-label">Country</label>
+                    <select class="form-select" id="phoneCountry"></select>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">Phone Number</label>
-                    <input class="form-control" type="text" id="phoneNumber">
+                    <input class="form-control" type="text" id="phoneNumber" inputmode="tel" autocomplete="off">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Type</label>
@@ -2327,6 +2333,8 @@ var aliasTypeOptions = [#aliasTypeOptsJS#];
 var aliasTypeLabels  = [#aliasTypeLblsJS#];
 </script>
 </cfoutput>
+<script src="/assets/vendor/libphonenumber-js/libphonenumber-min.js"></script>
+<script src="/assets/js/shared/phone-country-select.js"></script>
 <script src="/assets/js/admin/users-edit.js"></script>
 <cfif len(uhSyncFlashMessage)>
 <cfoutput>

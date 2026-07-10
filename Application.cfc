@@ -10,6 +10,15 @@
     this.showDebugOutput   = false;
     this.postParametersLimit = 10000;
 
+    // ── Custom Java dependencies ─────────────────────────────────────────
+    // libphonenumber (international phone parsing/validation/formatting) —
+    // self-contained jar in this app's own /lib, not the shared CF server lib.
+    this.javaSettings = {
+        loadPaths               : [ getDirectoryFromPath(getCurrentTemplatePath()) & "lib" ],
+        loadColdFusionClassPath : false,
+        reloadOnChange          : false
+    };
+
     // ── Component & template mappings ──────────────────────────────────
     // These let existing createObject("component","cfc.*") / "dao.*" and
     // cfinclude template="/includes/*" calls work without any code changes.

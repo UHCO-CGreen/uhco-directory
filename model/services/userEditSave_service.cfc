@@ -318,16 +318,25 @@ component output="false" singleton {
         var i = 0;
         var phoneNumber = "";
         var phoneType = "";
+        var phoneCountry = "";
 
         for (i = 0; i <= phoneCount - 1; i++) {
             phoneNumber = structKeyExists(arguments.formData, "number_#i#") ? trim(arguments.formData["number_#i#"]) : "";
             phoneType = structKeyExists(arguments.formData, "type_#i#") ? trim(arguments.formData["type_#i#"]) : "";
+            phoneCountry = structKeyExists(arguments.formData, "country_#i#") ? trim(arguments.formData["country_#i#"]) : "US";
             if (len(phoneNumber)) {
-                arrayAppend(phonesToSave, { number = phoneNumber, type = phoneType, isPrimary = (i EQ primaryIdx) });
+                arrayAppend(phonesToSave, { number = phoneNumber, type = phoneType, isPrimary = (i EQ primaryIdx), countryCode = phoneCountry });
             }
         }
 
-        variables.phoneService.replacePhones(arguments.userID, phonesToSave);
+        var saveResult = variables.phoneService.replacePhones(arguments.userID, phonesToSave);
+        if (arrayLen(saveResult.errors)) {
+            var errorNumbers = [];
+            for (var err in saveResult.errors) {
+                arrayAppend(errorNumbers, err.number & " (" & err.message & ")");
+            }
+            return success("Phones saved, but " & arrayLen(saveResult.errors) & " could not be saved: " & arrayToList(errorNumbers, "; "));
+        }
         return success("Phones saved.");
     }
 

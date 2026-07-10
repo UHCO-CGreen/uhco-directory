@@ -806,7 +806,8 @@ component output="false" singleton {
             arrayAppend(result, {
                 number = trim(phoneRow.PHONENUMBER ?: ""),
                 type = trim(phoneRow.PHONETYPE ?: ""),
-                isPrimary = val(phoneRow.ISPRIMARY ?: 0)
+                isPrimary = val(phoneRow.ISPRIMARY ?: 0),
+                countryCode = trim(phoneRow.COUNTRYCODE ?: "US")
             });
         }
         return result;
@@ -896,15 +897,20 @@ component output="false" singleton {
         var result = [];
         var count = (structKeyExists(arguments.formScope, "phoneCount") AND isNumeric(arguments.formScope.phoneCount)) ? val(arguments.formScope.phoneCount) : 0;
         for (var i = 0; i LT count; i++) {
-            var number = trim(arguments.formScope["phone_number_" & i] ?: "");
+            var rawNumber = trim(arguments.formScope["phone_number_" & i] ?: "");
+            var countryHint = trim(arguments.formScope["phone_country_" & i] ?: "");
             var phoneType = trim(arguments.formScope["phone_type_" & i] ?: "");
             var isPrimary = structKeyExists(arguments.formScope, "phone_primary") AND val(arguments.formScope.phone_primary) EQ i;
-            if (len(number)) {
-                arrayAppend(result, {
-                    number = number,
-                    type = phoneType,
-                    isPrimary = isPrimary ? 1 : 0
-                });
+            if (len(rawNumber)) {
+                var parsed = variables.phoneService.parseNumber(rawNumber, len(countryHint) ? countryHint : "US");
+                if (parsed.success) {
+                    arrayAppend(result, {
+                        number = parsed.e164,
+                        type = phoneType,
+                        isPrimary = isPrimary ? 1 : 0,
+                        countryCode = parsed.regionCode
+                    });
+                }
             }
         }
         return result;

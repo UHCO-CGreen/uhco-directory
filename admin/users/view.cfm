@@ -8,6 +8,7 @@
 
 <cfset directoryService = createObject("component", "cfc.directory_service").init()>
 <cfset usersService = createObject("component", "cfc.users_service").init()>
+<cfset phoneService = createObject("component", "cfc.phone_service").init()>
 <cfset profile = directoryService.getFullProfile(url.userID)>
 <cfset freshUserResult = usersService.getUser(val(url.userID))>
 <cfset userActiveRaw = val(profile.user.ACTIVE ?: 0)>
@@ -437,7 +438,7 @@
         <cfset ph = userPhones[phIdx]>
         <cfset phType = len(trim(ph.PHONETYPE ?: "")) ? " <span class='badge badge-secondary users-view-badge'>" & EncodeForHTML(ph.PHONETYPE) & "</span>" : "">
         <cfset phPrimary = val(ph.ISPRIMARY ?: 0) EQ 1 ? " <span class='badge badge-isprimary users-view-badge'><i class='bi bi-check2 me-1'></i>Primary</span>" : "">
-        <cfset contactInfoHtml &= "<li>" & EncodeForHTML(ph.PHONENUMBER ?: "") & phType & phPrimary & "</li>">
+        <cfset contactInfoHtml &= "<li>" & EncodeForHTML(phoneService.formatForDisplay(ph.PHONENUMBER ?: "", "NATIONAL")) & phType & phPrimary & "</li>">
     </cfloop>
     <cfset contactInfoHtml &= "</ul>">
 <cfelse>

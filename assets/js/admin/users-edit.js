@@ -1114,16 +1114,36 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!container) return;
         var modalEl = document.getElementById('phoneModal');
         var modal = new bootstrap.Modal(modalEl);
+        var phoneNumberInput = document.getElementById('phoneNumber');
+        var phoneCountrySelect = document.getElementById('phoneCountry');
+
+        PhoneCountryUI.populateSelect(phoneCountrySelect, 'US');
+        PhoneCountryUI.wireAsYouType(phoneNumberInput, phoneCountrySelect);
+
+        // Parses raw text against the given country; returns a PhoneNumber
+        // instance (with .number as E.164, .isValid()) or null if unparseable.
+        function tryParse(text, country) {
+            try { return libphonenumber.parsePhoneNumberFromString(text || '', country) || null; }
+            catch (e) { return null; }
+        }
+
+        // e164 is expected to already be a stored "+..." value.
+        function formatE164National(e164) {
+            var parsed = tryParse(e164);
+            return parsed ? parsed.formatNational() : e164;
+        }
 
         function getAllData() {
             var items = [];
             var hiddens = container.querySelectorAll('input[data-phone-field="number"]');
             hiddens.forEach(function (el) {
                 var idx = el.getAttribute('data-phone-idx');
+                var get = function (f) { return (container.querySelector('input[data-phone-field="' + f + '"][data-phone-idx="' + idx + '"]') || {}).value || ''; };
                 items.push({
                     number: el.value,
-                    type: (container.querySelector('input[data-phone-field="type"][data-phone-idx="'+idx+'"]') || {}).value || '',
-                    primary: (container.querySelector('input[data-phone-field="primary"][data-phone-idx="'+idx+'"]') || {}).value || '0'
+                    type: get('type'),
+                    primary: get('primary') || '0',
+                    country: get('country') || 'US'
                 });
             });
             return items;
@@ -1135,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 container.insertAdjacentHTML('beforeend',
                     "<div class='card mb-2'><div class='card-body py-2 px-3'>" +
                     "<div class='d-flex justify-content-between align-items-center'><div>" +
-                    "<strong>" + esc(d.number) + "</strong>" +
+                    "<strong>" + esc(formatE164National(d.number)) + "</strong>" +
                     (d.type ? " <span class='badge bg-secondary text-dark'>" + esc(d.type) + "</span>" : "") +
                     (d.primary === '1' ? " <span class='badge bg-success'>Primary</span>" : "") +
                     "</div><div>" +
@@ -1144,14 +1164,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     "</div></div></div></div>" +
                     "<input type='hidden' data-phone-field='number' data-phone-idx='" + i + "' value='" + esc(d.number) + "'>" +
                     "<input type='hidden' data-phone-field='type' data-phone-idx='" + i + "' value='" + esc(d.type) + "'>" +
-                    "<input type='hidden' data-phone-field='primary' data-phone-idx='" + i + "' value='" + (d.primary || '0') + "'>"
+                    "<input type='hidden' data-phone-field='primary' data-phone-idx='" + i + "' value='" + (d.primary || '0') + "'>" +
+                    "<input type='hidden' data-phone-field='country' data-phone-idx='" + i + "' value='" + esc(d.country || 'US') + "'>"
                 );
             });
         }
 
         function clearModal() {
             document.getElementById('phoneEditIdx').value = '-1';
-            document.getElementById('phoneNumber').value = '';
+            PhoneCountryUI.populateSelect(phoneCountrySelect, 'US');
+            phoneNumberInput.value = '';
             document.getElementById('phoneType').value = '';
             document.getElementById('phonePrimaryChk').checked = false;
             document.getElementById('phoneModalLabel').textContent = 'Add Phone';
@@ -1161,15 +1183,25 @@ document.addEventListener('DOMContentLoaded', function () {
             var items = getAllData();
             var d = items[idx];
             document.getElementById('phoneEditIdx').value = idx;
-            document.getElementById('phoneNumber').value = d.number;
+            PhoneCountryUI.populateSelect(phoneCountrySelect, d.country || 'US');
+            phoneNumberInput.value = formatE164National(d.number);
             document.getElementById('phoneType').value = d.type;
             document.getElementById('phonePrimaryChk').checked = d.primary === '1';
             document.getElementById('phoneModalLabel').textContent = 'Edit Phone';
         }
 
+        // Validates client-side via libphonenumber-js and returns E.164 in
+        // .number when valid; the server (Java libphonenumber) re-validates
+        // authoritatively on save regardless.
         function readModal() {
+            var country = phoneCountrySelect.value;
+            var rawText = phoneNumberInput.value.trim();
+            var parsed = tryParse(rawText, country);
             return {
-                number: document.getElementById('phoneNumber').value.trim(),
+                number: parsed ? parsed.number : rawText,
+                rawText: rawText,
+                valid: !!(parsed && parsed.isValid()),
+                country: country,
                 type: document.getElementById('phoneType').value,
                 primary: document.getElementById('phonePrimaryChk').checked ? '1' : '0'
             };
@@ -1179,7 +1211,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('savePhoneModalBtn').addEventListener('click', function () {
             var d = readModal();
-            if (!d.number) { showValidationError('Phone number is required.'); return; }
+            if (!d.rawText) { showValidationError('Phone number is required.'); return; }
+            if (!d.valid) { showValidationError('That doesn\'t look like a valid phone number for the selected country.'); return; }
             var items = getAllData();
             var editIdx = parseInt(document.getElementById('phoneEditIdx').value);
             if (editIdx >= 0) { items[editIdx] = d; } else { items.push(d); }
@@ -1210,6 +1243,7 @@ document.addEventListener('DOMContentLoaded', function () {
             items.forEach(function (d, i) {
                 body.append('number_' + i, d.number);
                 body.append('type_' + i, d.type);
+                body.append('country_' + i, d.country || 'US');
                 if (d.primary === '1') primaryIdx = i;
             });
             body.append('primary_idx', primaryIdx);
@@ -2380,7 +2414,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         var target = emailPane.querySelector('#phonesContainer input[data-phone-field="' + f + '"][data-phone-idx="' + idx + '"]');
                         return target ? target.value : '';
                     };
-                    items.push({ number: el.value, type: get('type'), primary: get('primary') });
+                    items.push({ number: el.value, type: get('type'), primary: get('primary'), country: get('country') });
                 });
                 body.append('userID', pageUserID);
                 body.append('section', 'phones');
@@ -2389,6 +2423,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 items.forEach(function (d, i) {
                     body.append('number_' + i, d.number || '');
                     body.append('type_' + i, d.type || '');
+                    body.append('country_' + i, d.country || 'US');
                     if ((d.primary || '0') === '1') {
                         primaryIdx = i;
                     }
